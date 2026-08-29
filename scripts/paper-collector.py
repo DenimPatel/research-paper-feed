@@ -1,3 +1,4 @@
+import argparse
 import html
 import logging
 import re
@@ -14,21 +15,56 @@ def safe_filename(title):
     """Strip characters that are illegal in filenames on common filesystems."""
     return re.sub(r'[\\/:"*?<>|]+', "_", title).strip()
 
-MAX_PAPERS_TO_PULL = 1000
-DOWNLOAD_PAPER = False
-DOWNLOAD_RESOURCES = False
-SAVE_CSV = False
-GENERATE_HTML = True
 
-now = datetime.now() 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Extract research papers from ArXiv into an HTML feed."
+    )
+    parser.add_argument(
+        "--topic",
+        help="ArXiv search query, e.g. 'cat:cs.CV AND \"3d reconstruction\"'. "
+             "Prompted for interactively if omitted.",
+    )
+    parser.add_argument(
+        "--max-papers", type=int, default=1000,
+        help="Maximum number of papers to pull (default: 1000).",
+    )
+    parser.add_argument(
+        "--output-dir", default="results",
+        help="Directory the generated HTML feed is written to (default: results).",
+    )
+    parser.add_argument(
+        "--download-pdfs", action="store_true",
+        help="Also download each paper's PDF.",
+    )
+    parser.add_argument(
+        "--download-sources", action="store_true",
+        help="Also download and extract each paper's LaTeX source archive.",
+    )
+    parser.add_argument(
+        "--save-csv", action="store_true",
+        help="Also save the extracted metadata as a CSV file.",
+    )
+    return parser.parse_args()
+
+
+args = parse_args()
+MAX_PAPERS_TO_PULL = args.max_papers
+DOWNLOAD_PAPER = args.download_pdfs
+DOWNLOAD_RESOURCES = args.download_sources
+SAVE_CSV = args.save_csv
+GENERATE_HTML = True
+OUTPUT_DIR = args.output_dir
+
+now = datetime.now()
 prefix = now.strftime("%m-%d-%Y-%H-%M-%S")
 
 # ## topic ideas
 # - cat:cs.CV AND \" 3d reconstruction \"
 # - hd AND map AND generation
-# - visual AND inertial AND odometry 
+# - visual AND inertial AND odometry
 
-topic = input("Enter the topic you need to search for : ")
+topic = args.topic or input("Enter the topic you need to search for : ")
 
 big_slow_client = arxiv.Client(
   page_size = min(1000, MAX_PAPERS_TO_PULL) ,
@@ -106,9 +142,8 @@ if GENERATE_HTML:
     </body>
     </html>""")
     data = "".join(data)
-    output_dir = 'results'
-    os.makedirs(output_dir, exist_ok=True)
-    filename = f'{output_dir}/{topic}-{len(df)}_papers_extracted_on_{prefix}.html'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    filename = f'{OUTPUT_DIR}/{topic}-{len(df)}_papers_extracted_on_{prefix}.html'
     with open(filename, "w") as file:
         file.write(data)
     print(filename, "file saved!")
