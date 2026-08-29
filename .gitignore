@@ -1,2 +1,7 @@
 *.ipynb_checkpoints
 .DS_Store
+__pycache__/
+*.pyc
+results/*.html
+results/*.csv
+!results/.gitkeep
