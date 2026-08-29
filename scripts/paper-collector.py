@@ -1,8 +1,6 @@
 import logging
 import arxiv
-import numpy as np
 import pandas as pd
-import arxiv
 import os
 import tarfile
 from datetime import datetime
