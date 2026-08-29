@@ -30,19 +30,20 @@ big_slow_client = arxiv.Client(
 )
 
 all_data = []
-for result in big_slow_client.results(arxiv.Search(query=topic, 
+for result in big_slow_client.results(arxiv.Search(query=topic,
                                                    sort_by = arxiv.SortCriterion.SubmittedDate,
                                                    sort_order = arxiv.SortOrder.Descending)):
-    temp = ["","","","","","","","",""]
-    temp[0] = result.title
-    temp[1] = result.published
-    temp[2] = result.entry_id
-    temp[3] = result.summary
-    temp[4] = result.pdf_url
-    temp[5] = result.authors
-    temp[6] = result.primary_category
-    temp[7] = result.categories
-    temp[8] = result.links
+    record = {
+        "Title": result.title,
+        "Date": result.published,
+        "Id": result.entry_id,
+        "Summary": result.summary,
+        "URL": result.pdf_url,
+        "Authors": result.authors,
+        "Primary_category": result.primary_category,
+        "Categories": result.categories,
+        "Links": result.links,
+    }
     if DOWNLOAD_PAPER:
         result.download_pdf(filename=f"{result.title}.pdf")
     if DOWNLOAD_RESOURCES:
@@ -50,12 +51,11 @@ for result in big_slow_client.results(arxiv.Search(query=topic,
         file = tarfile.open(f"{result.title}.tar.gz")
         file.extractall(f'./extracted/{result.title}')
         file.close()
-    all_data.append(temp)
+    all_data.append(record)
     if len(all_data) >= MAX_PAPERS_TO_PULL:
         break
 
-column_names = ['Title','Date','Id','Summary','URL', 'Authors', 'Primary_category', 'Categories', 'Links']
-df = pd.DataFrame(all_data, columns=column_names)
+df = pd.DataFrame(all_data)
  
 print("Number of papers extracted : ",df.shape[0])
 
