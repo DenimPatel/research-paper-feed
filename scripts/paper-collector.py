@@ -48,66 +48,47 @@ def parse_args():
     return parser.parse_args()
 
 
-args = parse_args()
-MAX_PAPERS_TO_PULL = args.max_papers
-DOWNLOAD_PAPER = args.download_pdfs
-DOWNLOAD_RESOURCES = args.download_sources
-SAVE_CSV = args.save_csv
-GENERATE_HTML = True
-OUTPUT_DIR = args.output_dir
+def fetch_papers(topic, max_papers, download_pdfs=False, download_sources=False):
+    client = arxiv.Client(
+        page_size=min(1000, max_papers),
+        delay_seconds=10,
+        num_retries=5,
+    )
+    search = arxiv.Search(
+        query=topic,
+        sort_by=arxiv.SortCriterion.SubmittedDate,
+        sort_order=arxiv.SortOrder.Descending,
+    )
 
-now = datetime.now()
-prefix = now.strftime("%m-%d-%Y-%H-%M-%S")
+    all_data = []
+    for result in client.results(search):
+        record = {
+            "Title": result.title,
+            "Date": result.published,
+            "Id": result.entry_id,
+            "Summary": result.summary,
+            "URL": result.pdf_url,
+            "Authors": result.authors,
+            "Primary_category": result.primary_category,
+            "Categories": result.categories,
+            "Links": result.links,
+        }
+        title_slug = safe_filename(result.title)
+        if download_pdfs:
+            result.download_pdf(filename=f"{title_slug}.pdf")
+        if download_sources:
+            result.download_source(filename=f"{title_slug}.tar.gz")
+            with tarfile.open(f"{title_slug}.tar.gz") as file:
+                file.extractall(f"./extracted/{title_slug}")
+        all_data.append(record)
+        if len(all_data) >= max_papers:
+            break
 
-# ## topic ideas
-# - cat:cs.CV AND \" 3d reconstruction \"
-# - hd AND map AND generation
-# - visual AND inertial AND odometry
+    return pd.DataFrame(all_data)
 
-topic = args.topic or input("Enter the topic you need to search for : ")
 
-big_slow_client = arxiv.Client(
-  page_size = min(1000, MAX_PAPERS_TO_PULL) ,
-  delay_seconds = 10,
-  num_retries = 5
-)
-
-all_data = []
-for result in big_slow_client.results(arxiv.Search(query=topic,
-                                                   sort_by = arxiv.SortCriterion.SubmittedDate,
-                                                   sort_order = arxiv.SortOrder.Descending)):
-    record = {
-        "Title": result.title,
-        "Date": result.published,
-        "Id": result.entry_id,
-        "Summary": result.summary,
-        "URL": result.pdf_url,
-        "Authors": result.authors,
-        "Primary_category": result.primary_category,
-        "Categories": result.categories,
-        "Links": result.links,
-    }
-    title_slug = safe_filename(result.title)
-    if DOWNLOAD_PAPER:
-        result.download_pdf(filename=f"{title_slug}.pdf")
-    if DOWNLOAD_RESOURCES:
-        result.download_source(filename=f"{title_slug}.tar.gz")
-        file = tarfile.open(f"{title_slug}.tar.gz")
-        file.extractall(f'./extracted/{title_slug}')
-        file.close()
-    all_data.append(record)
-    if len(all_data) >= MAX_PAPERS_TO_PULL:
-        break
-
-df = pd.DataFrame(all_data)
- 
-print("Number of papers extracted : ",df.shape[0])
-
-if SAVE_CSV:
-    df.to_csv(topic+"_papers.csv", index=False)
-
-if GENERATE_HTML:
-    data = [ r"""<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+def build_html_feed(df):
+    data = [r"""<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
     <html>
     <head>
     <title>Mathedemo</title>
@@ -141,9 +122,31 @@ if GENERATE_HTML:
     data.append("""
     </body>
     </html>""")
-    data = "".join(data)
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    filename = f'{OUTPUT_DIR}/{topic}-{len(df)}_papers_extracted_on_{prefix}.html'
+    return "".join(data)
+
+
+def main():
+    args = parse_args()
+    topic = args.topic or input("Enter the topic you need to search for : ")
+
+    df = fetch_papers(
+        topic,
+        args.max_papers,
+        download_pdfs=args.download_pdfs,
+        download_sources=args.download_sources,
+    )
+    print("Number of papers extracted : ", df.shape[0])
+
+    if args.save_csv:
+        df.to_csv(topic + "_papers.csv", index=False)
+
+    prefix = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
+    os.makedirs(args.output_dir, exist_ok=True)
+    filename = f"{args.output_dir}/{topic}-{len(df)}_papers_extracted_on_{prefix}.html"
     with open(filename, "w") as file:
-        file.write(data)
+        file.write(build_html_feed(df))
     print(filename, "file saved!")
+
+
+if __name__ == "__main__":
+    main()
