@@ -14,11 +14,11 @@ This project is a Python-based tool that allows you to extract research papers f
 1. Clone the repository:
 
 ``` shell
-COMING SOON
+git clone https://github.com/DenimPatel/research-paper-feed.git
 ```
 Change to the project directory:
 ``` shell
-cd FOLDER_NAME
+cd research-paper-feed
 ```
 
 Install the required dependencies:
@@ -26,17 +26,11 @@ Install the required dependencies:
 pip install -r requirements.txt
 ```
 
-# Output directory
-output_directory: ./results
-
-#
 Run the script to extract research papers:
 ``` shell
 python scripts/paper-collector.py
 ```
-The extracted research papers will be saved in the specified output_directory in PDF format, organized by category and publication date.
-Contributing
-Contributions are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request.
+The extracted research papers will be saved under `results/` as an HTML feed, organized by category and publication date.
 
 ## Acknowledgments
 The ArXiv API for providing access to the research papers.
