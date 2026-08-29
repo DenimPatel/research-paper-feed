@@ -106,7 +106,9 @@ if GENERATE_HTML:
     </body>
     </html>""")
     data = "".join(data)
-    filename = 'results/' + topic +'-'+ str(len(df))+'_papers_extracted_on_' + prefix + '.html'
+    output_dir = 'results'
+    os.makedirs(output_dir, exist_ok=True)
+    filename = f'{output_dir}/{topic}-{len(df)}_papers_extracted_on_{prefix}.html'
     with open(filename, "w") as file:
         file.write(data)
     print(filename, "file saved!")
