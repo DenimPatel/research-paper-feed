@@ -1,5 +1,6 @@
 import html
 import logging
+import re
 import arxiv
 import pandas as pd
 import os
@@ -7,6 +8,11 @@ import tarfile
 from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
+
+
+def safe_filename(title):
+    """Strip characters that are illegal in filenames on common filesystems."""
+    return re.sub(r'[\\/:"*?<>|]+', "_", title).strip()
 
 MAX_PAPERS_TO_PULL = 1000
 DOWNLOAD_PAPER = False
@@ -45,12 +51,13 @@ for result in big_slow_client.results(arxiv.Search(query=topic,
         "Categories": result.categories,
         "Links": result.links,
     }
+    title_slug = safe_filename(result.title)
     if DOWNLOAD_PAPER:
-        result.download_pdf(filename=f"{result.title}.pdf")
+        result.download_pdf(filename=f"{title_slug}.pdf")
     if DOWNLOAD_RESOURCES:
-        result.download_source(filename=f"{result.title}.tar.gz")
-        file = tarfile.open(f"{result.title}.tar.gz")
-        file.extractall(f'./extracted/{result.title}')
+        result.download_source(filename=f"{title_slug}.tar.gz")
+        file = tarfile.open(f"{title_slug}.tar.gz")
+        file.extractall(f'./extracted/{title_slug}')
         file.close()
     all_data.append(record)
     if len(all_data) >= MAX_PAPERS_TO_PULL:
