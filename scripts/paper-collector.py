@@ -1,3 +1,4 @@
+import html
 import logging
 import arxiv
 import pandas as pd
@@ -78,19 +79,22 @@ if GENERATE_HTML:
       MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
     </script>
     <script type="text/javascript"
-      src="http://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+      src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
     </script>
     </head>
 
      """]
     for i in range(len(df)):
+        title = html.escape(df["Title"][i])
+        summary = html.escape(df["Summary"][i])
+        url = html.escape(df["URL"][i])
         data.append(f"<br> <br> <br> <font size='5'> {i+1} </font> ")
-        data.append(f"""<div style="text-align: right"> {str(df["Date"][i])} </div>""")    
-        data.append("<hr style='border-style: dotted;' /> <b> <font size='5'> Title: "+df["Title"][i]+ "</b> </font>")
+        data.append(f"""<div style="text-align: right"> {html.escape(str(df["Date"][i]))} </div>""")
+        data.append(f"<hr style='border-style: dotted;' /> <b> <font size='5'> Title: {title} </b> </font>")
         data.append("<hr style='border-style: dotted;' /> ")
-        data.append(f"<br> <font size='3'> Summary: " + f'{df["Summary"][i]} </font>')             
+        data.append(f"<br> <font size='3'> Summary: {summary} </font>")
         data.append("<br> Link: ")
-        data.append(f"""<a href='{df["URL"][i]}' target="_blank">{df["URL"][i]}</a>""")
+        data.append(f"""<a href='{url}' target="_blank">{url}</a>""")
     data.append("""
     </body>
     </html>""")
