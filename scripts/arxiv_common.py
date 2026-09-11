@@ -40,6 +40,10 @@ def iter_results(query, max_results):
     client = build_client(max_results if max_results is not None else DEFAULT_PAGE_SIZE)
     search = arxiv.Search(
         query=query,
+        # ``arxiv.Search`` defaults ``max_results`` to 100 in arxiv>=2, which
+        # silently caps every query to a single page unless we pass our own
+        # limit through. ``None`` means "no limit".
+        max_results=max_results,
         sort_by=arxiv.SortCriterion.SubmittedDate,
         sort_order=arxiv.SortOrder.Descending,
     )
