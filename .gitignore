@@ -5,3 +5,8 @@ __pycache__/
 results/*.html
 results/*.csv
 !results/.gitkeep
+
+# Web app
+web/node_modules/
+web/dist/
+web/public/data/

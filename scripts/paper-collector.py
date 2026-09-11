@@ -1,12 +1,19 @@
 import argparse
 import html
 import logging
-import re
-import arxiv
-import pandas as pd
 import os
+import re
+import sys
 import tarfile
 from datetime import datetime
+
+# This module is loaded by path in tests, so make sibling imports resolve.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import arxiv  # noqa: E402
+import pandas as pd  # noqa: E402
+
+import arxiv_common  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 
@@ -49,46 +56,30 @@ def parse_args():
 
 
 def fetch_papers(topic, max_papers, download_pdfs=False, download_sources=False):
-    client = arxiv.Client(
-        page_size=min(1000, max_papers),
-        delay_seconds=10,
-        num_retries=5,
-    )
-    search = arxiv.Search(
-        query=topic,
-        sort_by=arxiv.SortCriterion.SubmittedDate,
-        sort_order=arxiv.SortOrder.Descending,
-    )
-
     all_data = []
-    try:
-        for result in client.results(search):
-            record = {
-                "Title": result.title,
-                "Date": result.published,
-                "Id": result.entry_id,
-                "Summary": result.summary,
-                "URL": result.pdf_url,
-                "Authors": result.authors,
-                "Primary_category": result.primary_category,
-                "Categories": result.categories,
-                "Links": result.links,
-            }
-            title_slug = safe_filename(result.title)
-            try:
-                if download_pdfs:
-                    result.download_pdf(filename=f"{title_slug}.pdf")
-                if download_sources:
-                    result.download_source(filename=f"{title_slug}.tar.gz")
-                    with tarfile.open(f"{title_slug}.tar.gz") as file:
-                        file.extractall(f"./extracted/{title_slug}")
-            except (arxiv.ArxivError, OSError, tarfile.TarError) as exc:
-                logging.warning("Failed to download resources for %r: %s", result.title, exc)
-            all_data.append(record)
-            if len(all_data) >= max_papers:
-                break
-    except arxiv.ArxivError as exc:
-        logging.error("ArXiv search failed: %s", exc)
+    for result in arxiv_common.iter_results(topic, max_papers):
+        record = {
+            "Title": result.title,
+            "Date": result.published,
+            "Id": result.entry_id,
+            "Summary": result.summary,
+            "URL": result.pdf_url,
+            "Authors": result.authors,
+            "Primary_category": result.primary_category,
+            "Categories": result.categories,
+            "Links": result.links,
+        }
+        title_slug = safe_filename(result.title)
+        try:
+            if download_pdfs:
+                result.download_pdf(filename=f"{title_slug}.pdf")
+            if download_sources:
+                result.download_source(filename=f"{title_slug}.tar.gz")
+                with tarfile.open(f"{title_slug}.tar.gz") as file:
+                    file.extractall(f"./extracted/{title_slug}")
+        except (arxiv.ArxivError, OSError, tarfile.TarError) as exc:
+            logging.warning("Failed to download resources for %r: %s", result.title, exc)
+        all_data.append(record)
 
     return pd.DataFrame(all_data)
 
