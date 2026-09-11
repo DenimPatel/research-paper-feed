@@ -1,0 +1,253 @@
+import importlib.util
+import json
+import os
+import unittest
+from datetime import datetime, timezone
+from types import SimpleNamespace
+
+MODULE_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "scripts", "build_index.py"
+)
+
+
+def load_module():
+    spec = importlib.util.spec_from_file_location("build_index", MODULE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+build_index = load_module()
+
+
+def make_record(paper_id, published, categories=None, **overrides):
+    categories = categories or ["cs.CV"]
+    record = {
+        "id": paper_id,
+        "title": f"Title {paper_id}",
+        "authors": ["A"],
+        "abstract": "abstract",
+        "abstractTruncated": False,
+        "published": published,
+        "updated": published,
+        "categories": list(categories),
+        "primaryCategory": categories[0],
+        "absUrl": f"https://arxiv.org/abs/{paper_id}",
+        "pdfUrl": f"https://arxiv.org/pdf/{paper_id}",
+    }
+    record.update(overrides)
+    return record
+
+
+class TruncateAbstractTests(unittest.TestCase):
+    def test_short_abstract_unchanged_and_not_flagged(self):
+        text, truncated = build_index.truncate_abstract("  hello   world ", 50)
+        self.assertEqual(text, "hello world")
+        self.assertFalse(truncated)
+
+    def test_long_abstract_is_capped_and_flagged(self):
+        abstract = "abcdefghij" * 10
+        text, truncated = build_index.truncate_abstract(abstract, 25)
+        self.assertTrue(truncated)
+        self.assertTrue(text.startswith("abcdefghij"))
+        self.assertTrue(text.endswith("\u2026"))
+        self.assertLessEqual(len(text), 26)
+
+
+class FormatAuthorsTests(unittest.TestCase):
+    def test_caps_and_appends_et_al(self):
+        authors = [SimpleNamespace(name=f"Author {i}") for i in range(10)]
+        names = build_index.format_authors(authors, max_authors=8)
+        self.assertEqual(len(names), 9)
+        self.assertEqual(names[-1], "et al.")
+        self.assertEqual(names[0], "Author 0")
+
+    def test_short_list_unchanged(self):
+        authors = [SimpleNamespace(name="Ada"), SimpleNamespace(name="Grace")]
+        self.assertEqual(build_index.format_authors(authors), ["Ada", "Grace"])
+
+
+class ArxivIdTests(unittest.TestCase):
+    def test_strips_url_and_version(self):
+        self.assertEqual(
+            build_index.arxiv_id_from_entry("http://arxiv.org/abs/2401.12345v2"),
+            "2401.12345",
+        )
+
+    def test_handles_missing_version(self):
+        self.assertEqual(
+            build_index.arxiv_id_from_entry("https://arxiv.org/abs/2401.12345"),
+            "2401.12345",
+        )
+
+
+class IsoWeekTests(unittest.TestCase):
+    def test_computes_iso_week(self):
+        self.assertEqual(build_index.iso_week_key("2024-01-08"), "2024-W02")
+
+    def test_handles_year_boundary(self):
+        self.assertEqual(build_index.iso_week_key("2023-01-01"), "2022-W52")
+
+
+class DedupeRecordsTests(unittest.TestCase):
+    def test_merges_cross_listed_papers_by_id(self):
+        records = [
+            make_record("2401.00001", "2024-01-08", ["cs.CV"]),
+            make_record("2401.00002", "2024-01-08", ["cs.LG"]),
+            make_record("2401.00001", "2024-01-08", ["cs.LG", "cs.AI"]),
+        ]
+        merged = build_index.dedupe_records(records)
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(merged[0]["id"], "2401.00001")
+        self.assertEqual(
+            merged[0]["categories"], ["cs.CV", "cs.LG", "cs.AI"]
+        )
+
+    def test_preserves_first_seen_metadata(self):
+        records = [
+            make_record("2401.00001", "2024-01-08", ["cs.CV"], title="First"),
+            make_record("2401.00001", "2024-01-08", ["cs.LG"], title="Second"),
+        ]
+        merged = build_index.dedupe_records(records)
+        self.assertEqual(merged[0]["title"], "First")
+
+
+class BuildShardsTests(unittest.TestCase):
+    def setUp(self):
+        self.records = [
+            make_record("2401.00001", "2024-01-08"),
+            make_record("2401.00002", "2024-01-09"),
+            make_record("2312.00001", "2023-12-31"),
+        ]
+        self.generated_at = datetime(2024, 1, 10, 12, 0, tzinfo=timezone.utc)
+        self.manifest, self.files = build_index.build_shards(
+            self.records,
+            generated_at=self.generated_at,
+            retention_days=30,
+            categories=["cs.CV"],
+        )
+
+    def test_manifest_shape_and_totals(self):
+        self.assertEqual(
+            self.manifest["generatedAt"], "2024-01-10T12:00:00Z"
+        )
+        self.assertEqual(self.manifest["retentionDays"], 30)
+        self.assertEqual(self.manifest["categories"], ["cs.CV"])
+        self.assertEqual(self.manifest["totalPapers"], 3)
+        self.assertEqual(
+            sum(s["count"] for s in self.manifest["shards"]), 3
+        )
+
+    def test_shards_are_newest_first(self):
+        weeks = [s["week"] for s in self.manifest["shards"]]
+        self.assertEqual(weeks, ["2024-W02", "2023-W52"])
+
+    def test_shard_bounds_and_files(self):
+        week_two = next(
+            s for s in self.manifest["shards"] if s["week"] == "2024-W02"
+        )
+        self.assertEqual(week_two["from"], "2024-01-08")
+        self.assertEqual(week_two["to"], "2024-01-09")
+        self.assertEqual(week_two["count"], 2)
+        self.assertEqual(week_two["file"], "papers-2024-W02.json")
+        self.assertIn("papers-2024-W02.json", self.files)
+
+    def test_records_sorted_newest_first_within_shard(self):
+        papers = self.files["papers-2024-W02.json"]["papers"]
+        self.assertEqual(
+            [p["id"] for p in papers], ["2401.00002", "2401.00001"]
+        )
+
+
+class RecordFromResultTests(unittest.TestCase):
+    def test_builds_public_record_shape(self):
+        result = SimpleNamespace(
+            entry_id="http://arxiv.org/abs/2401.12345v1",
+            title="  A   Great\nPaper ",
+            authors=[SimpleNamespace(name=f"Author {i}") for i in range(9)],
+            summary="x" * 600,
+            published=datetime(2024, 1, 8, 5, 0, tzinfo=timezone.utc),
+            updated=datetime(2024, 1, 9, 6, 0, tzinfo=timezone.utc),
+            categories=["cs.CV", "cs.LG"],
+            primary_category="cs.CV",
+            pdf_url="http://arxiv.org/pdf/2401.12345v1",
+        )
+        record = build_index.record_from_result(result, abstract_chars=500)
+        self.assertEqual(record["id"], "2401.12345")
+        self.assertEqual(record["title"], "A Great Paper")
+        self.assertEqual(len(record["authors"]), 9)
+        self.assertEqual(record["authors"][-1], "et al.")
+        self.assertEqual(record["published"], "2024-01-08")
+        self.assertEqual(record["updated"], "2024-01-09")
+        self.assertEqual(record["categories"], ["cs.CV", "cs.LG"])
+        self.assertEqual(record["primaryCategory"], "cs.CV")
+        self.assertTrue(record["abstractTruncated"])
+        self.assertEqual(record["absUrl"], "http://arxiv.org/abs/2401.12345v1")
+
+
+class WriteIndexTests(unittest.TestCase):
+    def test_writes_manifest_and_removes_stale_shards(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            stale = os.path.join(out_dir, "papers-2020-W01.json")
+            with open(stale, "w", encoding="utf-8") as handle:
+                handle.write("[]")
+
+            records = [make_record("2401.00001", "2024-01-08")]
+            manifest, files = build_index.build_shards(
+                records,
+                generated_at=datetime(2024, 1, 10, tzinfo=timezone.utc),
+            )
+            manifest_path = build_index.write_index(out_dir, manifest, files)
+
+            self.assertFalse(os.path.exists(stale))
+            self.assertTrue(os.path.exists(manifest_path))
+            with open(manifest_path, encoding="utf-8") as handle:
+                loaded = json.load(handle)
+            self.assertEqual(loaded["totalPapers"], 1)
+            self.assertTrue(
+                os.path.exists(os.path.join(out_dir, "papers-2024-W02.json"))
+            )
+
+
+class MainTests(unittest.TestCase):
+    def test_refuses_to_write_an_empty_index(self):
+        import tempfile
+
+        original = build_index.collect_papers
+        build_index.collect_papers = lambda *args, **kwargs: []
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                exit_code = build_index.main(["--out-dir", out_dir])
+                self.assertEqual(exit_code, 1)
+                self.assertFalse(
+                    os.path.exists(os.path.join(out_dir, "index.json"))
+                )
+        finally:
+            build_index.collect_papers = original
+
+    def test_writes_index_when_papers_exist(self):
+        import tempfile
+
+        records = [
+            make_record("2401.00001", "2024-01-08"),
+            make_record("2401.00002", "2024-01-09"),
+        ]
+        original = build_index.collect_papers
+        build_index.collect_papers = lambda *args, **kwargs: records
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                exit_code = build_index.main(["--out-dir", out_dir])
+                self.assertEqual(exit_code, 0)
+                manifest_path = os.path.join(out_dir, "index.json")
+                self.assertTrue(os.path.exists(manifest_path))
+                with open(manifest_path, encoding="utf-8") as handle:
+                    manifest = json.load(handle)
+                self.assertEqual(manifest["totalPapers"], 2)
+        finally:
+            build_index.collect_papers = original
+
+
+if __name__ == "__main__":
+    unittest.main()

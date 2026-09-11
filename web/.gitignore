@@ -1,0 +1,13 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+
+# Generated paper index (built in CI)
+public/data
+
+# Local files
+*.local
+.DS_Store
