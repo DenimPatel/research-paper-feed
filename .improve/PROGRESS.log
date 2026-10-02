@@ -15,4 +15,5 @@
 2026-10-02T09:54:23Z | IMP-009      | DONE     | 228d48d (attempt 2; attempt 1 never wired App.tsx)
 2026-10-02T10:37:33Z | IMP-010      | DONE     | 42e0edb
 2026-10-02T10:52:04Z | IMP-023      | DONE     | 297ed71
-2026-10-02T11:10:19Z | REGRESSION-2 | CLEAN    | 34 browser states, 160 web tests x9 runs, 53 python tests
+2026-10-02T11:10:19Z | REGRESSION-2 | CLEAN    | 34 browser states, 160 web tests x9 runs, 53 python tests2026-10-02T12:19:14Z | IMP-011 | DONE | 2e3f6e8
+ff3f331 | IMP-015 | DONE |  (attempt 2)
