@@ -5,7 +5,7 @@ repository and, where the defect is behavioural, an observed symptom from
 `.improve/REPO_PROFILE.md` or the six `.improve/reports/recon-*.md` files. No invented
 problems, no speculative rewrites.
 
-**Total items: 169** — 147 `TODO`, 7 `NEEDS-HUMAN`, 15 `DONE`.
+**Total items: 178** — 149 `TODO`, 8 `NEEDS-HUMAN`, 21 `DONE`.
 
 **Status legend**
 
@@ -66,24 +66,25 @@ proposed item renames `scripts/paper-collector.py`.
 | Tier | Score | Items |
 | --- | --- | --- |
 | 25.0 | `5 × 5 ÷ 1` | IMP-001 … IMP-005, IMP-143, IMP-151, IMP-154 |
-| 20.0 | `5 × 5 ÷ 1` / `5 × 4 ÷ 1` | IMP-007 … IMP-040 (IMP-022 absorbs the former IMP-047 and IMP-048; IMP-010 absorbs the former IMP-057) |
-| 15.0 | `4 × 4 ÷ 1` … `3 × 5 ÷ 1` | IMP-042 … IMP-092 (less the merged ids), plus IMP-144, IMP-145, IMP-147, IMP-152, IMP-155 … IMP-157 |
+| 20.0 | `5 × 5 ÷ 1` / `5 × 4 ÷ 1` / `4 × 5 ÷ 1` | IMP-007 … IMP-040 (IMP-022 absorbs the former IMP-047 and IMP-048; IMP-010 absorbs the former IMP-057), plus IMP-173 |
+| 15.0 | `4 × 4 ÷ 1` … `3 × 5 ÷ 1` | IMP-042 … IMP-092 (less the merged ids), plus IMP-144, IMP-145, IMP-147, IMP-152, IMP-155 … IMP-157, IMP-174, IMP-175 |
 | 12.5 | `5 × 5 ÷ 2` | IMP-006, IMP-041, IMP-093, IMP-094 |
-| 12.0 | `4 × 4 ÷ 2` | IMP-095 … IMP-097, IMP-146, IMP-153, IMP-158, IMP-159 |
+| 12.0 | `4 × 4 ÷ 2` / `3 × 4 ÷ 1` | IMP-095 … IMP-097, IMP-146, IMP-153, IMP-158, IMP-159, IMP-176, IMP-177 |
 | 10.0 | `3 × 3 ÷ 1` … `2 × 5 ÷ 1` | IMP-098 … IMP-115, IMP-148, IMP-150, IMP-160 … IMP-162, IMP-166 … IMP-171 |
-| 8.0 | `2 × 4 ÷ 1` … `2 × 5 ÷ 2` | IMP-116 … IMP-126, IMP-149, IMP-164, IMP-165 |
+| 8.0 | `2 × 4 ÷ 1` … `2 × 5 ÷ 2` | IMP-116 … IMP-126, IMP-149, IMP-164, IMP-165, IMP-178 |
 | 7.5 | `3 × 5 ÷ 2` | IMP-127 … IMP-131, IMP-163 |
 | 6.7 | `4 × 5 ÷ 3` | IMP-132 |
-| 6.0 | `3 × 4 ÷ 2` | IMP-133 … IMP-136 |
-| 5.0 | `3 × 4 ÷ 3` / `2 × 5 ÷ 2` | IMP-137 … IMP-140, IMP-172 |
+| 6.0 | `3 × 4 ÷ 2` / `2 × 3 ÷ 1` | IMP-133 … IMP-136, IMP-179 |
+| 5.0 | `3 × 4 ÷ 3` / `2 × 5 ÷ 2` / `1 × 5 ÷ 1` | IMP-137 … IMP-140, IMP-172, IMP-180, IMP-181 |
 | 4.0 | `2 × 4 ÷ 2` | IMP-141 … IMP-142 |
 
 IDs 47, 48 and 57 were retired by absorption and **must not be reused**; the live range is
-IMP-001 … IMP-172 minus those three.
+IMP-001 … IMP-181 minus those three.
 
 **NEEDS-HUMAN (not executable without a decision).** IMP-027 (deploy cadence), IMP-034 (delete
 or rewrite the notebook), IMP-088 (adopt a failing security gate), IMP-096 (`robots.txt`
-policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (print stylesheet).
+policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (print stylesheet),
+IMP-176 (may a malformed `published` silently drop a paper).
 
 **Dependency-critical path.**
 - IMP-143 (export and test the hash parser) gates IMP-008, IMP-132 and IMP-133. IMP-157 (batching-safe
@@ -240,6 +241,23 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Risk `med` because criterion 1 turns a permissive gate strict and criterion 3 is the guard against silently emptying real collections — that is exactly the failure mode IMP-001 introduced and IMP-151b had to walk back (regression sweep R1), so the "rejected count is zero against the real index" check must be run and reported, not assumed. Deliberately **not** fixed by IMP-018 (a React error boundary): that converts a blank page into a `role="alert"` fallback but still leaves the malformed snapshot in `localStorage`, and it does nothing for the *feed* path. It is a complement, not a substitute. Deliberately **not** fixed by IMP-098, which validates the manifest and shard payloads arriving over the network, not snapshots arriving from a file on disk. The point-of-use guards that would make this class of bug a degraded card rather than a blank page are IMP-160. Recorded as Issue 1 in `.improve/reports/verify-IMP-151.md`, which explicitly asks for its own backlog entry "at the same priority class as IMP-151". | commit pending
 
 ## Tier 20.0
+
+### IMP-173 — Stop a JSON `null` manifest from hanging the app on "Loading the paper index…" forever
+- **Status:** TODO
+- **Category:** Error handling & edge cases
+- **Type:** bug-fix
+- **Area / files:** `web/src/App.tsx:179-194` (`fetchManifest(...).then(...)` calls `setManifest(next)` and never `setLoading(false)`), `web/src/App.tsx:583-587` (`{!manifest && !error && (<p className="panel" role="status">Loading the paper index…</p>)}`, which does not consult `loading`), `web/src/lib/paperIndex.ts:183` (`return (await response.json()) as IndexManifest`)
+- **Intent:** `fetchManifest` casts the parsed body without inspecting it, so a body of JSON `null` parses successfully and resolves to `null`. `App.tsx:182` then calls `setManifest(null)`, which React treats as no state change, so `manifest` stays `null`; the papers effect at `App.tsx:228-231` early-returns on `!manifest`; and because the `.then` branch at `:180-184` never calls `setLoading(false)` while the `.catch` branch at `:192` does, nothing ever flips. `App.tsx:583` renders purely on `!manifest && !error`, so the app sits on "Loading the paper index…" **forever** — no error, no `role="alert"`, and no "Try again" button, which exists only behind `error` (`App.tsx:557-580`). There is no recovery short of a manual reload.
+- **Acceptance criteria:**
+  1. `PaperIndex.fetchManifest` (`web/src/lib/paperIndex.ts:162-191`) rejects with `IndexUnavailableError` — kind `"malformed"` and the existing message at `:186` — when the parsed body is not a plain object (`body === null || typeof body !== "object" || Array.isArray(body)`). A body of JSON `null`, a JSON array, and a JSON string all take this path, not the success path.
+  2. `web/src/App.tsx:180-184` calls `setLoading(false)` on the success branch as well as the `.catch` branch at `:192`, so no resolved-but-unusable manifest can leave `loading` true.
+  3. A new test in `web/src/__tests__/App.loadFailure.test.tsx` stubs `fetch` for `index.json` to return a body of `null` (HTTP 200, `content-type: application/json`), asserts that once the promise settles no element matching `/Loading the paper index/` remains, and asserts the IMP-007 panel (`No paper index yet` plus a `Try again` `<button>`) is rendered. `cd web && npm run typecheck && npm test` passes: 15 test files, at least 233 tests (232 pre-existing plus the new cases), with no existing expectation weakened.
+  4. The fix does not absorb IMP-098's scope: `fetchManifest` checks only that the body is a plain object; field-level checks (`categories`, `shards`, `totalPapers`) stay IMP-098's, and the implementer report must say so explicitly.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then `npm run build && npm run preview -- --port 5199 --strictPort`, copy `web/public/data/` to `/tmp/rpf-nullmanifest`, write the literal `null` into `/tmp/rpf-nullmanifest/index.json`, serve it, and confirm within 2 s that the "No paper index yet" panel with a working "Try again" replaces the indefinite spinner, and that pressing "Try again" re-requests `index.json`. Screenshot to `.improve/artifacts/IMP-173/feed-null-manifest-desktop-1280.png`, compared against `.improve/artifacts/baseline/baseline-feed-index-missing-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 20.0
+- **Notes:** Pre-existing, not a regression: `git show fc77a40:web/src/App.tsx` has the same `.then` with no `setLoading(false)` and the same `{!manifest && !error && (` guard at `:378`. Found as R4 in `.improve/reports/regression-sweep-3.md` §2 and re-derived independently at `.improve/reports/verify-IMP-018.md` §9.2. **Cross-reference — do not duplicate:** the bare cast at `paperIndex.ts:183` is the same "data validated only by cast" family as profile defect WEB-07 and as IMP-098 (TODO, `10.0`); IMP-098 owns field-level validation, this item owns the deadlock, and criterion 4 forbids this item from taking IMP-098's place. The related silent-data-loss question for a malformed `published`, which `paperIndex.ts:294` filters out rather than rejecting, is a **separate** item because it needs a product decision first.
 
 ### IMP-007 — Add a "Try again" button to the index-unavailable panel
 - **Status:** DONE
@@ -811,6 +829,40 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 ---
 
 ## Tier 15.0
+
+### IMP-174 — Pin that the stale-shard sweep runs last
+- **Status:** TODO
+- **Category:** Test coverage & test quality
+- **Type:** test
+- **Area / files:** `tests/test_build_index.py:230-289` (`WriteIndexOrderingTests`, 2 tests), `scripts/build_index.py:269-275` (shard writes → manifest write → `_clean_old_shards`), `scripts/build_index.py:244-256` (`_clean_old_shards`)
+- **Intent:** IMP-021's guarantee is that a crash at any point never leaves a deployed `index.json` referencing a shard file that does not exist. The suite pins *writes before sweep* but not *manifest before sweep*. Reordering `write_index` to `shards → sweep → manifest` — the exact misreading of "write the manifest before deleting stale shards" as "move the sweep line down one" — passes all 55 tests and is demonstrably unsafe. Measured: on a shrink run (3 deployed shards, 1 new shard) with a crash between the sweep and the manifest write, the directory is `['index.json', 'papers-2024-W03.json']` while the deployed manifest still references `papers-2024-W01.json` and `papers-2024-W02.json`. Both are missing, and `loadShard` turns a missing file into `Failed to load … (HTTP 404)`.
+- **Acceptance criteria:**
+  1. A new test in `tests/test_build_index.py`, added to `WriteIndexOrderingTests` or a new class beside it, wraps `build_index._clean_old_shards` and, **inside the wrapper**, asserts that the on-disk `index.json` already parses and that `{entry["file"] for entry in manifest["shards"]}` equals the set of shard files present in `out_dir`. The wrapper calls through, so the sweep still runs.
+  2. The fixture is the shrink case: `out_dir` is seeded with `papers-2024-W01.json`, `W02`, `W03` and an `index.json` referencing all three, and the run under test writes only `W03`. The test asserts at sweep entry that the stale shards are still on disk (the sweep has not run yet) and that the manifest on disk is the **new** one.
+  3. The new test fails when the sweep moves above the manifest write, and passes as shipped. Both runs are quoted verbatim in the implementer report: the suite as shipped, and the suite with `build_index.py:275` relocated to immediately before the manifest write at `:272`.
+  4. `/usr/local/bin/python3.11 -m unittest discover -s tests -v` reports **56** tests OK (55 pre-existing + 1) and `git diff -U0 -- tests/ | grep -c '^-[^-]'` is `0` — purely additive, no existing expectation weakened.
+- **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; then on a scratch copy of `scripts/build_index.py` move the `_clean_old_shards(out_dir, keep=shard_files)` call from `build_index.py:275` to immediately before the manifest write at `:272` and re-run, quoting the failing test name and the assertion that fails.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 15.0
+- **Notes:** The one real coverage gap in IMP-021's verification: `verify-IMP-021.md` §5 mutant D (`shards → sweep → manifest`) reported "Ran 55 tests … OK" while being unsafe, and mutants A, B and C were all killed. This is finding F-1 of that report. Impact is 3 rather than 4 because the shipped code is correct today — this item buys a regression guard. Cross-reference: the truncation half of the same crash family is IMP-099 (TODO, `10.0`) and is **not** duplicated here; nor is `_clean_old_shards`' default-argument path (`build_index.py:244`, D4 in `.improve/reports/discovered-IMP-021.md`).
+
+### IMP-175 — Make the newest-first ordering deterministic within a publication day
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/paperIndex.ts:295` (`.sort((a, b) => (a.published < b.published ? 1 : -1))`), `web/src/lib/search.ts:89` (the identical comparator inside `rankPapers`), `web/src/App.tsx:336-353` (`visiblePapers`, which preserves whatever order it is handed)
+- **Intent:** Both comparators return `-1` when the two `published` strings are **equal**, so the comparator is inconsistent — `cmp(a, b)` and `cmp(b, a)` are both `-1` for the same pair — and the engine's tie order becomes implementation-defined instead of file order. Measured on the deployed 2,549-paper shard: 593 papers share the maximum `published` value, and the first card the app rendered was file index **592** where a stable descending sort of the same bytes yields file index **0**. Three consequences: two loads of identical bytes can present same-day papers in a different order; with `PAGE_SIZE = 50` a given paper's position among its same-day peers is unpredictable; and the newest-first path stops being reproducible against the DOM, which is how `.improve/reports/impl-IMP-018.md` and `verify-IMP-018.md` both concluded a mutated fixture "did not apply" when it had.
+- **Acceptance criteria:**
+  1. `web/src/lib/paperIndex.ts:295` returns `0` for equal `published` values — e.g. `(a.published < b.published ? 1 : a.published > b.published ? -1 : 0)`, or a stable descending sort — so papers sharing a date come out in the order `batches.flat()` produced them.
+  2. `web/src/lib/search.ts:89` receives the same treatment inside `rankPapers`, so relevance ties also fall back to input order rather than engine order. Both sites are fixed; a single-site fix is not accepted.
+  3. A new test in `web/src/lib/__tests__/paperIndex.test.ts` builds a fixture of at least 4 papers that all share one `published` value, loads them through `loadPapers`, and asserts the returned order is exactly the shard's file order. A matching test in `web/src/lib/__tests__/search.test.ts` extends the existing `describe("rankPapers")` block and asserts equal-score, equal-date papers come back in input order; the existing assertion at `search.test.ts:96` ("orders by score with newest as the tie-breaker") must still pass unmodified.
+  4. `cd web && npm run typecheck && npm test` passes: 15 test files, **234** tests (232 pre-existing + 2), no existing expectation weakened and no test skipped.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then in the browser load the feed twice from a cleared cache and confirm the first 50 card ids are byte-identical across both loads, and that applying a bare `Array.prototype.sort` to a copy of the returned array leaves it unchanged (the stable-sort no-op). Screenshot to `.improve/artifacts/IMP-175/feed-newest-order-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 15.0
+- **Notes:** Pre-existing and unrelated to IMP-018's change; raised as finding 9.5 in `.improve/reports/verify-IMP-018.md` §3 and §9.5, and the same comparator was named independently in `.improve/reports/discovered-IMP-018.md` §2. Impact is 3 rather than 4 because no data is lost and every paper stays reachable — the harm is an unpredictable presentation order plus a verification method that reports a false negative. Cross-reference: IMP-008 (DONE) made the Relevance **chip** agree with the relevance **sort**; this item is about the comparator those sorts share, so the two do not overlap. IMP-098 (TODO) owns per-paper field validation and must not be used to defer this.
 
 ### IMP-144 — Reset load progress when a new load starts
 - **Status:** TODO
@@ -1765,6 +1817,39 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 
 ## Tier 12.0
 
+### IMP-176 — Decide what a paper with no usable `published` date should do to the feed
+- **Status:** NEEDS-HUMAN
+- **Category:** Data validation
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/paperIndex.ts:294` (`.filter((paper) => paper.published && paper.published >= start)`), `web/src/components/PaperCard.tsx:20-24` (`formatDate`, which returns a non-date string unchanged)
+- **Intent:** A shard paper with `published: null` is **silently filtered out**, not rejected. Measured: setting `published: null` on one rendered paper took the count from 2,812 to 2,811 papers and produced zero alerts and zero console errors; the error boundary correctly did nothing because nothing threw. A researcher browsing the feed cannot tell that a paper is missing from their window, and no operator signal says the index is malformed. `formatDate` compounds it — a non-date string renders as a nonsense date rather than a visible gap. This is silent data loss in a research feed, and whether that is acceptable is a product decision, not an engineering one.
+- **Acceptance criteria:**
+  1. The decision stated in Notes is implemented in **one** place, and the other policy is not half-implemented: either (a) a paper whose `published` is missing or non-string is counted, logged, and surfaced through the existing partial-load notice, or (b) a shard containing such a paper fails the window with the IMP-016 hard panel and its "Try again" button. Option (b) must not be implemented as an early `return` that leaves `loading` true — that is IMP-173's deadlock.
+  2. Whichever policy is chosen, `web/src/lib/paperIndex.ts:294`'s silent `.filter` is no longer the only thing between a malformed record and the feed: the chosen path either counts it or fails on it, and the count or shard filename appears in `console.error` or in the notice text.
+  3. A new test in `web/src/lib/__tests__/paperIndex.test.ts` feeds a shard containing one paper with `published: null` and asserts the chosen behaviour exactly — a `failedFiles` entry naming that shard under (a), or a rejected `loadPapers` under (b). `cd web && npm run typecheck && npm test` passes with 15 test files and **233** tests, no existing expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then serve a scratch copy of the data directory with one rendered paper's `published` set to `null` and confirm the reader can tell — either the result count drops **and** a notice names the affected week, or the window fails loudly with a retry. Screenshot to `.improve/artifacts/IMP-176/feed-null-published-desktop-1280.png`.
+- **Effort:** S    **Risk:** med
+- **Depends on:** none
+- **Priority score:** 12.0
+- **Notes:** Raised as spec inaccuracy 9.2 in `.improve/reports/verify-IMP-018.md` §9.2, which states the real defect "is *silent data loss*, which belongs to runtime validation (IMP-098), not to a boundary". IMP-098 (TODO, `10.0`) does own dropping malformed papers and explicitly requires logging the drop count, but its acceptance criteria name only `id`, `title`, `authors` and `abstract` — **not** `published` — so it does not cover this record. Do not widen IMP-098's criteria in place to absorb this item; the decision below comes first. Confidence is 4 rather than 5 because the behaviour is measured but the severity is exactly what is undecided.
+**NEEDS-HUMAN — product decision required.** Decide which of two honest behaviours the feed should have when a shard paper has no usable `published` date: (a) drop the paper but **count it and say so**, extending IMP-098's drop-and-log policy to this field; or (b) treat the shard as malformed and fail the whole window loudly with the IMP-016 panel. Option (a) preserves availability and loses one paper quietly-but-visibly; option (b) preserves the "the feed is complete or it says it is not" guarantee IMP-015 shipped, at the cost of hiding every other paper in that week over one bad record. This is a product call about whether a research feed may quietly omit a paper, and an implementer must not make it unilaterally. **Decision needed before implementation.**
+
+### IMP-177 — Name the partial-shard alert with the same words the reader can see
+- **Status:** TODO
+- **Category:** Accessibility
+- **Type:** bug-fix
+- **Area / files:** `web/src/App.tsx:664-675` (the `failedShards.length > 0` `role="alert"` banner), `web/src/App.tsx:667` (`aria-label="Some papers could not be loaded"`), `web/src/App.tsx:672-674` (the visible text: the `<strong>` plus `describeFailedWeeks(failedWeeks)` and "…so the feed below is incomplete. Everything that did load is shown.")
+- **Intent:** IMP-017 gave this alert an `aria-label` so the shard file name in `title` would stop becoming its accessible name — correct, and the reported symptom is gone. But the label it chose is the alert's own `<strong>`, which is only the **first sentence**. Because `alert` is an author-named role, a screen reader announces the `aria-label` and not the element's contents, so the announcement is "Some papers could not be loaded" with no week count and no date range. A screen-reader user is told the feed is degraded and not which weeks are missing — the one fact the notice exists to convey, and the one IMP-015 shipped.
+- **Acceptance criteria:**
+  1. `web/src/App.tsx:667`'s `aria-label` is computed from the same strings the banner renders, so the accessible name contains the visible sentence **and** the week description — e.g. `` `Some papers could not be loaded. ${describeFailedWeeks(failedWeeks)}` `` — rather than being a literal duplicating only the `<strong>`. It derives from `failedWeeks`, so it cannot drift when the prose changes.
+  2. The label does not reintroduce the file name or HTTP status that IMP-017's criterion 2 removed from the visible text: the rendered accessible name contains no `.json`, no `HTTP`, and no raw `Error.message`. The `title` at `:668-670` keeps the technical detail and is unchanged.
+  3. A new test in `web/src/__tests__/App.partialShard.test.tsx` asserts the `role="alert"` node's accessible name starts with the visible `<strong>` **and** contains the failed week's date range — the same label `describeFailedWeeks` produced — and that a `title` is still present. The existing IMP-015 and IMP-017 assertions in that file pass unmodified.
+  4. `cd web && npm run typecheck && npm test` passes: 15 test files, **233** tests (232 pre-existing + 1), no existing expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then serve a data directory with one shard removed, open the feed in Chromium, and read the alert's name from the accessibility snapshot — it must be "Some papers could not be loaded. One week in this window failed to load (Sep 24 – Sep 27, 2026)" — and confirm no `.json` or `HTTP` appears in it. Screenshot to `.improve/artifacts/IMP-177/feed-partial-shard-name-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 12.0
+- **Notes:** Rated MEDIUM by the IMP-017 verifier and recorded in `.improve/reports/impl-IMP-017.md` "Finding (c)". It is WCAG 2.5.3 in the direction that matters: the visible label is a **prefix** of the accessible name, so voice-control users can still say the visible words — the defect is that the accessible name is *shorter* than the visible text, not that it contradicts it. Cross-reference: this is the same author-named-`alert` trap IMP-017 fixed at `App.tsx:631` (`aria-label={error.message}`, already the full visible string) and IMP-018 fixed in `web/src/ErrorBoundary.tsx:76` (whose label **does** equal its `<h1>`); neither covers this third site. Do not "fix" it by deleting the `aria-label` — that is what put the shard file name into the accessible name in the first place.
 
 ### IMP-146 — Revoke the export blob URL after the download has started
 - **Status:** TODO
@@ -1938,7 +2023,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** M    **Risk:** med
 - **Depends on:** none
 - **Priority score:** 10.0
-- **Notes:** Risk `med` because a strict validator will reject data the app currently renders "successfully" (badly). Log every rejection and, on the first run against a real index, confirm the rejection count is zero before tightening.
+- **Notes:** Risk `med` because a strict validator will reject data the app currently renders "successfully" (badly). Log every rejection and, on the first run against a real index, confirm the rejection count is zero before tightening. **Cross-reference — this is the item that owns the "data validated only by cast" half of profile defect WEB-07** (`REPO_PROFILE.md:685`); the other half, the missing React error boundary, was fixed by IMP-018 (DONE), whose report failed to name WEB-07 as `.improve/reports/verify-IMP-018.md` §9.4 records. Two read sites to cover, not one: `web/src/components/PaperCard.tsx:50` (`paper.abstract.length`) and, reached from the **search box** rather than by scrolling, `web/src/lib/search.ts:55-57` (`paper.title.toLowerCase()`, `paper.authors.join`, `paper.abstract.toLowerCase` — measured blanking the page on a query that matches nothing, per `.improve/reports/discovered-IMP-018.md` §1). `published` is deliberately **not** in this item's field list; see IMP-176, which needs a product decision first and must not be settled by widening these criteria.
 
 ### IMP-099 — Make index writes atomic
 - **Status:** TODO
@@ -1954,7 +2039,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** M    **Risk:** low
 - **Depends on:** IMP-021
 - **Priority score:** 10.0
-- **Notes:** Keep `encoding="utf-8"` and `ensure_ascii=False` exactly as they are at `:241,244`; only the file lifecycle changes.
+- **Notes:** Keep `encoding="utf-8"` and `ensure_ascii=False` exactly as they are at `:241,244`; only the file lifecycle changes. **This item owns profile trap `PY-7`, confirmed twice after the fact:** `.improve/reports/discovered-IMP-021.md` D1 records that after IMP-021's reorder a crash during a same-week shard write — the normal weekly-deploy case — leaves the deployed `index.json` pointing at a 24-byte shard, and `.improve/reports/verify-IMP-021.md` F-2 injects `OSError(28)` mid-write and records `index.json` truncated to `'{\n  "totalPapers": 1,\n  "sha'` (24 bytes, `JSONDecodeError`) with the old shards still on disk. Neither is fixed by ordering, and neither is claimed by IMP-174 or IMP-179. Note also `.improve/reports/discovered-IMP-021.md` D2: if `PY-9` (error handling around `write_index`) is ever implemented as `return 0` or as a `finally` that sweeps stale shards, the ordering guarantee is silently voided — that form is forbidden.
 
 ### IMP-100 — Abort in-flight fetches and add a timeout in the browser
 - **Status:** TODO
@@ -2370,6 +2455,22 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 
 ## Tier 8.0
 
+### IMP-178 — Log the soft shard failure that only the tooltip carries
+- **Status:** TODO
+- **Category:** Observability & logging
+- **Type:** improvement
+- **Area / files:** `web/src/App.tsx:241-250` (`setFailedShards(list.failedFiles)` on the partial/soft path, which logs nothing), `web/src/App.tsx:668-670` (the `title` holding `` `${failure.file}: ${failure.message}` ``), `web/src/lib/paperIndex.ts:269-282` (where `failedFiles` is built)
+- **Intent:** Both hard paths log: `App.tsx:190` for a manifest failure and `App.tsx:258` for a total shard failure. The soft path — one shard failed, the rest loaded — is the **only** failure with no `console.error`, yet it carries the most diagnostic detail: the shard file name and its message live exclusively in the banner's `title` (`:668-670`), and `title` renders no tooltip on a touch device. On a phone the shard filename is therefore entirely unreachable, and for an operator the browser console — the one place a deploy failure is actually investigated — says nothing at all.
+- **Acceptance criteria:**
+  1. `web/src/App.tsx:241-250` calls `console.error` when `list.failedFiles.length > 0`, once per load, with a line that names every failed shard's `file` and `message` — e.g. `` `paper feed: ${list.failedFiles.length} shard(s) failed to load; the feed is incomplete.` `` followed by the per-file detail. It is not called when `failedFiles` is empty.
+  2. It is called **once per load**, not once per render: two recency changes against a failing shard produce exactly two log calls, asserted by counting `console.error` invocations in a new test in `web/src/__tests__/App.partialShard.test.tsx`.
+  3. The log line is developer-facing, so it keeps the file name and HTTP status that IMP-017 removed from the *visible* text; no reader-facing string changes. The IMP-015 and IMP-017 assertions in `App.partialShard.test.tsx` pass unmodified.
+  4. `cd web && npm run typecheck && npm test` passes: 15 test files, **233** tests (232 pre-existing + 1).
+- **Verification method:** `cd web && npm run typecheck && npm test`; then `npm run build && npm run preview -- --port 5199 --strictPort` against a data directory missing one shard, open DevTools, and confirm exactly one console error naming the missing file; then change the recency window twice and confirm two log lines in total, not four. Screenshot to `.improve/artifacts/IMP-178/feed-partial-shard-console-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 8.0
+- **Notes:** Rated LOW by the IMP-017 verifier and recorded in `.improve/reports/impl-IMP-017.md` "Finding (c)". Scored 8.0 rather than higher because the reader-facing prose IMP-015 shipped already names the missing week and its date range without any hover, so no reader is left with nothing — this is an operator-diagnosability gap, not a user-facing one. Cross-reference: IMP-144 (TODO) owns load **progress** observability and IMP-011 (DONE) owns the storage-failure alert; neither emits a line for this path. Match the message shape of `App.tsx:190` and `:258` ("paper feed: …", cause last) rather than inventing a third format.
 
 ### IMP-149 — Give the search field a visible label that fits at 390px
 - **Status:** TODO
@@ -2723,6 +2824,22 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 
 ## Tier 6.0
 
+### IMP-179 — Assert `write_index`'s manifest / `shard_files` caller contract
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** bug-fix
+- **Area / files:** `scripts/build_index.py:259-276` (`write_index`), `scripts/build_index.py:275` (`_clean_old_shards(out_dir, keep=shard_files)`), `scripts/build_index.py:156,165,174-175` (`build_shards` filling `shard_files` and `manifest["shards"]` in one loop iteration)
+- **Intent:** `write_index` derives the sweep's `keep` set from `shard_files` but takes the sweep's danger from `manifest`, and never checks that the two agree. If they did not, the sweep would delete a shard the manifest it just wrote references — recreating exactly the failure IMP-021 exists to prevent — and nothing would say so. The verifier constructed that case directly (`CASE C`: manifest refs `papers-2024-W07.json` while `shard_files` keys on `papers-2024-W05.json`, so the referenced file does not resolve). It is unreachable today: `build_shards` appends to `shards` and assigns `shard_files[filename]` in the same iteration, and `main` is the only caller — 0 mismatches over 500 randomized record sets. This item buys the invariant before a second caller exists, not after.
+- **Acceptance criteria:**
+  1. `write_index` verifies `{entry["file"] for entry in manifest["shards"]} == set(shard_files)` **before** any file is written, and raises `ValueError` naming both sets when they differ. The check runs before `os.makedirs`, so a mismatched call writes and deletes nothing.
+  2. A test in `tests/test_build_index.py` calls `write_index` with a manifest whose `shards[0]["file"]` is not a key of `shard_files`, asserts the raise, and asserts `sorted(os.listdir(out_dir))` is unchanged from the pre-call fixture — including that a pre-existing shard named in the manifest is still present.
+  3. `/usr/local/bin/python3.11 -m unittest discover -s tests -v` reports **56** tests OK (55 pre-existing + 1) and `git diff -U0 -- tests/ | grep -c '^-[^-]'` is `0`.
+- **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; then `/tmp/rpf-venv/bin/python scripts/build_index.py --category cs.CV --max-per-category 20 --out-dir /tmp/rpf-contract` exits 0, and a scratch script calling `write_index` with a hand-mismatched manifest raises `ValueError` and prints both sets.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 6.0
+- **Notes:** Latent, not live — finding F-3 in `.improve/reports/verify-IMP-021.md` §8, with `CASE B` / `CASE C` from its §4b and the 0/500 randomized agreement from the same section. Confidence is 3 rather than 5 because the defect has never been observed; impact is 2 because the guard only helps a future second caller. Two related notes that are **not** claimed here: `_clean_old_shards`' empty default (`build_index.py:244`, D4 in `.improve/reports/discovered-IMP-021.md`) has no test of its own, and IMP-099 (TODO) changes the write lifecycle this check sits in front of — if IMP-099 lands first, re-read `write_index` and place the assertion **after** the atomic rename so a failed rename cannot leave a validated-but-unwritten manifest. The regression guard for the ordering itself is IMP-174.
+
 ### IMP-133 — Add per-paper deep links
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -2789,6 +2906,39 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Risk `med` because this **changes user-visible result order for every query**. Screenshot-verify against a pre-change capture, and consider shipping it behind the same release as IMP-127 so the two ranking changes land together.
 
 ## Tier 5.0
+
+### IMP-180 — Clear the partial-shard notice when a new window load starts
+- **Status:** TODO
+- **Category:** Error handling & edge cases
+- **Type:** bug-fix
+- **Area / files:** `web/src/App.tsx:228-235` (the papers `useEffect`: `setLoading(true)` at `:233` and `setError(null)` at `:234`, with no `setFailedShards([])`), `web/src/App.tsx:638-676` (the `failedShards.length > 0` banner), `web/src/App.tsx:257` (the `setFailedShards([])` that exists only on the total-failure catch path)
+- **Intent:** `failedShards` is cleared on success (`:248`) and on a total failure (`:257`), but not when a load **starts**. Changing the recency window therefore leaves the previous window's "Some papers could not be loaded. One week in this window failed to load (…)" mounted for the whole duration of the new load, while the thing below it is the loading panel, not a feed. The banner is stale-worded — it describes a window that is no longer on screen. Verified benign in the ways that matter: it stays mounted so it is not re-announced, and it produces no duplicate notice. Only the sentence is false while it is visible.
+- **Acceptance criteria:**
+  1. `web/src/App.tsx:234` clears `failedShards` alongside `error` at the start of the load effect, so the banner is unmounted for the whole loading window and reappears only if the new load actually has a failing shard.
+  2. The total-failure path at `:257` keeps working: a load where every shard fails still shows the IMP-016 hard panel and never a stale partial banner.
+  3. A new test in `web/src/__tests__/App.partialShard.test.tsx` drives a load with one failing shard, asserts the partial banner, starts a second load with no failing shard, and asserts the banner is absent while that second load is pending and absent after it resolves; a second test drives two failing loads in a row and asserts the banner is present again after the second. `cd web && npm run typecheck && npm test` passes with 15 test files and **234** tests (232 pre-existing + 2), no existing expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then serve a data directory whose 60-day window has a missing shard and whose 7-day window does not, switch the recency control, and confirm the banner disappears as soon as the loading panel appears. Screenshot to `.improve/artifacts/IMP-180/feed-partial-shard-cleared-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 5.0
+- **Notes:** Cosmetic — finding R5 in `.improve/reports/regression-sweep-3.md` §2, which records it as verified benign ("the banner is not re-announced, it does not produce a duplicate notice, and it clears correctly as soon as the shard loads") and rates it stale-worded only. Impact is 1 for that reason. It is itemized because the fix is one line beside an existing `setError(null)` and because the false sentence is the same class of claim IMP-015 shipped specifically to avoid making. Cross-reference: do not fold this into IMP-101 (TODO, "Keep the previous list mounted while a new window loads") — that item is about not destroying card state and deliberately keeps a loading indicator visible, so the two are compatible but independent.
+
+### IMP-181 — Keep the Sort group on the controls row at 1280px
+- **Status:** TODO
+- **Category:** UI polish & visual consistency
+- **Type:** improvement
+- **Area / files:** `web/src/styles.css:223-227` (`.controls__row`, `display: flex; flex-wrap: wrap; gap: 1rem 1.75rem;`), `web/src/styles.css:20,123` (`--max-width: 1000px` and its use), `web/src/styles.css:229-236` (`.controls__group`, whose intrinsic width is set by its chip row)
+- **Intent:** IMP-010 added the "All" chip, which widened the Categories group enough that `flex-wrap` pushes the Sort group onto a second row at 1280px. Before that commit CATEGORIES, RECENCY and SORT all shared one row (compare `.improve/artifacts/regression-3/feed-default-1280.png` against `.improve/artifacts/baseline/baseline-feed-desktop-1280.png`). The wrap itself is graceful — labels and chips stay aligned, nothing is clipped, the card grows about 28 px, and the controls' padding and inner alignment are unchanged — so this is tracked as polish, not breakage. It is worth tracking because 1280px is the primary review viewport and a baseline screenshot comparison now shows a layout difference with no stated cause.
+- **Acceptance criteria:**
+  1. At 1280px the three control groups (`Categories`, `Recency`, `Sort`) render on **one** row, measured rather than inferred: all three `getBoundingClientRect().top` values of `.controls__row > .controls__group` are equal.
+  2. No horizontal overflow at 1280px (`scrollWidth === clientWidth`), and no group, chip, or label is clipped or visually overlapping.
+  3. Nothing changes at 390px or 520px relative to `.improve/artifacts/baseline/baseline-feed-mobile-390.png`, and the existing `@media (max-width: 520px)` block (`web/src/styles.css:720-753`) is neither re-indented nor re-authored.
+  4. `cd web && npm run typecheck && npm test && npm run build` pass with no test change — this is CSS-only, and `git diff -- web/src` lists `styles.css` and nothing else.
+- **Verification method:** `cd web && npm run build && npm run preview -- --port 5199 --strictPort`; at 1280px, 1024px and 390px record each `.controls__group`'s `getBoundingClientRect().top` and assert `scrollWidth === clientWidth`. Screenshot to `.improve/artifacts/IMP-181/feed-controls-one-row-desktop-1280.png`, compared against `.improve/artifacts/baseline/baseline-feed-desktop-1280.png`.
+- **Effort:** S    **Risk:** med
+- **Depends on:** none
+- **Priority score:** 5.0
+- **Notes:** Finding R6 in `.improve/reports/regression-sweep-3.md` §2, which judged it "a consequence of a deliberate feature, not breakage" — that judgement is why impact is 1. Risk is `med` because `.controls__row` is a shared flex row and the two obvious fixes both reach outside this item: widening `--max-width` changes the whole page's measure, and adding a breakpoint in the 520–1000px band is IMP-141's decision. **If one row at 1280px cannot be achieved without either, stop and report rather than making the call.** IMP-141 (NEEDS-HUMAN, "Add an intermediate layout breakpoint") owns that band and its own criterion 2 forbids changing 1280px, so it does not cover this.
 
 ### IMP-137 — Add an ESLint config and an `npm run lint` script
 - **Status:** TODO
