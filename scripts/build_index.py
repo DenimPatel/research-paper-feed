@@ -35,6 +35,11 @@ DEFAULT_ABSTRACT_CHARS = 500
 DEFAULT_MAX_AUTHORS = 8
 DEFAULT_OUT_DIR = os.path.join("web", "public", "data")
 
+# A ``--category`` value is interpolated straight into ``cat:<value>``, so
+# anything arXiv cannot answer with a feed is rejected here instead of coming
+# back as an empty result indistinguishable from "no new papers".
+CATEGORY_PATTERN = re.compile(r"^[a-zA-Z-]+(\.[a-zA-Z-]+)?$")
+
 # Used when ``--max-per-category`` is left at 0 ("no per-category cap").
 # The retention window is the real bound; this only prevents an unbounded run.
 UNLIMITED = 100000
@@ -276,6 +281,48 @@ def write_index(out_dir, manifest, shard_files):
     return manifest_path
 
 
+def int_at_least(flag, minimum):
+    """Return an argparse ``type`` for ``flag`` restricted to integers >= ``minimum``.
+
+    Out-of-range values fail loudly instead of degrading into a different
+    meaning: ``--retention-days 0`` used to make the cutoff now-or-future so the
+    retention check fired on the first result, and ``--abstract-chars -3`` used
+    to switch truncation off entirely.
+    """
+    accepted = f"{minimum} or greater"
+
+    def parse(text):
+        try:
+            value = int(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError(
+                f"{flag} expects a whole number, got {text!r}"
+            ) from None
+        if value < minimum:
+            raise argparse.ArgumentTypeError(
+                f"{flag} accepts {accepted}, got {value}"
+            )
+        return value
+
+    parse.__name__ = flag.lstrip("-").replace("-", "_")
+    return parse
+
+
+def category(value):
+    """Return ``value`` as an arXiv category, rejecting anything else.
+
+    Bare subjects (``cs``), archives (``astro-ph``) and archive/subject pairs
+    (``astro-ph.HE``) are the real forms arXiv understands.
+    """
+    if not CATEGORY_PATTERN.fullmatch(value):
+        raise argparse.ArgumentTypeError(
+            f"--category value {value!r} is not an arXiv category; expected a "
+            f"subject such as cs or cs.AI, or an archive/subject pair such as "
+            f"stat.ML or astro-ph.HE"
+        )
+    return value
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Build a sharded static JSON index of recent arXiv papers."
@@ -285,22 +332,27 @@ def parse_args(argv=None):
         help=f"Directory for index.json and shards (default: {DEFAULT_OUT_DIR}).",
     )
     parser.add_argument(
-        "--retention-days", type=int, default=DEFAULT_RETENTION_DAYS,
+        "--retention-days", type=int_at_least("--retention-days", 1),
+        default=DEFAULT_RETENTION_DAYS,
         help=f"Only keep papers published within this many days "
-             f"(default: {DEFAULT_RETENTION_DAYS}).",
+             f"(default: {DEFAULT_RETENTION_DAYS}; 1 or greater).",
     )
     parser.add_argument(
-        "--max-per-category", type=int, default=0,
-        help="Dev escape hatch: cap results fetched per category (0 = no cap).",
+        "--max-per-category", type=int_at_least("--max-per-category", 0),
+        default=0,
+        help="Dev escape hatch: cap results fetched per category "
+             "(default: 0; 0 or greater, 0 = no cap).",
     )
     parser.add_argument(
-        "--abstract-chars", type=int, default=DEFAULT_ABSTRACT_CHARS,
+        "--abstract-chars", type=int_at_least("--abstract-chars", 1),
+        default=DEFAULT_ABSTRACT_CHARS,
         help=f"Truncate abstracts to this many characters "
-             f"(default: {DEFAULT_ABSTRACT_CHARS}).",
+             f"(default: {DEFAULT_ABSTRACT_CHARS}; 1 or greater).",
     )
     parser.add_argument(
-        "--category", action="append", dest="categories",
-        help="Override a category to query (repeatable). "
+        "--category", action="append", dest="categories", type=category,
+        help="Override a category to query (repeatable). Each value must look "
+             "like cs.AI, stat.ML or astro-ph.HE. "
              f"Defaults to {', '.join(DEFAULT_CATEGORIES)}.",
     )
     return parser.parse_args(argv)

@@ -502,7 +502,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:**
 - **Notes:** commit pending
 ### IMP-022 — Validate every CLI flag in both scripts
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Configuration & defaults
 - **Type:** bug-fix
 - **Area / files:** `scripts/build_index.py:248-275` (`parse_args`), `scripts/build_index.py:48-53` (`truncate_abstract`, `max_chars <= 0` silently disables truncation), `scripts/build_index.py:208` (`max_per_category > 0` else `UNLIMITED`), `scripts/build_index.py:211` (`query = f"cat:{category}"`), `scripts/paper-collector.py:35-38` (`--max-papers`, default 1000), `scripts/arxiv_common.py:37-38` (non-positive short circuit), `readme.md:42-44` and `readme.md:96-103`
@@ -517,7 +517,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** Adding validation ranges changes `--help` output, which profile §4.5 requires to be reconciled with `readme.md` in the same change — that is criterion 5. IMP-114 documents `--category` in the readme and should be sequenced with this item.
+- **Notes:** Adding validation ranges changes `--help` output, which profile §4.5 requires to be reconciled with `readme.md` in the same change — that is criterion 5. IMP-114 documents `--category` in the readme and should be sequenced with this item. | commit pending
 
 ### IMP-023 — Make `safe_filename` a real sanitizer
 - **Status:** DONE

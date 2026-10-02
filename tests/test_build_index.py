@@ -1,4 +1,6 @@
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import unittest
@@ -434,6 +436,138 @@ class MainTests(unittest.TestCase):
                 with open(manifest_path, encoding="utf-8") as handle:
                     manifest = json.load(handle)
                 self.assertEqual(manifest["totalPapers"], 2)
+        finally:
+            build_index.collect_papers = original
+
+
+class ParseArgsValidationTests(unittest.TestCase):
+    """Out-of-range and malformed values must be rejected, not reinterpreted.
+
+    ``--retention-days 0`` used to make the cutoff now-or-future so the retention
+    break fired on the first result, ``--abstract-chars -3`` switched truncation
+    off, and ``--max-per-category -9`` silently meant unlimited.
+    """
+
+    def _assert_rejected(self, argv, flag, expected):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as raised:
+                build_index.parse_args(argv)
+        self.assertEqual(raised.exception.code, 2, argv)
+        message = stderr.getvalue()
+        self.assertIn(flag, message)
+        self.assertIn(expected, message)
+
+    def test_retention_days_below_one_is_rejected(self):
+        for value in ("0", "-1", "-60"):
+            with self.subTest(value=value):
+                self._assert_rejected(
+                    ["--retention-days", value],
+                    "--retention-days",
+                    "1 or greater",
+                )
+
+    def test_retention_days_must_be_a_whole_number(self):
+        self._assert_rejected(
+            ["--retention-days", "sixty"], "--retention-days", "whole number"
+        )
+
+    def test_abstract_chars_below_one_is_rejected(self):
+        for value in ("0", "-3"):
+            with self.subTest(value=value):
+                self._assert_rejected(
+                    ["--abstract-chars", value],
+                    "--abstract-chars",
+                    "1 or greater",
+                )
+
+    def test_max_per_category_below_zero_is_rejected(self):
+        for value in ("-1", "-9"):
+            with self.subTest(value=value):
+                self._assert_rejected(
+                    ["--max-per-category", value],
+                    "--max-per-category",
+                    "0 or greater",
+                )
+
+    def test_max_per_category_zero_still_means_no_cap(self):
+        args = build_index.parse_args(["--max-per-category", "0"])
+        self.assertEqual(args.max_per_category, 0)
+
+    def test_defaults_are_unchanged(self):
+        args = build_index.parse_args([])
+        self.assertEqual(args.retention_days, 60)
+        self.assertEqual(args.abstract_chars, 500)
+        self.assertEqual(args.max_per_category, 0)
+        self.assertEqual(args.out_dir, os.path.join("web", "public", "data"))
+
+    def test_valid_values_are_accepted(self):
+        args = build_index.parse_args([
+            "--retention-days", "7",
+            "--abstract-chars", "1",
+            "--max-per-category", "2",
+        ])
+        self.assertEqual(args.retention_days, 7)
+        self.assertEqual(args.abstract_chars, 1)
+        self.assertEqual(args.max_per_category, 2)
+
+
+class CategoryArgumentTests(unittest.TestCase):
+    """A malformed category is a query arXiv answers with an empty feed."""
+
+    def _assert_rejected(self, value):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as raised:
+                build_index.parse_args(["--category", value])
+        self.assertEqual(raised.exception.code, 2, value)
+        self.assertIn("--category", stderr.getvalue())
+        self.assertIn(repr(value), stderr.getvalue())
+
+    def test_real_category_forms_are_accepted(self):
+        for value in ("cs.AI", "stat.ML", "astro-ph.HE", "cs", "astro-ph"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    build_index.parse_args(["--category", value]).categories,
+                    [value],
+                )
+
+    def test_malformed_categories_are_rejected(self):
+        for value in (
+            "cs.CV foo",
+            "cs..CV",
+            "cs.CV.BOGUS",
+            "cs.CV;",
+            "cat:cs.CV",
+            "",
+            "cs.CV\nfoo",
+            "cs.CV AND ti:robot",
+            "123",
+        ):
+            with self.subTest(value=value):
+                self._assert_rejected(value)
+
+    def test_repeated_categories_accumulate_in_order(self):
+        args = build_index.parse_args(
+            ["--category", "cs.CV", "--category", "cs.LG"]
+        )
+        self.assertEqual(args.categories, ["cs.CV", "cs.LG"])
+
+    def test_categories_is_none_when_unset(self):
+        self.assertIsNone(build_index.parse_args([]).categories)
+
+    def test_main_does_not_query_arxiv_for_a_rejected_category(self):
+        original = build_index.collect_papers
+        build_index.collect_papers = lambda *args, **kwargs: self.fail(
+            "collect_papers must not run when a category is rejected"
+        )
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    build_index.main(
+                        ["--category", "cs.CV foo", "--out-dir", "unused"]
+                    )
+            self.assertEqual(raised.exception.code, 2)
         finally:
             build_index.collect_papers = original
 

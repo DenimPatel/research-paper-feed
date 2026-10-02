@@ -162,7 +162,32 @@ def extract_source_archive(archive_path, dest):
         file.extractall(dest, members=safe_members, filter="data")
 
 
-def parse_args():
+def int_at_least(flag, minimum):
+    """Return an argparse ``type`` for ``flag`` restricted to integers >= ``minimum``.
+
+    ``--max-papers 0`` used to short-circuit ``iter_results`` and still write a
+    zero-paper HTML feed, printing a success message on the way out.
+    """
+    accepted = f"{minimum} or greater"
+
+    def parse(text):
+        try:
+            value = int(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError(
+                f"{flag} expects a whole number, got {text!r}"
+            ) from None
+        if value < minimum:
+            raise argparse.ArgumentTypeError(
+                f"{flag} accepts {accepted}, got {value}"
+            )
+        return value
+
+    parse.__name__ = flag.lstrip("-").replace("-", "_")
+    return parse
+
+
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Extract research papers from ArXiv into an HTML feed."
     )
@@ -172,8 +197,8 @@ def parse_args():
              "Prompted for interactively if omitted.",
     )
     parser.add_argument(
-        "--max-papers", type=int, default=1000,
-        help="Maximum number of papers to pull (default: 1000).",
+        "--max-papers", type=int_at_least("--max-papers", 1), default=1000,
+        help="Maximum number of papers to pull (default: 1000; 1 or greater).",
     )
     parser.add_argument(
         "--output-dir", default="results",
@@ -191,7 +216,7 @@ def parse_args():
         "--save-csv", action="store_true",
         help="Also save the extracted metadata as a CSV file.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def fetch_papers(topic, max_papers, download_pdfs=False, download_sources=False):

@@ -40,8 +40,14 @@ snapshot, so a collection keeps working after the paper ages out of the index.
    ```
 
    This writes `web/public/data/index.json` plus `data/papers-<YYYY>-W<NN>.json`.
-   Useful flags: `--retention-days`, `--max-per-category` (fast dev runs),
-   `--abstract-chars`, and `--out-dir`.
+   Useful flags, with the values they accept: `--retention-days` (1 or greater,
+   default `60`), `--max-per-category` (0 or greater, default `0` = no cap — pass
+   a small number for fast dev runs), `--abstract-chars` (1 or greater, default
+   `500`), `--category` (repeatable; each value must look like `cs.AI`,
+   `stat.ML` or `astro-ph.HE`, defaulting to `cs.CV`, `cs.LG`, `cs.CL`, `cs.AI`,
+   `cs.RO`), and `--out-dir` (any writable directory, default
+   `web/public/data`). An out-of-range or malformed value is rejected before
+   anything is fetched or written.
 
 2. Start the dev server:
 
@@ -96,7 +102,7 @@ The extracted papers are saved under `results/` as an HTML feed.
 | Flag | Description | Default |
 | --- | --- | --- |
 | `--topic` | ArXiv search query. If omitted, you'll be prompted interactively. | _(prompted)_ |
-| `--max-papers` | Maximum number of papers to pull. | `1000` |
+| `--max-papers` | Maximum number of papers to pull. Must be 1 or greater. | `1000` |
 | `--output-dir` | Directory the generated HTML feed is written to. | `results` |
 | `--download-pdfs` | Also download each paper's PDF. | off |
 | `--download-sources` | Also download and extract each paper's LaTeX source archive. | off |

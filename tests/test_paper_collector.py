@@ -234,6 +234,45 @@ class MainOutputPathTests(unittest.TestCase):
         )
 
 
+class MaxPapersArgumentTests(unittest.TestCase):
+    """``--max-papers 0`` used to short-circuit the fetch and still write a feed."""
+
+    def _assert_rejected(self, argv, expected):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as raised:
+                paper_collector.parse_args(argv)
+        self.assertEqual(raised.exception.code, 2, argv)
+        self.assertIn("--max-papers", stderr.getvalue())
+        self.assertIn(expected, stderr.getvalue())
+
+    def test_zero_max_papers_is_rejected(self):
+        self._assert_rejected(
+            ["--topic", "cat:cs.CV", "--max-papers", "0"], "1 or greater"
+        )
+
+    def test_negative_max_papers_is_rejected(self):
+        self._assert_rejected(["--max-papers", "-5"], "1 or greater")
+
+    def test_non_numeric_max_papers_is_rejected(self):
+        self._assert_rejected(["--max-papers", "lots"], "whole number")
+
+    def test_default_max_papers_is_unchanged(self):
+        self.assertEqual(paper_collector.parse_args([]).max_papers, 1000)
+
+    def test_documented_example_command_still_parses(self):
+        args = paper_collector.parse_args([
+            "--topic", 'cat:cs.CV AND "3d reconstruction"',
+            "--max-papers", "200",
+        ])
+        self.assertEqual(args.topic, 'cat:cs.CV AND "3d reconstruction"')
+        self.assertEqual(args.max_papers, 200)
+        self.assertEqual(args.output_dir, "results")
+
+    def test_no_topic_leaves_the_interactive_prompt_in_place(self):
+        self.assertIsNone(paper_collector.parse_args([]).topic)
+
+
 class ExtractSourceArchiveTests(unittest.TestCase):
     """``--download-sources`` must not let an archive write outside its own directory."""
 
