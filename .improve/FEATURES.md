@@ -468,7 +468,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Risk `med` because dropping non-`datetime` records changes what reaches the index for any upstream shape change; verify a real run still produces ~the same paper count before merging. The baseline index on disk is `totalPapers: 2812` across 2 shards; a smoke run of `--category cs.CV --max-per-category 300` is the comparison to record.
 
 ### IMP-021 — Write the manifest before deleting stale shards
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `scripts/build_index.py:224-232` (`_clean_old_shards`), `scripts/build_index.py:235-245` (`write_index` order)
@@ -482,7 +482,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-022 — Validate every CLI flag in both scripts
 - **Status:** TODO
 - **Category:** Configuration & defaults

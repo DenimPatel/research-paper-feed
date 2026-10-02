@@ -227,6 +227,66 @@ class WriteIndexTests(unittest.TestCase):
             )
 
 
+class WriteIndexOrderingTests(unittest.TestCase):
+    def test_deployed_shards_survive_a_failure_mid_write(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            deployed = os.path.join(out_dir, "papers-2023-W52.json")
+            with open(deployed, "w", encoding="utf-8") as handle:
+                json.dump({"papers": [{"id": "2312.00001"}]}, handle)
+            manifest_path = os.path.join(out_dir, "index.json")
+            with open(manifest_path, "w", encoding="utf-8") as handle:
+                json.dump({"shards": [{"file": "papers-2023-W52.json"}]}, handle)
+
+            records = [make_record("2401.00001", "2024-01-08")]
+            manifest, files = build_index.build_shards(
+                records,
+                generated_at=datetime(2024, 1, 10, tzinfo=timezone.utc),
+            )
+
+            original_dump = build_index.json.dump
+
+            def failing_dump(*args, **kwargs):
+                raise OSError("simulated crash mid-write")
+
+            build_index.json.dump = failing_dump
+            try:
+                with self.assertRaises(OSError):
+                    build_index.write_index(out_dir, manifest, files)
+            finally:
+                build_index.json.dump = original_dump
+
+            self.assertTrue(os.path.exists(deployed))
+            with open(deployed, encoding="utf-8") as handle:
+                self.assertEqual(
+                    json.load(handle)["papers"][0]["id"], "2312.00001"
+                )
+            with open(manifest_path, encoding="utf-8") as handle:
+                self.assertEqual(
+                    json.load(handle)["shards"][0]["file"], "papers-2023-W52.json"
+                )
+
+    def test_same_week_shard_from_a_previous_run_is_kept(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            previous = os.path.join(out_dir, "papers-2024-W02.json")
+            with open(previous, "w", encoding="utf-8") as handle:
+                json.dump({"papers": [{"id": "2401.00009"}]}, handle)
+
+            records = [make_record("2401.00001", "2024-01-08")]
+            manifest, files = build_index.build_shards(
+                records,
+                generated_at=datetime(2024, 1, 10, tzinfo=timezone.utc),
+            )
+            build_index.write_index(out_dir, manifest, files)
+
+            self.assertTrue(os.path.exists(previous))
+            with open(previous, encoding="utf-8") as handle:
+                self.assertEqual(json.load(handle)["papers"][0]["id"], "2401.00001")
+
+
 class CollectPapersTests(unittest.TestCase):
     def setUp(self):
         self.original = build_index.arxiv_common.iter_results

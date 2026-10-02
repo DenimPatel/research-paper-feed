@@ -241,10 +241,14 @@ def collect_papers(
     return records
 
 
-def _clean_old_shards(out_dir):
+def _clean_old_shards(out_dir, keep=()):
+    """Remove shard files in ``out_dir``, sparing the names in ``keep``."""
     if not os.path.isdir(out_dir):
         return
+    keep = set(keep)
     for name in os.listdir(out_dir):
+        if name in keep:
+            continue
         if re.fullmatch(r"papers-\d{4}-W\d{2}\.json", name):
             try:
                 os.remove(os.path.join(out_dir, name))
@@ -253,15 +257,22 @@ def _clean_old_shards(out_dir):
 
 
 def write_index(out_dir, manifest, shard_files):
-    """Write the manifest and shard files to ``out_dir``."""
+    """Write the manifest and shard files to ``out_dir``.
+
+    Shards land first, then the manifest, and stale shards are swept last. The
+    previously deployed ``index.json`` therefore keeps referencing shards that
+    are still on disk for the whole window in which this run can fail; deleting
+    first would leave it pointing at files that no longer exist, which the app
+    cannot recover from.
+    """
     os.makedirs(out_dir, exist_ok=True)
-    _clean_old_shards(out_dir)
     for filename, shard in shard_files.items():
         with open(os.path.join(out_dir, filename), "w", encoding="utf-8") as handle:
             json.dump(shard, handle, ensure_ascii=False, separators=(",", ":"))
     manifest_path = os.path.join(out_dir, "index.json")
     with open(manifest_path, "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, ensure_ascii=False, indent=2)
+    _clean_old_shards(out_dir, keep=shard_files)
     return manifest_path
 
 
