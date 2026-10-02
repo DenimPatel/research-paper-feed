@@ -87,10 +87,16 @@ export function isHttpUrl(value: unknown): boolean {
   return /^https?:\/\//i.test(String(value).trim());
 }
 
+/**
+ * Reject only urls that are present and not `http(s)`. A field the producer
+ * left absent is `null` as often as it is missing — `build_index.py` reads it
+ * with `getattr(result, …, None)` — and that is "no url", not "unsafe url",
+ * so dropping the paper would lose data this guard never meant to remove.
+ */
 function hasSafeUrls(value: Paper): boolean {
   const paper = value as Partial<Paper>;
   return [paper.absUrl, paper.pdfUrl].every(
-    (url) => url === undefined || isHttpUrl(url),
+    (url) => url == null || isHttpUrl(url),
   );
 }
 

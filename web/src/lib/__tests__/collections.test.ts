@@ -437,6 +437,75 @@ describe("prototype-keyed import payloads", () => {
   });
 });
 
+describe("producer-null urls in imported papers", () => {
+  /**
+   * `scripts/build_index.py` builds `absUrl`/`pdfUrl` with `getattr(result, …,
+   * None)`, so a genuinely url-less paper reaches the wire as JSON `null`. The
+   * round-trip reproduces the bytes the import path actually reads.
+   */
+  function parseImported(papers: unknown[]) {
+    return parseExportPayload(
+      JSON.parse(
+        JSON.stringify({
+          version: 1,
+          exportedAt: "2026-10-02T00:00:00.000Z",
+          collection: {
+            id: "c1",
+            name: "Imported",
+            createdAt: "2026-10-02",
+            paperIds: (papers as Array<{ id: string }>).map((paper) => paper.id),
+          },
+          papers,
+        }),
+      ),
+    );
+  }
+
+  it("keeps a paper whose absUrl is null", () => {
+    const payload = parseImported([
+      { ...makePaper("2401.00001"), absUrl: null },
+      makePaper("2401.00002"),
+    ]);
+    expect(payload?.papers.map((paper) => paper.id)).toEqual([
+      "2401.00001",
+      "2401.00002",
+    ]);
+    expect(payload?.papers[0].absUrl).toBeNull();
+  });
+
+  it("keeps a paper whose pdfUrl is null", () => {
+    const payload = parseImported([
+      { ...makePaper("2401.00001"), pdfUrl: null },
+      makePaper("2401.00002"),
+    ]);
+    expect(payload?.papers.map((paper) => paper.id)).toEqual([
+      "2401.00001",
+      "2401.00002",
+    ]);
+    expect(payload?.papers[0].pdfUrl).toBeNull();
+  });
+
+  it("keeps a paper whose absUrl and pdfUrl are both null", () => {
+    const payload = parseImported([
+      { ...makePaper("2401.00001"), absUrl: null, pdfUrl: null },
+    ]);
+    expect(payload?.papers.map((paper) => paper.id)).toEqual(["2401.00001"]);
+    expect(payload?.papers[0].absUrl).toBeNull();
+    expect(payload?.papers[0].pdfUrl).toBeNull();
+  });
+
+  it("still drops javascript:, data: and vbscript: urls beside null siblings", () => {
+    const payload = parseImported([
+      makePaper("2401.00001", { absUrl: "javascript:alert(1)" }),
+      makePaper("2401.00002", { pdfUrl: "data:text/html,<script>x</script>" }),
+      makePaper("2401.00003", { pdfUrl: "vbscript:msgbox(1)" }),
+      { ...makePaper("2401.00004"), absUrl: null, pdfUrl: null },
+      makePaper("2401.00005", { absUrl: "httpx://evil.example/5" }),
+    ]);
+    expect(payload?.papers.map((paper) => paper.id)).toEqual(["2401.00004"]);
+  });
+});
+
 describe("loadState / saveState", () => {
   it("round-trips collections and papers", () => {
     const storage = new MemoryStorage();
