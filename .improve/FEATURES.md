@@ -5,7 +5,7 @@ repository and, where the defect is behavioural, an observed symptom from
 `.improve/REPO_PROFILE.md` or the six `.improve/reports/recon-*.md` files. No invented
 problems, no speculative rewrites.
 
-**Total items: 164** — 148 `TODO`, 7 `NEEDS-HUMAN`, 9 `DONE`.
+**Total items: 169** — 147 `TODO`, 7 `NEEDS-HUMAN`, 15 `DONE`.
 
 **Status legend**
 
@@ -70,16 +70,16 @@ proposed item renames `scripts/paper-collector.py`.
 | 15.0 | `4 × 4 ÷ 1` … `3 × 5 ÷ 1` | IMP-042 … IMP-092 (less the merged ids), plus IMP-144, IMP-145, IMP-147, IMP-152, IMP-155 … IMP-157 |
 | 12.5 | `5 × 5 ÷ 2` | IMP-006, IMP-041, IMP-093, IMP-094 |
 | 12.0 | `4 × 4 ÷ 2` | IMP-095 … IMP-097, IMP-146, IMP-153, IMP-158, IMP-159 |
-| 10.0 | `3 × 3 ÷ 1` … `2 × 5 ÷ 1` | IMP-098 … IMP-115, IMP-148, IMP-150, IMP-160 … IMP-162, IMP-166, IMP-167 |
+| 10.0 | `3 × 3 ÷ 1` … `2 × 5 ÷ 1` | IMP-098 … IMP-115, IMP-148, IMP-150, IMP-160 … IMP-162, IMP-166 … IMP-171 |
 | 8.0 | `2 × 4 ÷ 1` … `2 × 5 ÷ 2` | IMP-116 … IMP-126, IMP-149, IMP-164, IMP-165 |
 | 7.5 | `3 × 5 ÷ 2` | IMP-127 … IMP-131, IMP-163 |
 | 6.7 | `4 × 5 ÷ 3` | IMP-132 |
 | 6.0 | `3 × 4 ÷ 2` | IMP-133 … IMP-136 |
-| 5.0 | `3 × 4 ÷ 3` / `2 × 5 ÷ 2` | IMP-137 … IMP-140 |
+| 5.0 | `3 × 4 ÷ 3` / `2 × 5 ÷ 2` | IMP-137 … IMP-140, IMP-172 |
 | 4.0 | `2 × 4 ÷ 2` | IMP-141 … IMP-142 |
 
 IDs 47, 48 and 57 were retired by absorption and **must not be reused**; the live range is
-IMP-001 … IMP-167 minus those three.
+IMP-001 … IMP-172 minus those three.
 
 **NEEDS-HUMAN (not executable without a decision).** IMP-027 (deploy cadence), IMP-034 (delete
 or rewrite the notebook), IMP-088 (adopt a failing security gate), IMP-096 (`robots.txt`
@@ -256,7 +256,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** IMP-003
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending; attempt 2 PASS
+- **Notes:** commit ac1fae2; attempt 2 PASS (attempt 1 FAILed — the retry button was dead: one `getManifest()` per document, so a second click could not re-fetch)
 ### IMP-008 — Make relevance sort agree with the Relevance chip
 - **Status:** DONE
 - **Category:** Correctness
@@ -272,7 +272,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** IMP-143
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending; attempt 2 PASS
+- **Notes:** commit 67ee0a4; attempt 2 PASS (attempt 1 FAILed — flaky test race)
 ### IMP-009 — Validate `#cat=` values against the manifest
 - **Status:** DONE
 - **Category:** Correctness
@@ -288,7 +288,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending
+- **Notes:** commit 228d48d; attempt 2 PASS (attempt 1 FAILed — it wrote `urlState.ts` but never wired `App.tsx` to call it, so the behaviour never changed)
 ### IMP-010 — Make the category selection reversible and representable
 - **Status:** DONE
 - **Category:** UX flows & interactivity
@@ -532,7 +532,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** S    **Risk:** med
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** Risk `med` because a real arXiv source archive may contain members that `filter="data"` rejects, and `--download-sources` is a documented flag. Test against a real source archive before merging and log every rejection so a user can see what was skipped. | commit pending; attempt 2 PASS
+- **Notes:** Risk `med` because a real arXiv source archive may contain members that `filter="data"` rejects, and `--download-sources` is a documented flag. Test against a real source archive before merging and log every rejection so a user can see what was skipped. | commit 19f8dbb; attempt 2 PASS (attempt 1 FAILed — the no-`filter` fallback branch still allowed traversal: `FORCE_FALLBACK=1` measured 21 escape routes)
 
 ### IMP-025 — Make `--save-csv` honor `--output-dir`
 - **Status:** TODO
@@ -2300,6 +2300,74 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 — no user or operator harm, and not one line of shipped code was wrong. The reason to itemize it is that `.improve/` is the memory of this loop: a fabricated figure in a DONE item's report is read by the next three implementers as a baseline, and the loop's whole value is that the baseline is measured. The verifier's judgement was that this "is the most serious report defect, because it is the one that would mislead a human reviewer skimming for evidence" — record that reasoning in the PR body so the item is not dismissed as pedantry. D1, D4 and D5 in `.improve/reports/verify-IMP-012.md`. This item does **not** retroactively invalidate the IMP-012 code change, which passed 7/7 criteria.
 
+### IMP-168 — Suffix the reserved-name **stem**, not the whole slug, in `safe_filename`
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** bug-fix
+- **Area / files:** `scripts/paper-collector.py:65-67` (the reserved-name branch of `safe_filename`), `scripts/paper-collector.py:35-41` (`WINDOWS_RESERVED_NAMES`), `scripts/paper-collector.py:53-59` (the docstring promise it fails to keep), `tests/test_paper_collector.py:109-112` (`test_reserved_name_before_a_long_extension_is_still_suffixed`)
+- **Intent:** IMP-023 (`297ed71`) made `safe_filename` a real sanitizer, but its reserved-name branch appends the `_` to the **end of the whole slug**, so `con.txt` → `con.txt_` and `NUL.tar.gz` → `NUL.tar.gz_`. Windows resolves a device name from the portion before the **first** dot and ignores the extension — which is precisely why Microsoft documents `NUL.txt` and `NUL.tar.gz` as reserved — so `con.txt_` still names the console device, and `f"{title_slug}.pdf"` at `paper-collector.py:214` turns `NUL` into `NUL.tar.gz_.pdf`, which Windows still resolves to `NUL`. The function's own docstring promises a slug that "must never name a reserved Windows device", and the promise is not kept for any of the 22 names followed by an extension. The suite cannot see it: `test_reserved_name_before_a_long_extension_is_still_suffixed` (`tests/test_paper_collector.py:109-112`) asserts only `slug.startswith("CON.x")` plus a byte bound, so it passes while every one of those outputs is still a device.
+- **Acceptance criteria:**
+  1. In `safe_filename` (`scripts/paper-collector.py:52-71`) the reserved-name branch inserts the `_` at the **end of the stem before the first dot**, so for every form that carries a dot the returned slug satisfies `slug.split(".")[0].upper() not in WINDOWS_RESERVED_NAMES` — e.g. `con.txt` → `con_.txt` and `NUL.tar.gz` → `NUL_.tar.gz_`, or a single flattened `con_txt`; pick one rule and apply it identically on every path. An input with no dot keeps today's behaviour: `safe_filename("CON") == "CON_"`.
+  2. For each of the 22 names in `WINDOWS_RESERVED_NAMES` and each of the forms `NAME`, `name.lower()`, `NAME.title()`, `NAME.txt`, `NAME.tar.gz`, `NAME.json`, `NAME.` and `NAME.x` — 176 cases — the returned slug is non-empty, is neither `.` nor `..`, contains no path separator, is at most 200 UTF-8 bytes, and has a stem that is not a device name.
+  3. No other behaviour changes: `test_documented_topics_stay_readable` (`tests/test_paper_collector.py:119-127`) and `test_names_that_only_start_like_a_device_are_untouched` (`:114-117`, covering `CONSORTIUM`, `com10`, `lpt0`, `auxiliary losses`) pass **unmodified**, `safe_filename("..") == "_"` still holds, and `safe_filename("x" * 400)` is still exactly 200 bytes.
+  4. `tests/test_paper_collector.py:109-112` is rewritten to assert the **result** is not a device name — `slug.split(".")[0].upper() not in paper_collector.WINDOWS_RESERVED_NAMES` for `"CON.txt"`, `"NUL.tar.gz"`, `"COM1.json"`, `"aux.md"` and `"lpt9.csv"` — replacing the `startswith("CON.x")` assertion. The replacement must be strictly stronger, and non-vacuity must be demonstrated: run the new assertion against `git show HEAD:scripts/paper-collector.py` in a `/tmp` copy and quote the failure count, as the IMP-023 verifier did for its own new tests.
+- **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; then `/usr/local/bin/python3.11 -c "import importlib.util; s=importlib.util.spec_from_file_location('pc','scripts/paper-collector.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); [print(repr(m.safe_filename(x)), m.safe_filename(x).split('.')[0].upper() in m.WINDOWS_RESERVED_NAMES) for x in ('con.txt','NUL.tar.gz','COM1.json','aux.md','lpt9.csv','CON','CONSORTIUM')]"` must print `False` in the second column for every one of the seven inputs.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Impact is 2 — Windows-only, narrow input, no traversal and no overwrite of anything a user owns; the failure is that the sanitized name *is* the device, so the write lands on the console or `NUL` instead of the disk. Confidence is 5: the mechanism is fixed at `paper-collector.py:65` and was reproduced on Python 3.9.6/3.11.8/3.14.3. This is **not** a regression — the pre-IMP-023 one-liner returned `con.txt`, equally a device — and it reopens nothing IMP-023 closed (its criteria 1, 3 and 4 are untouched); the IMP-023 verifier scored criterion 2 MET because the criterion's literal wording ("gains a `_` suffix") is satisfied while flagging the intent as only partly delivered. Cross-references, deliberately not duplicated: IMP-023 is DONE and correct as scored; IMP-162 touches `scripts/paper-collector.py` on the same extraction path but concerns `TarInfo.mode`; IMP-050 rewrites the same `title_slug` call sites to honour `--output-dir` and must not absorb this. The sibling slug-collision finding from the same verification is IMP-171. Issues **I1** and **I2** in `.improve/reports/verify-IMP-023.md`; also §6 of `.improve/reports/regression-sweep-2.md`, whose CLI table shows `NUL.txt` → `NUL.txt_` and does not flag it.
+
+### IMP-169 — Reject prototype-keyed collection ids in `isCollection`
+- **Status:** TODO
+- **Category:** Security
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/collections.ts:116-127` (`isCollection`, which validates `id`/`name`/`paperIds[]` but never consults `PROTOTYPE_KEYS`), `web/src/lib/collections.ts:40` (`PROTOTYPE_KEYS`), `web/src/lib/collections.ts:84` (`isPaper`'s matching `!PROTOTYPE_KEYS.has(paper.id)` guard), `web/src/lib/collections.ts:319` (`loadState`'s `parsedCollections.filter(isCollection)`), `web/src/lib/collections.ts:264` (`parseExportPayload`'s `isCollection` call)
+- **Intent:** IMP-151 (`34ea96c`) added `PROTOTYPE_KEYS` to `isPaper` at `:84` and to `loadState`'s paper loop at `:312`, but left `isCollection` untouched, so a collection whose `id` is `"__proto__"`, `"constructor"` or `"prototype"` is still accepted from `localStorage` and from an import file. This is the same class of defect IMP-151 exists to close, one function over, and it leaves the two validators in a single file disagreeing about what an identifier may be. It is, however, **currently inert**: every use of a collection id was traced — collections live in the `state.collections` array, are matched with `c.id === payload.collection.id`, are used only as a React `key={collection.id}`, and are minted by `newId()` — and none of them reads the prototype chain. No exploit path exists today; what is open is that the next refactor which keys collections into an object reopens it, and that a collection id is the one untrusted identifier in the file with no prototype guard.
+- **Acceptance criteria:**
+  1. `isCollection` (`web/src/lib/collections.ts:116-127`) rejects a collection whose `id` is in `PROTOTYPE_KEYS`, with a clause structurally identical to `isPaper`'s at `:84`. That clause is the **only** addition to the function — the three existing `typeof`/`Array.isArray` checks at `:122-125` are unchanged.
+  2. New tests in `web/src/lib/__tests__/collections.test.ts` assert that `loadState` drops a stored collection whose `id` is `"__proto__"`, `"constructor"` and `"prototype"` while keeping a valid sibling, and that `parseExportPayload` with such a `collection` behaves exactly as it does today for a structurally invalid collection (no throw, papers preserved). Per IMP-161's note, use the existing `hasOwnKey` helper — `Object.hasOwn` is unusable because `web/tsconfig.json:5` sets `lib: ["ES2020", …]` and fails with TS2550.
+  3. Nothing legitimate is dropped: `newId()` output is unaffected, and an id of `toString` is still accepted — it is a real own key in the 2,812-paper corpus and is deliberately absent from `PROTOTYPE_KEYS`. Assert both in a test.
+  4. `grep -n "PROTOTYPE_KEYS" web/src/lib/collections.ts` reports at least four hits — the declaration at `:40`, `isPaper`, `loadState`, and `isCollection` — so the two validators can no longer drift apart silently.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then seed `rpf.collections.v1` in a browser with one collection whose `id` is `"__proto__"` and one valid sibling, hard-reload `http://localhost:5199/research-paper-feed/#view=collections`, and confirm the poisoned collection is absent, the sibling renders, and the console is empty. Screenshot to `.improve/artifacts/IMP-169/collections-prototype-id-desktop-1280.png` against `.improve/artifacts/baseline/baseline-collections-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Impact is deliberately 2, not higher: the verifier traced every use of a collection id and found no prototype-chain read, so this closes an inconsistency rather than a live vulnerability — it is scored identically to IMP-161 for the identical reason. Confidence 5: the absence of the check is a fact in the file as it stands. Cross-references, deliberately **not** duplicated: IMP-151 (DONE) closed the paper-id read/write paths and its criterion 2 names only `isPaper`; IMP-161 guards `mergeImport`'s `papers[paper.id]` write and names `isCollection` only as the site performing its own validation, never as a site that must reject a prototype id; IMP-160 guards the render path, not the validator. Finding **F3** in §8 of `.improve/reports/regression-sweep-2.md`, whose minimal fix is exactly `!PROTOTYPE_KEYS.has(collection.id) &&` in the `isCollection` return chain, and which confirms the gap was left by `34ea96c`.
+
+### IMP-170 — Guard `noCategoriesSelected` on a manifest that actually has categories
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** bug-fix
+- **Area / files:** `web/src/App.tsx:197-198` (`const noCategoriesSelected = manifest !== null && activeCategories.length === 0`), `web/src/App.tsx:191-192` (`activeCategories = categoryResolution.selected ?? manifest?.categories ?? []`), `scripts/build_index.py:189` (`list(categories or DEFAULT_CATEGORIES)`) and `scripts/build_index.py:300` (`categories = args.categories or DEFAULT_CATEGORIES`) — the reason the state is unreachable today
+- **Intent:** IMP-010 (`42e0edb`) made "no categories selected" a distinct, named, reversible state precisely so that a bare-URL `categories: null` ("all categories") could never be presented as an empty selection, and its verifier proved the `null`-vs-`[]` distinction holds across four layers. But `noCategoriesSelected` is guarded on `manifest !== null` alone, not on "the index declares any category at all". With `manifest.categories === []`, a **bare URL with no filter whatsoever** (`categories === null`, meaning every category the index has — of which there are none) renders the "No categories selected" panel plus a "Select all categories" button that cannot change anything: a nominal collapse of the exact distinction IMP-010 established, in a form the item forbids. It is currently unreachable, because `build_index.py` forces a non-empty default list at `:189` and `:300` so a built manifest can never carry an empty `categories`, and `PaperIndex.fetchManifest` only casts. But that cast is unchecked, so a hand-placed or third-party index could trigger it, and the coupling between an app invariant and a producer default is silent in both directions.
+- **Acceptance criteria:**
+  1. `web/src/App.tsx:197-198` becomes `manifest !== null && manifest.categories.length > 0 && activeCategories.length === 0`, so the named empty state is reachable only when the index declares at least one category.
+  2. A manifest whose `categories` is `[]` renders the **generic** empty-filter branch, not the named one: with such a manifest and a bare URL, `document.body.textContent` does not contain `"No categories selected"` and no `"Select all categories"` button is present. The condition still keys on `activeCategories.length === 0`, so a real empty selection against a real manifest keeps its own named message — that half of the change must not regress.
+  3. A new test in `web/src/__tests__/App.categories.test.tsx` (the file IMP-010 created) stubs a zero-category manifest, loads a bare URL, and asserts the named branch is not taken. The existing IMP-010 tests — which drive `#cat=` against a two-category manifest and assert `"No categories selected"` **is** rendered — pass unmodified, which is what proves criterion 1 did not over-correct.
+  4. `cd web && npm run typecheck && npm test && npm run build` pass, and no test in `web/src/__tests__/App.categories.test.tsx` needed its expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then `npm run build && npm run preview -- --port 5199 --strictPort` against a **copy** of `web/dist` staged under `/tmp` with `data/index.json` hand-edited to `"categories": []` (the repo is never touched), load a bare URL and confirm the named state is absent; then serve the real index, load `#cat=`, and confirm it is present. Screenshots to `.improve/artifacts/IMP-170/feed-zero-category-manifest-desktop-1280.png` and `.improve/artifacts/IMP-170/feed-no-categories-selected-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Impact is 2 and confidence 5: the verifier reproduced the state directly with a stubbed zero-category manifest — `[ZERO-CATEGORY INDEX] hash="" … emptyPanel="No categories selected" selectAllButtonPresent=true` — and confirmed it is unreachable through the shipped pipeline, so this is latent coupling rather than a shipped bug. Cross-references, deliberately **not** duplicated: IMP-010 (DONE) owns the `null`-vs-`[]` contract in `resolveCategories`/`readHash`/`writeHash` and met all four of its criteria; IMP-098 validates the manifest arriving **over the network**, but its criterion 1 only requires `categories` to be a string array — which `[]` satisfies — so IMP-098 does **not** close this and the two are complements rather than substitutes. Non-blocking §6.3 in `.improve/reports/verify-IMP-010.md`, which proposes exactly this one-line guard and notes the optional one-line hardening for "whoever touches this file next".
+
+### IMP-171 — Stop title-derived slugs from colliding in the download and extraction tree
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** bug-fix
+- **Area / files:** `scripts/paper-collector.py:211` (`title_slug = safe_filename(result.title)` — the single source for all three artifacts), `scripts/paper-collector.py:214` (`f"{title_slug}.pdf"`), `scripts/paper-collector.py:216` (`f"{title_slug}.tar.gz"`), `scripts/paper-collector.py:218` (`f"./extracted/{title_slug}"`), `scripts/paper-collector.py:34` (`FALLBACK_SLUG = "_"`)
+- **Intent:** After IMP-023 the slug is a de-facto primary key for three artifacts per paper, and it is derived from the title alone, so distinct topics can share one key. Three collision classes exist on a default case-insensitive APFS volume, all confirmed empirically with `os.path.samefile`: `CON` and `CON_` now resolve to the **same** directory because the `_` suffix IMP-023 introduced lands on a name a real paper may already own (`NUL`/`NUL_` likewise); every dot-only title — `.`, `..`, `///` — collapses to the single `FALLBACK_SLUG = "_"`; and plain case variants (`Report`/`report`, `A Study`/`A study`) collide. The consequence is bounded — two papers' `extracted/<slug>` trees merge and the second `download_source(filename=f"{title_slug}.tar.gz")` overwrites the first — but it is silent, there is no traversal and no escape, and because macOS is case-insensitive by default it will recur on every developer machine rather than only on a case-sensitive CI runner.
+- **Acceptance criteria:**
+  1. `fetch_papers` derives the per-paper artifact base from something unique to the result rather than from `safe_filename(result.title)` alone — for example the sanitized title truncated more aggressively **plus** the arXiv id (`result.get_short_id()`), or the id alone — so two results whose sanitized titles are equal produce different `{base}.pdf`, `{base}.tar.gz` and `extracted/{base}` paths. One scheme, applied identically at `:214`, `:216` and `:218`; record the resulting on-disk layout in the PR body.
+  2. Overwriting silently is not an acceptable outcome under this item. Either criterion 1 holds, or — as an explicitly recorded alternative — the collision is detected and reported: a `logger.warning` naming the colliding base and both results, and the second write skipped rather than performed. Record which branch was taken.
+  3. New tests in `tests/test_paper_collector.py` drive `fetch_papers` with two fake results titled `"CON"` and `"CON_"`, and separately with `"."` and `".."`, and assert the four download calls and the two extraction destinations are pairwise distinct — or, under the alternative branch, that a warning is logged and the second write skipped. The test must be shown non-vacuous by running it in a `/tmp` copy against `git show HEAD:scripts/paper-collector.py` and quoting the failure count.
+  4. All 2,812 real titles in `web/public/data/papers-2026-W39.json` and `papers-2026-W40.json` produce pairwise-distinct bases under the new scheme, asserted as a count in a test rather than by eye; and `safe_filename` itself is **unchanged** — this is a caller-side change, not a fourth sanitizer rule.
+- **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; then from a scratch CWD `/tmp/rpf-venv/bin/python scripts/paper-collector.py --topic 'cat:cs.CV' --max-papers 2 --download-sources --output-dir /tmp/rpf-collide` and confirm `ls /tmp/rpf-collide/extracted` holds two distinct directories with no overwrite and that `git status --porcelain` is empty.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Impact is 2 — measured, but negligible in practice: of the 2,812 real titles, **0** collide, and the failure mode is an overwrite rather than data loss or an escape. Confidence 5: the collisions were measured with `os.path.samefile` on this machine's volume and the class is inherent to a title-derived key. Every alternative fallback name has the same property (the verifier's own words), which is why the item is about the **caller** deriving the base rather than the sanitizer inventing more names — hence criterion 4's "do not touch `safe_filename`". Cross-references: IMP-050 (TODO) rewrites these same three call sites to honour `--output-dir` and deletes the `.tar.gz` after extraction; land IMP-050 first (it is 15.0, above this item) and let it carry the distinctness assertion into its criterion-2 test, but do **not** declare a `Depends on`, so this item's unit tests can land independently in the same three lines. IMP-023 (DONE) chose `FALLBACK_SLUG = "_"` deliberately and disclosed the collision in its own report; this item does not reopen that choice. Issue **I3** in `.improve/reports/verify-IMP-023.md` and §8 of `impl-IMP-023.md`. Only the `CON`/`CON_` and dot-only classes are new; the `Report`/`report` case collided under the pre-IMP-023 one-liner too.
+
 ## Tier 8.0
 
 
@@ -2788,6 +2856,23 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** The profile warns against cosmetic churn, and this is the smallest item in the backlog — it is here because both pieces actively mislead, and because removing them is a prerequisite for ESLint reporting zero findings honestly (IMP-138). The `import` version check that belongs in the same neighborhood is IMP-060.
+
+### IMP-172 — Put the "No categories selected" action inside the `.empty` panel
+- **Status:** TODO
+- **Category:** UI polish & visual consistency
+- **Type:** improvement
+- **Area / files:** `web/src/App.tsx:489-500` (the `<p className="empty">No categories selected</p>` and the sibling `<p>` holding the "Select all categories" button), `web/src/App.tsx:391-399` (the retry panel, which nests its button correctly and is the model to copy), `web/src/styles.css:554-561` (`.empty`, whose `text-align: center` at `:556` applies only inside the panel)
+- **Intent:** In the empty-category state IMP-010 introduced, the message "No categories selected" renders **inside** the dashed `.empty` panel and is centred by `text-align: center`, while the "Select all categories" button renders in a sibling `<p>` **outside** that panel and is therefore left-aligned to the page gutter. The two halves of one message-and-action pair sit at different horizontal positions and different widths, which reads as an accident rather than a hierarchy. The retry panel already does it correctly — `App.tsx:391-399` puts its "Try again" button inside the panel — so this new markup is the only place in the app that splits the pair, and IMP-010 deliberately added no `styles.css` rule for it, so there is no compensating alignment anywhere.
+- **Acceptance criteria:**
+  1. The `<p><button className="button">Select all categories</button></p>` at `web/src/App.tsx:491-499` is moved **inside** the same element that carries `className="empty"`, so `.empty`'s `text-align: center` applies to both and the structure matches the retry panel's.
+  2. No rule in `web/src/styles.css` is added or changed: `git diff -- web/src/styles.css` is empty for this item, and the only layout change is the DOM nesting.
+  3. The rendered horizontal centres agree, measured rather than inferred: at 1280px **and** at 390px the midpoint of the button's `getBoundingClientRect()` is within 2 px of the midpoint of the `.empty` panel's.
+  4. Behaviour is untouched: the button keeps `type="button"`, the `button` class, its accessible name `"Select all categories"`, and real `Enter` and `Space` activation still restore the full selection; `cd web && npm run typecheck && npm test && npm run build` pass with the existing IMP-010 assertions in `web/src/__tests__/App.categories.test.tsx` **unmodified**.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then `npm run build && npm run preview -- --port 5199 --strictPort`, load `http://localhost:5199/research-paper-feed/#cat=`, and record both `getBoundingClientRect()` midpoints at 1280px and 390px. Screenshots to `.improve/artifacts/IMP-172/feed-no-categories-selected-desktop-1280.png` and `.improve/artifacts/IMP-172/feed-no-categories-selected-mobile-390.png`, the first compared against `.improve/artifacts/baseline/baseline-feed-no-categories-selected-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 5.0
+- **Notes:** Impact is 1 — purely cosmetic, and the current form is fully usable and correctly keyboard-reachable as shipped; the IMP-010 verifier explicitly called this "not a defect" and recorded it as an observation. It is itemized because the fix is a two-line DOM move with no behavioural risk, and because the inconsistency is now visible to anyone who compares the two empty-state panels side by side. Cross-references: IMP-106 (TODO) adds a functional "Clear filters" action to the **other** empty state (`PaperList`'s generic "No papers match the current filters.") and is a separate change — if both land, that action belongs inside the same `.empty` panel for the same reason, so do not duplicate the nesting work across the two items. IMP-148 (TODO) adds `role="status"` to the empty states and constrains its own criterion 3 to "no CSS changes"; it neither covers this button nor should be allowed to substitute a markup-only nudge for it. §8.6 of `.improve/reports/verify-IMP-010.md`, which names `App.tsx:391-399` as the structure to copy.
 
 ## Tier 4.0
 
