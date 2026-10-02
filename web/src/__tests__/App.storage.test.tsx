@@ -152,6 +152,12 @@ describe("a collections save that localStorage refuses", () => {
     // exists. Without the banner that is the whole story the user gets, and the
     // data is gone on the next reload.
     expect(await screen.findByRole("heading", { name: /^Vision/ })).toBeTruthy();
+    // The heading is the reducer's optimistic commit; the banner is a separate
+    // `saveFailed` state set by the save effect on a later passive commit, so
+    // waiting for the card says nothing about the notice. The count is the wait.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert")).toHaveLength(1),
+    );
     const banner = saveFailedBanner();
     expect(banner.textContent).toContain("Collections could not be saved");
     expect(banner.textContent).toMatch(/storage may be full/i);

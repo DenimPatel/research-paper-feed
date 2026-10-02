@@ -879,7 +879,12 @@ describe("the load failure alongside the other notices", () => {
     // to be earned before the two can be compared side by side.
     await saveSomething();
 
-    expect(screen.getAllByRole("alert")).toHaveLength(2);
+    // The storage banner is armed by a save effect and the load-failure panel by
+    // the load effect, so the two do not mount together. Waiting for the first
+    // alert says nothing about the second, so the count itself is the wait.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert")).toHaveLength(2),
+    );
     const panel = failurePanel();
     const storage = screen
       .getAllByRole("alert")
@@ -891,7 +896,12 @@ describe("the load failure alongside the other notices", () => {
     const search = screen.getByLabelText("Search papers");
     fireEvent.change(search, { target: { value: "abstract" } });
 
-    expect(screen.getAllByRole("alert")).toHaveLength(2);
+    // The same wait after the re-render: a search change re-renders the whole app,
+    // and the node-identity assertions below only mean anything once both notices
+    // are back on screen.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert")).toHaveLength(2),
+    );
     expect(failurePanel()).toBe(panel);
     expect(screen.getAllByRole("alert")).toContain(storage as HTMLElement);
   });
@@ -901,9 +911,14 @@ describe("the load failure alongside the other notices", () => {
     window.location.hash = "#cat=cs.BI";
 
     render(<App />);
-    await screen.findByRole("alert");
-
-    expect(screen.getAllByRole("alert")).toHaveLength(2);
+    // The unknown-category banner can only appear once the manifest has resolved
+    // and `resolveCategories` has dropped `cs.BI`, which is a different effect from
+    // the one that fails the load. The panel can therefore be on screen while the
+    // banner is still mounting, so waiting for the first alert says nothing about
+    // the second and the count itself has to be the wait.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert")).toHaveLength(2),
+    );
     expect(failurePanel().textContent).toMatch(/not an empty window/i);
     const unknown = screen
       .getAllByRole("alert")

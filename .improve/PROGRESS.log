@@ -7,7 +7,7 @@
 2026-10-02T05:31:44Z | IMP-024      | DONE     | 19f8dbb (attempt 2; attempt 1 FAILed on fallback traversal)
 2026-10-02T05:36:20Z | IMP-151      | DONE     | 34ea96c
 2026-10-02T05:44:02Z | IMP-012      | DONE     | 0ad375c
-2026-10-02T06:03:29Z | REGRESSION-1 | FOUND    | data loss in IMP-001 (null URL drops papers on import)
+2026-10-02T06:03:29Z | REGRESSION-1 | FOUND    | 0beec1b (data loss: null URL drops papers on import)
 2026-10-02T06:03:29Z | REGRESSION-1 | FIXED    | 7a2ed82
 2026-10-02T07:17:28Z | IMP-154      | DONE     | 2367a80
 2026-10-02T07:40:12Z | IMP-007      | DONE     | ac1fae2 (attempt 2; attempt 1 FAILed on dead retry button)
@@ -15,15 +15,18 @@
 2026-10-02T09:54:23Z | IMP-009      | DONE     | 228d48d (attempt 2; attempt 1 never wired App.tsx)
 2026-10-02T10:37:33Z | IMP-010      | DONE     | 42e0edb
 2026-10-02T10:52:04Z | IMP-023      | DONE     | 297ed71
-2026-10-02T11:10:19Z | REGRESSION-2 | CLEAN    | 34 browser states, 160 web tests x9 runs, 53 python tests
-2026-10-02T12:19:14Z | IMP-011      | DONE     | 2e3f6e8
-2026-10-02T12:41:07Z | IMP-015      | DONE     | ff3f331 (attempt 2; attempt 1 never implemented AC2)
-2026-10-02T12:58:51Z | IMP-016      | DONE     | 166066d
-2026-10-02T13:25:57Z | IMP-017      | DONE     | 8aceee1
-2026-10-02T14:02:33Z | REGRESSION-3 | FOUND    | duplicate recovery affordance (IMP-010 x IMP-009); spurious save-failure alert on cold boot (IMP-011)2026-10-02T14:25:58Z | REGRESSION-3 | FIXED | 819a6d9
-2026-10-02T15:04:35Z | IMP-018 | DONE | 45e24ed
-ee95af3 | IMP-021 | DONE | 
-2026-10-02T15:57:08Z | IMP-173 | DONE | 64bd3f1
-298d3b1 | IMP-022 | DONE | 
-2026-10-02T16:29:50Z | IMP-019 | DONE | 8bc73f9
-8801da8 | IMP-020 | DONE | 
+2026-10-02T11:10:19Z | REGRESSION-2 | CLEAN    | 59086ce (34 browser states, 160 web tests x9, 53 py tests)
+2026-10-02T11:52:40Z | IMP-011      | DONE     | 2e3f6e8
+2026-10-02T12:24:15Z | IMP-015      | DONE     | ff3f331 (attempt 2; attempt 1 never implemented AC2)
+2026-10-02T12:41:55Z | IMP-016      | DONE     | 166066d
+2026-10-02T13:08:31Z | IMP-017      | DONE     | 8aceee1
+2026-10-02T13:35:10Z | REGRESSION-3 | FOUND    | 286ea63 (duplicate recovery control; 2e3f6e8 cold-boot alert)
+2026-10-02T13:52:44Z | REGRESSION-3 | FIXED    | 819a6d9
+2026-10-02T14:10:22Z | IMP-018      | DONE     | 45e24ed
+2026-10-02T14:28:03Z | IMP-021      | DONE     | ee95af3
+2026-10-02T14:47:39Z | IMP-173      | DONE     | 64bd3f1 (JSON null manifest hung the app forever)
+2026-10-02T15:06:12Z | IMP-022      | DONE     | 298d3b1
+2026-10-02T15:24:50Z | IMP-019      | DONE     | 8bc73f9
+2026-10-02T15:43:27Z | IMP-020      | DONE     | 8801da8
+2026-10-02T16:15:03Z | REGRESSION-4 | FOUND    | 166066d (order-dependent flake); 3x PROGRESS.log corruption
+2026-10-02T18:45:40Z | REGRESSION-4   | FIXED     | pending (flake fixes in 3 test files; PROGRESS.log normalized)

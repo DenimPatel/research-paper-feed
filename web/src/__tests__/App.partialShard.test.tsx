@@ -412,8 +412,15 @@ describe("the shard notice alongside the storage notice", () => {
     // earned before the two can be compared side by side.
     await saveSomething();
 
+    // Two alerts is the settled state, but not one `await` away: the shard
+    // notice rides the load effect's single `setPapers`/`setFailedShards` commit
+    // while the storage notice is a separate `saveFailed` state set by the save
+    // effect, so the two live regions mount on independent ticks. `saveSomething`
+    // ends on the paper title, which says nothing about either notice.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert")).toHaveLength(2),
+    );
     const alerts = screen.getAllByRole("alert");
-    expect(alerts).toHaveLength(2);
 
     const shardNotice = partialNotice();
     const storageNotice = alerts.find((node) => node !== shardNotice);
@@ -429,7 +436,9 @@ describe("the shard notice alongside the storage notice", () => {
     const search = screen.getByLabelText("Search papers");
     fireEvent.change(search, { target: { value: "abstract" } });
 
-    expect(screen.getAllByRole("alert")).toHaveLength(2);
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert")).toHaveLength(2),
+    );
     expect(partialNotice()).toBe(shardNotice);
     expect(screen.getAllByRole("alert")).toContain(storageNotice as HTMLElement);
   });
