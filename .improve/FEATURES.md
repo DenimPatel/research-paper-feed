@@ -569,7 +569,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:**
 
 ### IMP-026 — Add `npm run build` to CI
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** CI & automation
 - **Type:** tooling
 - **Area / files:** `.github/workflows/ci.yml:21-38` (`web-tests` job: `npm ci`, `npm run typecheck`, `npm test` only)
@@ -582,7 +582,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** A broken `npm run lint` step is a bug, not a gate (profile §4.5). Do not add one until IMP-137 creates the script.
+- **Notes:** A broken `npm run lint` step is a bug, not a gate (profile §4.5). Do not add one until IMP-137 creates the script. | commit pending; AC3 size stale-baseline proven
 
 ### IMP-027 — Reconcile the deploy cron with its comment and `readme.md`
 - **Status:** NEEDS-HUMAN
@@ -682,7 +682,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** If IMP-026 adds a build gate, this is the doc side of it. Combine the two PRs if convenient.
 
 ### IMP-033 — Add an upper bound to `arxiv` in `requirements.txt`
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Packaging & installation
 - **Type:** bug-fix
 - **Area / files:** `requirements.txt:1` (`arxiv>=2.1.0`), `requirements.txt:2` (`pandas>=2.0.0`), `scripts/paper-collector.py:75,77` (the 4.x breakage)
