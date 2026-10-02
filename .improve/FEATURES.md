@@ -5,7 +5,7 @@ repository and, where the defect is behavioural, an observed symptom from
 `.improve/REPO_PROFILE.md` or the six `.improve/reports/recon-*.md` files. No invented
 problems, no speculative rewrites.
 
-**Total items: 147** — 140 `TODO`, 7 `NEEDS-HUMAN`.
+**Total items: 164** — 148 `TODO`, 7 `NEEDS-HUMAN`, 9 `DONE`.
 
 **Status legend**
 
@@ -24,8 +24,8 @@ dependents. `NEEDS-HUMAN` items are ordered by score like any other but are not 
 written.
 
 **Baseline (do not regress; do not claim to have fixed)**
-`/usr/local/bin/python3.11 -m unittest discover -s tests -v` → 27 tests OK.
-`cd web && npm run typecheck && npm test && npm run build` → all clean, 36 tests.
+`/usr/local/bin/python3.11 -m unittest discover -s tests -v` → 44 tests OK.
+`cd web && npm run typecheck && npm test && npm run build` → all clean, 69 tests across 5 files.
 `jupyter nbconvert --execute notebooks/paper-collector.ipynb` → pre-existing failure (PE-7).
 `cd web && npm run lint` → does not exist (PE-6/INF-04).
 
@@ -38,6 +38,19 @@ Dev server: `cd web && npm run dev -- --port 5199 --strictPort`, app served at
 `http://localhost:5199/research-paper-feed/`.
 Visual: Playwright at 1280px and 390px, screenshots under `.improve/artifacts/<IMP-ID>/`,
 compared against the 14 files in `.improve/artifacts/baseline/`.
+
+**Evidence rules for implementer and verifier reports.** `.improve/` is this loop's only memory,
+so an untraceable figure in a report is worse than a missing one — the next implementer reads it as
+a baseline. Established after `.improve/reports/verify-IMP-012.md` found three wrong line numbers,
+a wrong computed-font-size table, and a build-size figure ("CSS 8.85 kB / JS 382.45 kB") that no
+build ever produced, stated next to a "same as baseline" claim its own numbers contradicted (real:
+10.93 kB / 163.72 kB). Item IMP-167 owns the process change.
+1. **Line numbers** cited in a report must be read from the file they name, not recalled.
+2. **Build sizes, test counts, contrast ratios, timings** must appear with the command that produced
+   them and its output, quoted verbatim.
+3. **A figure not measured is omitted**, never estimated. If it could not be measured, say so and
+   say why — that is itself evidence, and it is what `.improve/reports/discovered-IMP-005.md` §2
+   did correctly about an unverifiable Node engine floor.
 
 **Never proposed (do-not-touch from profile §6)**
 `.kilo/worktrees/mildly-income/`, `.git/hooks/`, `.git/info/exclude`, `LICENSE`,
@@ -52,25 +65,30 @@ proposed item renames `scripts/paper-collector.py`.
 
 | Tier | Score | Items |
 | --- | --- | --- |
-| 25.0 | `5 × 5 ÷ 1` | IMP-001 … IMP-005, IMP-143 |
+| 25.0 | `5 × 5 ÷ 1` | IMP-001 … IMP-005, IMP-143, IMP-151, IMP-154 |
 | 20.0 | `5 × 5 ÷ 1` / `5 × 4 ÷ 1` | IMP-007 … IMP-040 (IMP-022 absorbs the former IMP-047 and IMP-048; IMP-010 absorbs the former IMP-057) |
-| 15.0 | `4 × 4 ÷ 1` … `3 × 5 ÷ 1` | IMP-042 … IMP-092 (less the merged ids), plus IMP-144, IMP-145, IMP-147 |
+| 15.0 | `4 × 4 ÷ 1` … `3 × 5 ÷ 1` | IMP-042 … IMP-092 (less the merged ids), plus IMP-144, IMP-145, IMP-147, IMP-152, IMP-155 … IMP-157 |
 | 12.5 | `5 × 5 ÷ 2` | IMP-006, IMP-041, IMP-093, IMP-094 |
-| 12.0 | `4 × 4 ÷ 2` | IMP-095 … IMP-097, IMP-146 |
-| 10.0 | `3 × 3 ÷ 1` … `2 × 5 ÷ 1` | IMP-098 … IMP-115, IMP-148, IMP-150 |
-| 8.0 | `2 × 4 ÷ 1` … `2 × 5 ÷ 2` | IMP-116 … IMP-126, IMP-149 |
-| 7.5 | `3 × 5 ÷ 2` | IMP-127 … IMP-131 |
+| 12.0 | `4 × 4 ÷ 2` | IMP-095 … IMP-097, IMP-146, IMP-153, IMP-158, IMP-159 |
+| 10.0 | `3 × 3 ÷ 1` … `2 × 5 ÷ 1` | IMP-098 … IMP-115, IMP-148, IMP-150, IMP-160 … IMP-162, IMP-166, IMP-167 |
+| 8.0 | `2 × 4 ÷ 1` … `2 × 5 ÷ 2` | IMP-116 … IMP-126, IMP-149, IMP-164, IMP-165 |
+| 7.5 | `3 × 5 ÷ 2` | IMP-127 … IMP-131, IMP-163 |
 | 6.7 | `4 × 5 ÷ 3` | IMP-132 |
 | 6.0 | `3 × 4 ÷ 2` | IMP-133 … IMP-136 |
 | 5.0 | `3 × 4 ÷ 3` / `2 × 5 ÷ 2` | IMP-137 … IMP-140 |
 | 4.0 | `2 × 4 ÷ 2` | IMP-141 … IMP-142 |
+
+IDs 47, 48 and 57 were retired by absorption and **must not be reused**; the live range is
+IMP-001 … IMP-167 minus those three.
 
 **NEEDS-HUMAN (not executable without a decision).** IMP-027 (deploy cadence), IMP-034 (delete
 or rewrite the notebook), IMP-088 (adopt a failing security gate), IMP-096 (`robots.txt`
 policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (print stylesheet).
 
 **Dependency-critical path.**
-- IMP-143 (export and test the hash parser) gates IMP-008, IMP-132 and IMP-133.
+- IMP-143 (export and test the hash parser) gates IMP-008, IMP-132 and IMP-133. IMP-157 (batching-safe
+  `applyState`) is a second prerequisite for those three, since they add bulk controls and keyboard
+  shortcuts — the shapes that trip the bug.
 - IMP-005 (make component testing possible) gates IMP-037, and IMP-037 gates IMP-129,
   IMP-130, IMP-131 and IMP-132.
 - IMP-004 (fail a partial index) gates IMP-040.
@@ -80,6 +98,8 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - IMP-063 (memoize `isSaved`) gates IMP-064. IMP-021 (write before delete) gates IMP-099.
 - IMP-022 (validate CLI flags) gates IMP-051. IMP-085 (`pyproject.toml`) gates IMP-086.
   IMP-093 (arxiv 4 downloads) gates IMP-104. IMP-137 (ESLint) gates IMP-138.
+- IMP-154 (validate `categories`/`published` in `isPaper`) complements IMP-018 (error boundary);
+  neither substitutes for the other and neither waits on the other.
 
 ---
 
@@ -200,6 +220,24 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:** Same threat model as IMP-001 (a file someone sent you) with higher impact, because IMP-001's `isHttpUrl` filter does not touch this path. IMP-018 (a React error boundary around `<App />`) would blunt the symptom — a crash becomes a `role="alert"` fallback instead of a blank page — but not the defect, since the poisoned id is still written into `paperIds` and `localStorage`; it is a complement, not a substitute. Deliberately scoped to own-property semantics: OBS-1 in `.improve/reports/verify-IMP-001.md` (an array-valued `absUrl` survives `isHttpUrl` because `String(["https://x"])` stringifies to a valid prefix) is not exploitable and belongs with IMP-019's type widening, not here. Found and reported — not fixed — by the independent IMP-001 verifier. | commit pending
+
+### IMP-154 — Validate `categories` and `published` in `isPaper` so a malformed export cannot blank the app
+- **Status:** TODO
+- **Category:** Data validation
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/collections.ts:68-80` (`isPaper`, which checks only `id`, `title`, `authors`, `abstract`), `web/src/components/PaperCard.tsx:79` (`paper.categories.map((category) => …)`, unguarded), `web/src/components/PaperCard.tsx:73` (`paper.published` → `formatDate`), `web/src/components/PaperCard.tsx:82` (`paper.primaryCategory`)
+- **Intent:** `isPaper` is the only gate between a file someone sent you and the renderer, and it validates four of the seven fields `PaperCard` dereferences. An export whose paper omits `categories` throws `TypeError: Cannot read properties of undefined (reading 'map')` at `PaperCard.tsx:79`; with no error boundary above `<App />` the **entire app blanks** — the identical blast radius IMP-151 exists to remove, reached with a payload containing zero prototype keys. The IMP-151 verifier proved this byte-identical on the pre-fix and post-fix trees, so it is pre-existing, independently reachable, and named by no IMP-151 acceptance criterion (none mentions `categories`). It is also the gap that made the verifier's own first attack payload crash: the `{id, title, authors, abstract}` shape is what IMP-151's own criterion-4 payload uses.
+- **Acceptance criteria:**
+  1. `isPaper` validates every field `PaperCard` dereferences without a guard: `categories` must be `Array.isArray(...)` (of strings), `primaryCategory` must be a `string`, and `published` must be a `string`. The four existing checks and the `PROTOTYPE_KEYS` id check at `:75` are unchanged.
+  2. A paper that fails any of those checks is dropped at import exactly like a paper that fails today's checks — silently, per IMP-059's reporting gap — and a payload whose papers all fail still returns `papers: []`, never `null`.
+  3. No real shard record is rejected: driving `loadState`/`parseExportPayload` with the committed `web/public/data/papers-2026-W40.json` records must keep all 2,812 papers, because every one of them has all 11 keys with no `null`s. Assert that count in a test rather than by eye.
+  4. New tests in `web/src/lib/__tests__/collections.test.ts` cover a payload paper missing `categories`, one missing `published`, and one with `"categories": "cs.CV"` (a string, not an array) — each dropped, each with a fully-populated valid sibling kept, and the sibling present in the merged `paperIds`.
+  5. `cd web && npm run typecheck && npm test && npm run build` pass with no pre-existing expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test && npm run build`; then at `http://localhost:5199/research-paper-feed/#view=collections` import a payload whose single paper is `{"id": "2401.00009", "title": "No categories", "authors": ["A"], "abstract": "abc"}` — before the fix `#root` has 0 children and the console carries an uncaught `TypeError`; after it, the app renders, the import reports nothing added, and the console is empty per profile §4.2. Screenshot to `.improve/artifacts/IMP-154/collections-import-missing-categories-desktop-1280.png` against `.improve/artifacts/baseline/baseline-collections-desktop-1280.png`.
+- **Effort:** S    **Risk:** med
+- **Depends on:** none
+- **Priority score:** 25.0
+- **Notes:** Risk `med` because criterion 1 turns a permissive gate strict and criterion 3 is the guard against silently emptying real collections — that is exactly the failure mode IMP-001 introduced and IMP-151b had to walk back (regression sweep R1), so the "rejected count is zero against the real index" check must be run and reported, not assumed. Deliberately **not** fixed by IMP-018 (a React error boundary): that converts a blank page into a `role="alert"` fallback but still leaves the malformed snapshot in `localStorage`, and it does nothing for the *feed* path. It is a complement, not a substitute. Deliberately **not** fixed by IMP-098, which validates the manifest and shard payloads arriving over the network, not snapshots arriving from a file on disk. The point-of-use guards that would make this class of bug a degraded card rather than a blank page are IMP-160. Recorded as Issue 1 in `.improve/reports/verify-IMP-151.md`, which explicitly asks for its own backlog entry "at the same priority class as IMP-151".
 
 ## Tier 20.0
 
@@ -411,7 +449,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** S    **Risk:** med
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** Risk `med` because widening the types may surface compile errors in `PaperCard.tsx` and `App.tsx` filter code (`App.tsx:211-212` uses `paper.primaryCategory` in a `Set` lookup, which is fine for `null` but changes the filter semantics subtly).
+- **Notes:** Risk `med` because widening the types may surface compile errors in `PaperCard.tsx` and `App.tsx` filter code (`App.tsx:211-212` uses `paper.primaryCategory` in a `Set` lookup, which is fine for `null` but changes the filter semantics subtly). **Advisory carried forward from `.improve/reports/verify-IMP-151b.md` OBS-D, which must survive this item:** widening the types to `string | null` makes it *tempting* to simplify `hasSafeUrls` (`web/src/lib/collections.ts:96-101`) from `url == null || isHttpUrl(url)` down to `isHttpUrl(paper.absUrl)`. Do not. `parseExportPayload` validates a file read off disk, so a `null` is reachable there regardless of what the declared type says, and `PaperCard.tsx:33-35`'s `safeHref(url: string | undefined)` is likewise now inaccurate about what it receives. The `null` exemption is load-bearing for correctness, and `isHttpUrl`'s `(value: unknown)` parameter is what makes it safe — narrowing that parameter to `string` would let a `null` flow straight into an `href`.
 
 ### IMP-020 — Make the retention window a filter, not only an ordered `break`
 - **Status:** TODO
@@ -473,6 +511,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
   1. `safe_filename("..")` and `safe_filename(".")` return a value that is neither `.` nor `..` nor empty, and no input produces a path separator.
   2. The returned slug's UTF-8 encoding is at most 200 bytes (verified as `len(slug.encode("utf-8"))`, not character count — a 400-char CJK title is ~1,200 bytes), and a slug whose stem case-insensitively matches a Windows reserved name (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`) gains a `_` suffix. Truncation must not split a multi-byte character.
   3. New tests in `tests/test_paper_collector.py` cover `.`, `..`, a 400-character title, and `CON`, and the two existing `SafeFilenameTests` at `:22-31` still pass.
+  4. This item, not IMP-024, is what makes the extraction destination safe. IMP-024 (`19f8dbb`) passes `filter="data"`, which guarantees members stay inside `dest` and says **nothing about `dest` itself** — so today `safe_filename("..") == ".."` still makes `dest` the repository root and every member lands there, inside the filter's own boundary, with nothing rejected and nothing logged. Criterion 1 alone closes that hole; do not treat the landed `filter="data"` as a substitute for it (recorded as D2 in `.improve/reports/discovered-IMP-024.md`, which explicitly asks for this note).
 - **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; then `/usr/local/bin/python3.11 -c "import importlib.util,sys; s=importlib.util.spec_from_file_location('pc','scripts/paper-collector.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(repr(m.safe_filename('..')), len(m.safe_filename('x'*400)))"`.
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
@@ -520,7 +559,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Acceptance criteria:**
   1. `.github/workflows/ci.yml` runs `npm run build` after `npm test` in the `web-tests` job, and the step references only scripts that exist in `web/package.json:6-13`.
   2. The new build step is the **first** thing in the job that would catch a build break: to prove it is not a no-op, push a scratch branch whose only change is a deliberate syntax error in `vite/vite.config.ts` and confirm the job fails at the build step (not at `typecheck`); then revert and confirm green.
-  3. `cd web && npm run build` still succeeds locally and produces `dist/assets/index-*.js` within 1 kB of the 163.17 kB baseline (profile §3.3).
+  3. `cd web && npm run build` still succeeds locally and produces `dist/assets/index-*.js` within 1 kB of the 163.72 kB baseline (profile §3.3).
 - **Verification method:** `cd web && npm run typecheck && npm test && npm run build`; then `cat -n .github/workflows/ci.yml` and confirm each `run:` line maps to a real `web/package.json` script.
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
@@ -1059,7 +1098,8 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Acceptance criteria:**
   1. A successful import renders a `role="status"` confirmation naming the collection and the number of papers.
   2. An import whose collection id already exists renders a distinct message stating the collection was already imported, and the user can tell the two apart.
-  3. `cd web && npm run typecheck && npm test` passes, with a new test in `web/src/lib/__tests__/collections.test.ts` covering the duplicate-id outcome.
+  3. A `role="status"` line also reports **papers that were discarded as invalid** — the count `parseExportPayload` dropped, or the word "none" — because today the two failure modes are indistinguishable to the user: an XSS-laden export is silently cleaned *and* a `null`-URL export is silently emptied (the shape IMP-151b, `7a2ed82`, had to fix), and both look identical to someone who exported 5 papers and imported 2. Raise the count in `.improve/reports/regression-sweep-1.md` §"Minimal fix", second paragraph.
+  4. `cd web && npm run typecheck && npm test` passes, with a new test in `web/src/lib/__tests__/collections.test.ts` covering the duplicate-id outcome and the discarded-paper count.
 - **Verification method:** `cd web && npm run typecheck && npm test`; then export a collection, import it once and screenshot the confirmation to `.improve/artifacts/IMP-059/collections-import-success-desktop-1280.png`, import it again and screenshot the duplicate message to `.improve/artifacts/IMP-059/collections-import-duplicate-desktop-1280.png`.
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
@@ -1616,6 +1656,61 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 
 ---
 
+### IMP-155 — Cover `isHttpUrl`'s whitespace/tab-obfuscated `javascript:` rejections
+- **Status:** TODO
+- **Category:** Test coverage & test quality
+- **Type:** test
+- **Area / files:** `web/src/lib/collections.ts:86-88` (`isHttpUrl`, exported), `web/src/lib/__tests__/collections.test.ts:266-267` (the existing bare-`javascript:` assertions), `web/src/components/PaperCard.tsx:33-35` (`safeHref`)
+- **Intent:** The repository's only coverage of the IMP-001 security property tests the bare string `"javascript:alert(1)"`. The variants that are *actually executable* are untested: real Chromium strips leading C0 controls and space and removes embedded tab/LF, so `" javascript:alert(1)"`, `"\t\n javascript:alert(1)"` and `"java\tscript:alert(1)"` all resolve to protocol `javascript:` on a live anchor. `isHttpUrl` rejects all of them today — but only because the regex is anchored at `^` **after** `.trim()`, and browser URL parsing only ever removes U+0009/U+000A/U+000D, none of which appear in the literal `https`. Deleting that one `.trim()` re-opens the hole and every existing test still passes. This is a coverage gap, not a live defect.
+- **Acceptance criteria:**
+  1. `web/src/lib/__tests__/collections.test.ts` asserts `isHttpUrl` is `false` for, at minimum: `" javascript:alert(1)"`, `"\t\n javascript:alert(1)"`, `"java\tscript:alert(1)"`, `"JAVASCRIPT:alert(1)"`, and `"data:text/html,<script>x</script>"`, `"vbscript:msgbox(1)"`, `"file:///etc/passwd"`, `"blob:https://x/y"`, `"//evil.example"`, `"httpsx://ok"` — asserted on the exported predicate directly, since that is what makes the mutation detectable.
+  2. `isHttpUrl` remains `true` for `"https://ok.example"`, `"HTTP://ARXIV.ORG/ABS/1"`, `"\thttps://ok.example"`, `"http://"` and `"http://arxiv.org/abs/2401.00001"`. The last one is load-bearing: `scripts/build_index.py:111` emits `http://` for every live card, so an https-only assertion would be a false failure.
+  3. The full import **and render** path is asserted end to end for at least one whitespace-obfuscated payload: `parseExportPayload` drops the paper, and rendering a `PaperCard` built from the surviving state yields `[...document.querySelectorAll("a")].every(a => !a.getAttribute("href")?.startsWith("javascript:"))` as `true`.
+  4. Deleting `.trim()` from `web/src/lib/collections.ts:87` makes at least one of the new assertions fail. Prove this in a `/tmp` copy — do not leave the repo broken — and record the exact failure count in the PR body.
+  5. `cd web && npm run typecheck && npm test` pass with no pre-existing expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then the `/tmp` revert described in criterion 4, confirming the suite goes red; then in the browser import a payload carrying `"absUrl": " javascript:alert(1)"` and confirm zero `javascript:` hrefs and an empty console.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 15.0
+- **Notes:** Impact is scored 3, not 5, because nothing is currently broken — this buys *detection* of a regression rather than a fix, and its whole value is criterion 4. Do not fold this into IMP-152 (emit `https://`): that item must leave `isHttpUrl` accepting both schemes, and these tests are what pin the `http` half of that promise. The `null`/`undefined` exemption is already covered by IMP-151b's four tests (`7a2ed82`) and is not duplicated here. OBS-E in `.improve/reports/verify-IMP-151b.md`.
+
+### IMP-156 — Cover `urlState`'s default `hash` argument and its default location writer
+- **Status:** TODO
+- **Category:** Test coverage & test quality
+- **Type:** test
+- **Area / files:** `web/src/lib/urlState.ts:16` (`readHash(hash: string = window.location.hash)`), `web/src/lib/urlState.ts:41-47` (`writeToLocation`, the default `HashWriter`), `web/src/lib/urlState.ts:55-59` (`writeHash(…, write = writeToLocation)`), `web/src/App.tsx:64,69,76` (the production call sites that rely on both defaults), `web/src/lib/__tests__/urlState.test.ts`
+- **Intent:** All 18 tests in `urlState.test.ts` pass an explicit hash string and an injected writer, so the only code in the module that still touches `window` has zero coverage. Two independent mutations survive the whole suite: replacing the `= window.location.hash` default with `= ""` (M1), and replacing the default writer with a no-op (M7). `App.tsx:64` and `:76` call `readHash()` with no argument and `:69` calls `writeHash(next, mode)` with two — the exact 2-arg shape that appears nowhere in the test file. A future edit that breaks push/replace wiring would be caught by neither the typechecker nor the suite. Since IMP-005 landed (`894fb9b`) there is now a jsdom environment available to close this cheaply.
+- **Acceptance criteria:**
+  1. A test sets `window.location.hash` and calls `readHash()` with **no** argument, asserting it parsed the live hash; the same case must fail if the `= window.location.hash` default is changed to `= ""`.
+  2. A test calls `writeHash(state, "push")` with **no** writer and asserts `window.location.hash` equals the returned `hash`; and calls `writeHash(state, "replace")` with no writer and asserts `window.location.hash` changed while `history.length` is unchanged. Both must fail if the default writer becomes a no-op.
+  3. The 2-argument `writeHash(readHash(h), "replace")` form named in IMP-143's criterion 2 appears in the test file — the verifier recorded that it currently appears nowhere.
+  4. `urlState.test.ts` keeps its `// @vitest-environment node` docblock for the existing 18 tests; the new cases go in a sibling file (e.g. `web/src/lib/__tests__/urlStateWindow.test.ts`) or a `describe` block that opts into jsdom, so the "no jsdom required" property IMP-143 criterion 3 asked for is not lost.
+  5. Each of the two mutations in criteria 1 and 2 is demonstrated to turn the suite red, in a `/tmp` copy, and the exact failed-test count is recorded in the PR body.
+  6. `cd web && npm run typecheck && npm test && npm run build` pass; the test count rises from 69 and the module count from 39 only if new runtime code is added, which this item must not do.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then the two `/tmp` mutation runs from criteria 1, 2 and 5; then at 1280px in the browser, type a query, click Collections, reload, and confirm the hash round-trips exactly as before (IMP-143's own browser check). Screenshot to `.improve/artifacts/IMP-156/feed-desktop-1280.png` — must be MD5-identical to `.improve/artifacts/baseline/baseline-feed-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 15.0
+- **Notes:** Test-only, so effort is `S` and the bundle must not grow. The two mutations are M1 and M7 in `.improve/reports/verify-IMP-143.md` §8; the implementer disclosed M7 at `impl-IMP-143.md:135-139` and recommended exactly this follow-up. Not a defect and not attributable to IMP-143: IMP-143's criterion 3 only required that `writeHash` be *testable* without a window, which it is. This is the first test item that genuinely needs the jsdom environment IMP-005 added, so it is the cheapest proof that IMP-005 paid for itself. Also see profile WEB-37's "not yet closed" note.
+
+### IMP-157 — Make `applyState` immune to React 18 batching
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** bug-fix
+- **Area / files:** `web/src/App.tsx:67-73` (`applyState`, a `useCallback` that computes from the render-captured `urlState` and commits with non-functional `setUrlState`), `web/src/App.tsx:183,187,191,195,203` (`setView` / `setQuery` / `setRecency` / `setSort` / `toggleCategory`, all built on it), `web/src/lib/urlState.ts:55-79` (`writeHash`, called eagerly with the same stale base)
+- **Intent:** `applyState` reads `urlState` — the value captured in the current render — and commits `setUrlState(next)` non-functionally. Under React 18 automatic batching, two calls dispatched inside one task both read the *same* stale `urlState`, so the second silently discards the first. `writeHash` is called eagerly with the fresh object, so the address bar is briefly correct and then gets rewritten: the **hash** ends up wrong too, not just React state. Reproduced with four dispatches in one `page.evaluate` — `setQuery('diffusion'); toggleCategory(cs.RO); setRecency(30); setSort('relevance'); setView('collections')` settled on `#view=collections&q=diffusion`, losing `cat`, `recency` and `sort` entirely. The same four actions in four separate ticks produce correct cumulative hashes. Latent today because every control is a separate DOM click handler, but it is a one-line fix and it is a forward hazard for exactly the items that add bulk controls or keyboard shortcuts.
+- **Acceptance criteria:**
+  1. `applyState` derives the next state functionally — `setUrlState((current) => ({ ...current, ...patch }))` — and derives the hash from that same patch rather than from a second, independently-computed object, so the URL and the state cannot diverge.
+  2. Two `applyState` calls dispatched in a single JS task compose: dispatching `setQuery("diffusion")` and `setRecency(30)` in one task settles on a hash containing **both** `q=diffusion` and `recency=30`, with `cat` intact.
+  3. The push/replace split is unchanged: `setView` still passes `"push"` and every filter setter still passes `"replace"`, so Back behaviour is identical to the baseline. `web/src/lib/urlState.ts` is not modified — `HashState` does not change shape.
+  4. A test drives the reducer/setter path with two same-task updates and asserts the composed result. Because `applyState` lives in `App.tsx`, this is either a component test under `web/src/__tests__/` (IMP-037's file, which gates it) or an extraction of the pure merge — if you extract, name the function and keep it in `App.tsx` unless the PR body argues for `urlState.ts`.
+  5. `cd web && npm run typecheck && npm test && npm run build` pass.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then in the browser at 1280px, run `["setQuery","toggleCategory","setRecency","setSort"].forEach(fn => window.__dispatch(fn))` — or whatever hook the test exposes — inside **one** `page.evaluate`, and confirm the settled hash contains every field that was set. Then click through the same four changes as four real user clicks and confirm the hash is identical either way. Screenshot to `.improve/artifacts/IMP-157/feed-desktop-1280.png` against the baseline.
+- **Effort:** S    **Risk:** med
+- **Depends on:** none
+- **Priority score:** 15.0
+- **Notes:** Risk `med` because switching to a functional update changes *when* `writeHash` is called, and the push/replace split is load-bearing for Back (profile WEB-34) — criterion 3 exists so a verifier checks that rather than assuming it. **Pre-existing, not a regression:** `applyState` and every setter built on it are byte-identical to `fc77a40` (verified by content hash), and IMP-143 only moved `readHash`/`writeHash` out of `App.tsx` while ignoring the new `{ hash }` return value at the call site. Do not credit this to IMP-143. Second prerequisite alongside IMP-143 for IMP-008, IMP-132 and IMP-133 — those add keyboard shortcuts and bulk actions, which are exactly the shapes that trip it. D-1 in `.improve/reports/discovered-IMP-143.md`, independently reproduced in `.improve/reports/verify-IMP-143.md` §7, whose verdict was that it must not block IMP-143 but "should be filed as its own backlog item".
+
 ## Tier 12.5
 
 ### IMP-006 — Make the two `localStorage` writes crash-consistent
@@ -1659,7 +1754,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Area / files:** `tests/test_build_index.py` (add a contract test), `web/src/lib/__tests__/paperIndex.test.ts` (add a fixture-driven case), `scripts/build_index.py:97-114` (`record_from_result`), `web/src/lib/types.ts:1-36`
 - **Intent:** The wire format is hand-mirrored and completely unvalidated: `record_from_result` is the only producer, `web/src/lib/types.ts` is a hand-maintained copy, `fetchManifest` does a bare `as IndexManifest` cast (`web/src/lib/paperIndex.ts:91`), and `loadShard` only checks `Array.isArray(data.papers)`. Renaming a field in Python fails silently and a missing `abstract` throws inside render, blanking the app. No test on either side asserts the contract.
 - **Acceptance criteria:**
-  1. A committed fixture pair — a real `index.json` and a real `papers-<YYYY>-W<NN>.json` produced by `write_index` — is committed under `web/src/lib/__tests__/fixtures/` (not `tests/`, which is outside the `web/` package and cannot be imported by vitest, and not the gitignored `web/public/data/`). A test in `web/src/lib/__tests__/paperIndex.test.ts` reads it with `node:fs` — legal because `vite.config.ts:8` sets `environment: "node"` — stubs `fetch` to serve it, and drives `PaperIndex.loadPapers`.
+  1. A committed fixture pair — a real `index.json` and a real `papers-<YYYY>-W<NN>.json` produced by `write_index` — is committed under `web/src/lib/__tests__/fixtures/` (not `tests/`, which is outside the `web/` package and cannot be imported by vitest, and not the gitignored `web/public/data/`). A test in `web/src/lib/__tests__/paperIndex.test.ts` reads it with `node:fs` — legal because Vitest executes on Node in every test environment and only swaps globals; since IMP-005 (`894fb9b`) the global environment is `jsdom`, so either add a `// @vitest-environment node` docblock (the pattern `urlState.test.ts:1` uses) or state that `node:fs` needs no special environment — stubs `fetch` to serve the fixture, and drives `PaperIndex.loadPapers`.
   2. A test in `tests/test_build_index.py` asserts `sorted(record_from_result(fake_result).keys())` equals a literal 11-name list, so a Python-side rename or addition fails in Python CI.
   3. The TS fixture test fails if the fixture's paper is missing any field declared in `web/src/lib/types.ts:1-13`, checked by an explicit key assertion rather than a cast.
 - **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v` and `cd web && npm run typecheck && npm test`; then deliberately rename `absUrl` to `abs_url` in `scripts/build_index.py:112` and confirm the Python test fails, revert, and confirm both suites pass.
@@ -1755,6 +1850,41 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 12.0
 - **Notes:** Risk `med` because this *deletes* user-visible saved papers rather than merely deactivating a field — a user who deliberately saved a paper carrying an odd url loses it, so the PR body must state that trade-off instead of presenting the change as a pure win. Recorded as OBS-2 in `.improve/reports/verify-IMP-001.md`, where the verifier confirmed the render guard already renders these inert and explicitly deferred the scrub to a separate item. Independent of IMP-151: that item fixes the own-property membership check, this one filters url *values*, and they touch `loadState` at different lines — so neither needs to wait for the other.
+
+### IMP-158 — Catch `KeyError` from a dangling in-tree hardlink in the source-extraction path
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** bug-fix
+- **Area / files:** `scripts/paper-collector.py:181` (`fetch_papers`'s `except` tuple, currently `(arxiv.ArxivError, OSError, tarfile.TarError)`), `scripts/paper-collector.py:78-123` (`extract_source_archive`, the IMP-024 code), `tests/test_paper_collector.py` (the new `ExtractSourceArchiveTests`)
+- **Intent:** `TarFile._find_link_target` raises `KeyError: "linkname 'nope.tex' not found"` for a hardlink whose target is not in the archive. `KeyError` is not in the handler's tuple, so **one crafted or malformed archive kills the run for every remaining paper** — the `--download-sources` loop has no per-paper isolation for this case. `data_filter` correctly *allows* an in-tree hardlink, so this is not something IMP-024 introduced; the behaviour is identical before and after that change. It is now additionally reachable via a hardlink whose target the IMP-024 pre-screen rejected, which means the hardened fallback gained one more route to it.
+- **Acceptance criteria:**
+  1. `fetch_papers` does not abort the run for a hardlink whose target is missing. Either `KeyError` joins the `except` tuple so that paper logs a warning and the loop continues, or hardlink targets are validated against the surviving member set before extraction. Pick one and record it in the PR body; `KeyError` and `EOFError` (a hostile/truncated header raises `struct.error`) must both be survivable.
+  2. The guard is **per paper**, not per run: a run that processes 3 papers where the middle archive is hostile still extracts and reports the other two.
+  3. A new test in `tests/test_paper_collector.py` builds an archive with `main.tex` plus a hardlink `alt.tex -> nope.tex`, drives it through `extract_source_archive` (or `fetch_papers` with a stubbed client), and asserts the call returns rather than raising, that `main.tex` was extracted, and that one warning naming `alt.tex` was logged. No network.
+  4. `/usr/local/bin/python3.11 -m unittest discover -s tests -v` passes, and the new test runs rather than skipping on the provisioned interpreter.
+- **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; then `/tmp/rpf-venv/bin/python scripts/paper-collector.py --topic 'cat:cs.CV' --max-papers 2 --output-dir /tmp/rpf-hardlink --download-sources` on a healthy network must still exit 0 — real arXiv archives contain only valid in-tree links, so this is the no-regression check, and the hostile case is proven by criterion 3's unit test rather than by hunting for a real malicious archive.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 12.0
+- **Notes:** Confidence is 4, not 5: the behaviour is confirmed by reading CPython's `_find_link_target` and by the IMP-024 verifier's independent reproduction, but no real arXiv archive has ever been observed to trigger it, so reachability from the actual arXiv corpus is theoretical. Impact is 3, not higher, because the flag is a legacy convenience path (`--download-sources`) that the web app does not use. D6 in `.improve/reports/discovered-IMP-024.md`, restated as R4.1 in `.improve/reports/verify-IMP-024-r2.md`, which classed it HIGH for severity and pre-existing. Pairs with IMP-093 (repair both download flags on arxiv 4) — do not batch, but note that IMP-093's criterion 2 already widens that same `except` tuple, so if both land the tuple must not be widened twice inconsistently.
+
+### IMP-159 — Require `loadState`'s storage key to agree with `paper.id`
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/collections.ts:288-296` (`loadState`'s `Object.entries(parsedPapers)` loop, which trusts the record key and ignores `paper.id`), `web/src/lib/collections.ts:229-234` (`exportCollection`), `web/src/lib/collections.ts:132-149` (`mergeImport`, which keys by `paper.id`)
+- **Intent:** `loadState` writes `papers[id] = paper` using the **storage key** and never checks that `paper.id` agrees. `rpf.papers.v1` holding `{"foo": {"id": "bar", …}}` yields `state.papers.foo` containing a paper whose own `id` is `"bar"`. Three consequences follow: `mergeImport` merges by `paper.id` while `loadState` keys by the storage key, so a paper saved in one session duplicates under two keys in the next; `exportCollection` then emits `papers: [{id: "bar"}]` inside a collection whose `paperIds` say `"foo"`; and re-importing that file **drops the paper**, because `"foo"` has no own snapshot. The user watches a saved paper vanish across one export/import round trip with no error anywhere. Pre-existing and unrelated to prototype keys.
+- **Acceptance criteria:**
+  1. `loadState` either requires `paper.id === id` or re-keys on `paper.id`. Re-keying is preferred if the round trip is otherwise affected; skipping is acceptable if the paper is instead dropped. Either way, no entry in `state.papers` may have a key different from its `paper.id`.
+  2. A paper whose key and `id` disagree is either re-keyed to `id` or dropped — **never** left under a key that references no matching `paper.id` — and the existing `PROTOTYPE_KEYS`/`hasOwnKey` guard at `:299` is preserved unchanged.
+  3. A new test in `web/src/lib/__tests__/collections.test.ts` drives `loadState` with a `Storage` fake whose `rpf.papers.v1` is `{"foo": {"id": "bar", "title": "t", "authors": [], "abstract": "a", "categories": ["cs.CV"], "published": "2024-01-01", "primaryCategory": "cs.CV"}, "bar": {…valid…}}` and asserts the resulting `state.papers` contains no key whose value's `id` differs from that key.
+  4. A second test round-trips: export the loaded state and re-import the result, asserting the paper count is preserved and the collection's `paperIds` all resolve to own snapshots.
+  5. `cd web && npm run typecheck && npm test` passes with no pre-existing expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then seed `localStorage` under `rpf.papers.v1` with the mismatched payload above plus a collection naming `"foo"`, load `http://localhost:5199/research-paper-feed/#view=collections`, export that collection, and re-import the exported file — the paper must still be present after the round trip. Screenshot to `.improve/artifacts/IMP-159/collections-storage-key-mismatch-desktop-1280.png`.
+- **Effort:** S    **Risk:** med
+- **Depends on:** none
+- **Priority score:** 12.0
+- **Notes:** Impact is 3 and confidence 4 because the only *current* producer of a mismatched key is a hand-edited `localStorage` — every in-app write path (`mergeImport`, `addPaper`, `loadState` itself) keys by `paper.id`, so the key/id invariant already holds in practice. It is recorded because the invariant is real, the consequence is silent data loss, and nothing enforces it, so the first future code path that keys by anything else inherits it. Risk `med` because the fix *deletes* entries in the mismatched case (criterion 1's preferred option does not), so the PR body must say which of the two options was taken and why. D-1 in `.improve/reports/discovered-IMP-151.md`. Distinct from IMP-006 (crash-consistent writes) and IMP-058 (orphan snapshots): those are about write ordering and pruning, not about the key/`id` agreement on read.
 
 ## Tier 10.0
 
@@ -2083,6 +2213,93 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Priority score:** 10.0
 - **Notes:** All four branches are currently untested, which is why the docstring drifted without anyone noticing.
 
+### IMP-160 — Guard the collection render path against a paper snapshot it does not own
+- **Status:** TODO
+- **Category:** Correctness
+- **Type:** improvement
+- **Area / files:** `web/src/components/CollectionsView.tsx:42-45` (`collection.paperIds.map((id) => state.papers[id]).filter(paper => Boolean(paper))`), `web/src/components/PaperCard.tsx:50` and `:56` (`paper.abstract.length`, inside a `useMemo` and again in the render)
+- **Intent:** `CollectionsView.tsx:42` dereferences whatever `state.papers[id]` returns, and `PaperCard` trusts its `Paper`-typed prop with no guard. Both are safe **only because their producer** (`mergeImport` / `loadState`) now filters on own-key membership after IMP-151 — nothing at the point of use defends either. If any future path ever adds a `paperIds` entry without an own snapshot, the inherited value flows straight into `PaperCard` and `paper.abstract.length` throws: with no error boundary the user gets a permanently blank collections view until they clear `localStorage`, which is the exact outcome IMP-151 was written to remove. `isPaper` and `hasSafeUrls` exist precisely because snapshots are untrusted, and the component is the last line of defence with none.
+- **Acceptance criteria:**
+  1. `CollectionsView.tsx:42-45` filters on **own** key membership before handing a value to `PaperCard`, reusing the same `hasOwnKey` helper `web/src/lib/collections.ts` already exports for IMP-151 rather than writing a third membership idiom.
+  2. `PaperCard` no longer throws on a snapshot whose `abstract` is missing or not a string: it renders a visibly degraded card (no "Show more" control, the title still present) rather than raising. Pick the fallback and record it; do not silently substitute `""` for a real field, per IMP-098 criterion 2's reasoning.
+  3. New tests, which is why this item is not a one-liner: a test in `web/src/components/__tests__/CollectionsView.test.tsx` (IMP-037's file, which gates it) renders a collection whose `paperIds` names an id with no own snapshot and asserts the component renders without throwing; a test in the same directory renders a `PaperCard` with `abstract` absent and asserts the same. Per profile §5.3, component tests go in `web/src/__tests__/` or a `components/__tests__/` sibling, and `.tsx` must be in the vitest `include` glob — it is, as of `894fb9b`.
+  4. `cd web && npm run typecheck && npm test && npm run build` pass.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then seed `rpf.papers.v1` directly with `{"__proto__x": {"id": "__proto__x", "title": "orphan", "authors": [], "abstract": "a", "categories": [], "published": "2024-01-01", "primaryCategory": "cs.CV"}}` plus a collection whose `paperIds` is `["__proto__x"]`, hard-reload `#view=collections`, and confirm the view renders and the console is empty. Screenshot to `.improve/artifacts/IMP-160/collections-orphan-snapshot-desktop-1280.png`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Defence in depth, deliberately **not** scored as a bug: no current code path reaches either site with a bad value, which is why impact is 2. Its value is converting the *next* regression of this class from "permanently blank page until the user clears localStorage" into a degraded card — IMP-151 closed one reachable route and this closes the class. IMP-018 (a React error boundary around `<App />`) is the broader, coarser complement and should be treated as the backstop for anything this and IMP-154 miss; if IMP-018 lands first, criteria 1 and 2 still hold value because a boundary shows a fallback page rather than a working view with one bad card hidden. D-2 and D-3 in `.improve/reports/discovered-IMP-151.md`, restated as Issue 3 of `.improve/reports/verify-IMP-151.md`, which confirmed the current state is safe purely by the producer invariant.
+
+### IMP-161 — Guard `mergeImport`'s `papers[paper.id]` write against a prototype key
+- **Status:** TODO
+- **Category:** Security
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/collections.ts:140` (`papers[paper.id] = paper` inside `mergeImport` — the one remaining untrusted-key `[[Set]]` in the file), `web/src/lib/collections.ts:146-149` (`mergeImport`'s own read, already guarded), `web/src/lib/collections.ts:299` (`loadState`'s analogous write, already guarded)
+- **Intent:** IMP-151 guarded the *read* at `:146` and `loadState`'s *write* at `:299`, but left `mergeImport`'s *write* at `:140` unguarded. Dispatching the reducer directly with a `__proto__`-id paper sets the prototype of the live `papers` object: `Object.getPrototypeOf(state.papers)` becomes the attacker's paper object. Measured: own keys `[]`, no crash, no global `Object.prototype` pollution, and **no persistence** (`JSON.stringify` writes own enumerable keys only, so it emits `{}`). It is latent rather than exploitable today — the sole production caller is `CollectionsView.tsx:176 onImport(payload)`, where `payload` is the non-null result of `parseExportPayload`, which rejects prototype-key ids — so this is a symmetry fix, not a live hole.
+- **Acceptance criteria:**
+  1. `web/src/lib/collections.ts:140` carries the same guard as `:299`: a paper whose id is in `PROTOTYPE_KEYS`, or is already an own key of `papers`, is not written. After the change, `grep -n "papers\[" web/src/lib/collections.ts` shows every assignment guarded by `hasOwnKey` or a `PROTOTYPE_KEYS` check.
+  2. `grep -nE '\[\s*paper\.id\s*\]|\[\s*id\s*\]' web/src/lib/collections.ts` reports no unguarded computed write outside `isPaper`/`isCollection`'s own validation.
+  3. A new test in `web/src/lib/__tests__/collections.test.ts` dispatches `collectionsReducer` **directly** (bypassing `parseExportPayload`) with a payload containing `{"id": "__proto__", "title": "p", "authors": [], "abstract": "a", "categories": [], "published": "2024-01-01", "primaryCategory": "cs.CV"}` and asserts `Object.getPrototypeOf(state.papers)` is `Object.prototype`, not the attacker's object. This test must fail before the fix and pass after.
+  4. No legitimate arXiv id is dropped: importing the committed `web/public/data/papers-2026-W40.json` records keeps all 2,812 papers, and an id of `toString` is still accepted (it is a real own key in that corpus and is deliberately absent from `PROTOTYPE_KEYS`).
+  5. `cd web && npm run typecheck && npm test` passes with no pre-existing expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then import the real 2,812-paper index through the UI and confirm the collection count reads 2812 with an empty console; and run the criterion-3 probe in a `/tmp` copy with the guard removed to confirm the test is not vacuous.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Impact is 2, not higher, precisely because the verifier measured no global pollution, no crash and no persistence — this is closing a latent inconsistency with IMP-151's own invariant, not a live vulnerability. Note the toolchain constraint recorded by IMP-151's implementer: `Object.hasOwn` is **not** usable here, because `web/tsconfig.json:5` sets `lib: ["ES2020", …]` and it fails with TS2550; use `Object.prototype.hasOwnProperty.call(...)` via the existing `hasOwnKey` helper. Do not introduce `Object.hasOwn`. Issue 2 in `.improve/reports/verify-IMP-151.md`; keep the cited line number current, since the file shifted when IMP-151 landed.
+
+### IMP-162 — Handle `TarInfo.mode is None` and strip privileged mode bits on the fallback path
+- **Status:** TODO
+- **Category:** Security
+- **Type:** bug-fix
+- **Area / files:** `scripts/paper-collector.py:43-67` (`rejection_reason()` and the fallback pre-screen, neither of which inspects `member.mode`), `scripts/paper-collector.py:116-121` (the `Sanitized member` warning, which exists only on the `TARFILE_HAS_FILTER` branch), `scripts/paper-collector.py:123` (the `filter="data"` call that IS told about mode changes)
+- **Intent:** The IMP-024 fallback is less strict than `data_filter` in two ways that both concern `member.mode`, and neither is logged. First, `rejection_reason()` never inspects the mode, so on the fallback branch a setuid/setgid/sticky bit survives onto disk — measured on 3.8.19, 3.11.8, 3.12.7 and 3.13.0 with the fallback forced: `suid=0o4755`, `sgid=0o2755`, `sticky=0o1777`, where `data_filter` would yield `0755` **and log it**. Second and more of a trap: `tarfile.data_filter` returns a `TarInfo` whose `.mode` is **`None` for symlink members** (CPython uses `None` to mean "do not chmod this link"), so any `%o` formatting of a filtered member's mode raises `TypeError: %o format: an integer is required, not NoneType` **inside the logging handler** — which would abort extraction of that archive rather than merely losing a log line. The current code dodges both with a local `mode_str()`, but the shape is easy to re-break and neither behavior is pinned by a test.
+- **Acceptance criteria:**
+  1. On the fallback path, a member whose `member.mode is not None and member.mode & 0o7000` is logged with the same `Sanitized member` shape used on the `TARFILE_HAS_FILTER` branch, and the bit is neutralised to `mode & 0o755` **on the `TarInfo` that is actually written** — the shipped `safe_members` list must carry the *replacement* `TarInfo`, not the original, because it is passed to a filterless `extractall`.
+  2. Every mode comparison and every `%o`/`%d` format of a mode in this module is `None`-guarded. No `logging` call in `scripts/paper-collector.py` may raise for any member shape.
+  3. New tests in `tests/test_paper_collector.py`, with the fallback forced by stubbing `TARFILE_HAS_FILTER` to `False`: (a) an archive member with mode `0o4755` extracts as `0o755` and the warning names the member; (b) a **symlink** member extracts successfully with no `TypeError` and with no spurious `Sanitized member` warning for it; (c) a plain regular file at `0o644` produces **no** warning, so the item cannot be "fixed" by warning on everything.
+  4. The same three assertions pass on the `TARFILE_HAS_FILTER` branch, so both code paths agree.
+  5. `/usr/local/bin/python3.11 -m unittest discover -s tests -v` passes, and the forced-fallback tests **run** rather than skip on the provisioned interpreter.
+- **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; then `/usr/local/bin/python3.11 -c "import importlib.util,stat,os; s=importlib.util.spec_from_file_location('pc','scripts/paper-collector.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(oct(m.TARFILE_HAS_FILTER))"`; and a real extraction check: `/tmp/rpf-venv/bin/python scripts/paper-collector.py --topic 'cat:cs.CV' --max-papers 1 --output-dir /tmp/rpf-modes --download-sources` then `find /tmp/rpf-modes -type f -perm -4000` must print nothing, and the run must exit 0 with no `TypeError`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Impact is 2 because the branch is unreachable on every patched CPython ≥3.8.17 and in CI, and because the extracted file is owned by the user running the tool — a preserved setuid bit grants no privilege and there is no traversal or write-outside-`dest` consequence. It is a hardening/consistency gap, not an escape, and the verifier explicitly recommended accepting IMP-024 with this folded into a follow-up. Do not "fix" it by warning on every member (criterion 3c). Related but deliberately **not** bundled: the fallback *rejects* absolute member names while `data_filter` *relocates* them into the destination — both safe, not equivalent, and only worth reconciling in whichever item eventually removes the fallback (D8 in `.improve/reports/discovered-IMP-024.md`). R1 and D7 in the discovery/verification reports.
+
+### IMP-166 — Pin the Node version in both workflows and declare `engines`
+- **Status:** TODO
+- **Category:** CI & automation
+- **Type:** tooling
+- **Area / files:** `.github/workflows/ci.yml:30` (`node-version: "20"`), `.github/workflows/deploy.yml:38` (`node-version: "20"`), `web/package.json` (no `engines` field), `web/package-lock.json` (declares `jsdom@29.1.1`'s `engines: {"node": "^20.19.0 || ^22.13.0 || >=24.0.0"}`)
+- **Intent:** IMP-005 added `jsdom@29.1.1`, whose declared engine floor is `^20.19.0 || ^22.13.0 || >=24`. Both workflows request the floating `"20"`, which `actions/setup-node@v4` currently resolves to the newest 20.x and therefore satisfies — but only by resolution, not by declaration. There is no `.npmrc` and no `engine-strict`, so a future drift degrades to an `EBADENGINE` **warning** rather than a red build, and nothing in the repo records the requirement a contributor must meet locally. This is the same class of fragility as PE-10's floating `python-version: "3.x"`, on the JavaScript side.
+- **Acceptance criteria:**
+  1. Both workflows request an explicit minor version (e.g. `node-version: "20.19"` or `"22.13"`), never a bare `"20"`, and the two files agree.
+  2. `web/package.json` gains an `engines.node` that matches what CI installs, and `engines` is not a lie: the value must be one the provisioned Node satisfies. Check it with `node -p "process.versions.node"` and record the result in the PR body.
+  3. Decision recorded in the PR body: whether to add `engine-strict=true` (via `.npmrc`) so a mismatch fails loudly, or to leave it a warning. Either is acceptable; leaving it undecided is not.
+  4. `cd web && npm ci` is clean afterwards (`npm ci --dry-run` exits 0 with no lockfile drift) and `cd web && npm run typecheck && npm test && npm run build` pass.
+- **Verification method:** `cat -n .github/workflows/ci.yml .github/workflows/deploy.yml | grep -n 'node-version'`; `cd web && node -p "process.versions.node"`; `cd web && npm ci --dry-run`; `cd web && npm ls jsdom`.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Impact is 2 — it cannot fail today. It is included because IMP-005 inherited a floating-version dependency constraint and nothing in the repo will catch it when it does drift, and because the fix is a one-line change in two files. Unverified on the machine that found it: every Homebrew `node@21`/`node@22` keg under `/opt/homebrew/opt/` symlinks into `Cellar/node/25.6.1`, so no real Node 20 was available to test against and the author could only reason about `setup-node`'s resolution, not observe it — criterion 2 exists to close that gap. Do **not** bundle the alternative fix (`npm install --save-dev jsdom@^26`, which declares `node >=18`): that would churn `web/package-lock.json`, which profile §6 restricts to IMP-005 and IMP-137. Recorded as §2 of `.improve/reports/discovered-IMP-005.md`; profile INF-19 records the absence of `engines`/`.nvmrc` but no item owns it.
+
+### IMP-167 — Require every implementer report to quote the command behind each figure
+- **Status:** TODO
+- **Category:** CI & automation
+- **Type:** tooling
+- **Area / files:** `.improve/reports/impl-IMP-012.md:4, 22, 229` (wrong line number `styles.css:18`, actual `:9`), `.improve/reports/impl-IMP-012.md:220, 222` (wrong computed font sizes: `.hero p` given as `1.05rem`/16.8px, actual `1rem`/16px; `.paper__meta` as 12.25px, actual 13.28px), `.improve/reports/impl-IMP-012.md:338` (fabricated build output: "CSS 8.85 kB (gzip 2.56 kB), JS 382.45 kB (gzip 113.00 kB)" and "Same output sizes as the recorded baseline", when the real build is **CSS 10.93 kB (gzip 2.86 kB), JS 163.72 kB (gzip 52.63 kB)** and the CSS figure matched neither the pre- nor the post-IMP-005 baseline)
+- **Intent:** The IMP-012 *code* was correct — one line, `--text-muted: #7a7a73` → `#666661` at `web/src/styles.css:9`, and every contrast ratio in the report reproduced to four decimal places under independent arithmetic. But the report that is supposed to be the record carried a wrong line number three times, a wrong font-size table, and build-size numbers that were never produced by any build, alongside an explicit "same as baseline" claim that its own figures contradict. A human skimming for evidence is misled by exactly that claim, and a downstream agent reading the report inherits 8.85 kB and 382.45 kB as fact. The gap is procedural: nothing requires a report figure to be traceable to a command and its output.
+- **Acceptance criteria:**
+  1. The three reports above are corrected in place: `impl-IMP-012.md:4, 22, 229` say `styles.css:9`; the `:220, 222` table carries the computed values (`.hero p` 16px, `.paper__meta` 13.28px, `.controls__count` 14.4px, `.collection__count` 14.4px); `:338` carries the real `npm run build` output and drops the "same as baseline" claim in favour of naming the baseline it was compared against. No source file is touched.
+  2. A short **"Evidence rules"** block is added to this backlog's header, above the verification vocabulary, stating that (a) any line-number citation must be read from the file it names, (b) any build-size or test-count figure must be quoted with the command that produced it, and (c) a figure the author did not measure must be omitted rather than estimated.
+  3. The block is echoed in `.improve/REPO_PROFILE.md` §4.6's definition of done, as a seventh numbered step, so it applies to the verification playbook and not only to implementers.
+  4. No existing item's acceptance criteria are weakened by this change; it is a documentation and process change only.
+- **Verification method:** `grep -n "styles.css:18\|8\.85 kB\|382\.45" .improve/reports/impl-IMP-012.md` must return nothing; `grep -n "Evidence rules" .improve/FEATURES.md` and `grep -n "Evidence rules" .improve/REPO_PROFILE.md` must each return one hit; `cd web && npm run build` must still print `10.93 kB` and `163.72 kB`, confirming the corrected report matches reality.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 10.0
+- **Notes:** Impact is 2 — no user or operator harm, and not one line of shipped code was wrong. The reason to itemize it is that `.improve/` is the memory of this loop: a fabricated figure in a DONE item's report is read by the next three implementers as a baseline, and the loop's whole value is that the baseline is measured. The verifier's judgement was that this "is the most serious report defect, because it is the one that would mislead a human reviewer skimming for evidence" — record that reasoning in the PR body so the item is not dismissed as pedantry. D1, D4 and D5 in `.improve/reports/verify-IMP-012.md`. This item does **not** retroactively invalidate the IMP-012 code change, which passed 7/7 criteria.
+
 ## Tier 8.0
 
 
@@ -2280,6 +2497,41 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Priority score:** 8.0
 - **Notes:** Pairs with IMP-055 (move `basicConfig` out of import scope); without that, the flag cannot take effect because the import-time call already configured the root logger.
 
+### IMP-164 — Treat an empty-string URL as "no URL" rather than unsafe
+- **Status:** TODO
+- **Category:** Data validation
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/collections.ts:86-88` (`isHttpUrl`, where `String("").trim()` is `""` and fails the regex), `web/src/lib/collections.ts:96-101` (`hasSafeUrls`, which therefore rejects the paper), `web/src/lib/collections.ts:249-257` (`parseExportPayload`'s `filter(isPaper).filter(hasSafeUrls)` chain)
+- **Intent:** `hasSafeUrls` already exempts `null` and `undefined` — "absent, not hostile" — after IMP-151b. An **empty string** falls on the wrong side of that line: `""` is present, so it goes to `isHttpUrl`, whose `String(value).trim()` is still `""`, which fails `/^https?:\/\//`, so the whole paper is discarded. The user exports 5 papers, imports a file where one was hand-edited to `"absUrl": ""`, and silently gets 4 with no message. This is the same data-loss shape as the `null` regression that IMP-151b had to fix, and it is worth closing now rather than letting a verifier rediscover it. Latent rather than live: `build_index.py:113-114` uses `getattr(result, …, None)`, so the producer emits `null`, never `""`.
+- **Acceptance criteria:**
+  1. `hasSafeUrls` treats an empty or whitespace-only url the same as `null`/`undefined` — exempt, not hostile — so the paper is kept. The exemption is whitespace-trimmed, so `"   "` behaves like `""` and not like `" javascript:alert(1)"`, which must still be rejected.
+  2. `isHttpUrl` itself is **unchanged**. It answers "is this string an `http(s)` url", and `""` is correctly not one; the fix belongs in the exemption set at `hasSafeUrls`, which is exactly the split IMP-151b's verifier insisted on ("widens the *exempt* set … leaves the *accepted* set exactly as IMP-001 defined it"). Widening `isHttpUrl` to return `true` for `""` would re-open the hole IMP-001 closed.
+  3. New tests in `web/src/lib/__tests__/collections.test.ts` assert a payload paper with `"absUrl": ""` is **retained**, one with `"pdfUrl": "   "` is retained, and one with `"absUrl": " javascript:alert(1)"` is still dropped beside them.
+  4. `cd web && npm run typecheck && npm test` passes with no pre-existing expectation weakened, and the 41-payload attack table in `.improve/reports/verify-IMP-151b.md` §7 still yields **zero** unsafe hrefs.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then import a payload with an empty-string `absUrl` and confirm the paper appears in the collection; then re-run the `javascript:`/leading-space import and confirm the paper is dropped and no `javascript:` href exists in the DOM.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 8.0
+- **Notes:** OBS-A in `.improve/reports/verify-IMP-151b.md`, which called it "latent, not live" and "arguably correct-by-design" — that judgement is the reason this sits at 8.0 rather than higher. The argument for doing it anyway: the exemption set already contains `null` and `undefined` for exactly the same reason, so an empty string is an inconsistency in a rule rather than a new rule. The argument against: an export carrying `"absUrl": ""` may signal a producer that is not `build_index.py`, and silently keeping such a paper is more permissive than silently dropping it. Whichever way the implementer decides, decide it **explicitly** and record it in the PR body; the acceptance criteria above take the permissive side because it matches IMP-151b's stated posture. Do not fold this into IMP-153, which filters the `localStorage` read path; this is the import path.
+
+### IMP-165 — Reject tab, LF and CR inside `isHttpUrl`
+- **Status:** TODO
+- **Category:** Security
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/collections.ts:86-88` (`isHttpUrl`, the single regex to tighten), `web/src/components/PaperCard.tsx:33-35` (`safeHref`, which trims and then hands the raw string to `href`), `web/src/lib/__tests__/collections.test.ts` (the assertion set from IMP-155)
+- **Intent:** `isHttpUrl` accepts `"https://x\n@evil.example"` and `safeHref` writes that raw string into the `href`; Chromium silently strips the newline and resolves it to `https://x@evil.example/` — userinfo `x`, **host `evil.example`**. The `^https?://` anchor makes this *not* an XSS: the scheme is always `http` or `https`, because browser URL parsing only ever removes U+0009/U+000A/U+000D and none of those appear in the literal `https`. It is a phishing / defence-in-depth gap: a reader sees a plausible arXiv link in the visible text and lands on a different host. The verifier measured it and explicitly ruled it out of scope for the regression it was reviewing, noting that a hardening "is behaviour-changing and belongs to its own item" — this is that item.
+- **Acceptance criteria:**
+  1. `isHttpUrl` returns `false` for any candidate containing `\t`, `\n` or `\r` anywhere in the string, in addition to its existing prefix requirement. Equivalently and preferably, `safeHref` refuses to emit a url containing them — pick one place, say which in the PR body, and do not leave the two disagreeing.
+  2. `String(value).trim()` still runs **before** the prefix test, so `"\thttps://ok.example"` and `" https://ok.example"` remain accepted; only *interior* control characters are newly rejected. Getting this backwards would drop legitimate urls.
+  3. New tests in `web/src/lib/__tests__/collections.test.ts` assert `isHttpUrl` is `false` for `"https://x\n@evil.example"`, `"https://x\t@evil.example"` and `"https://x\r@evil.example"`, and still `true` for `"https://arxiv.org/abs/2401.00001"` and `"http://arxiv.org/abs/2401.00001"` — the `http` case matters because `build_index.py:111` emits it for every live card.
+  4. A named constant or a single named predicate holds the control-character set, so IMP-155's assertions and this one reference the same rule rather than two regexes.
+  5. `cd web && npm run typecheck && npm test && npm run build` pass.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then in the browser import a payload whose `absUrl` is `"https://arxiv.org/abs/2401.00001\n@evil.example"` and confirm `[...document.querySelectorAll('a')].every(a => !(a.getAttribute('href') || '').includes('@evil.example'))` is `true`; then import the committed 2,812-paper index and confirm the first card's `href` is still `http://arxiv.org/abs/…` and renders — screenshot to `.improve/artifacts/IMP-165/feed-normal-absurl-desktop-1280.png` against `.improve/artifacts/baseline/baseline-feed-desktop-1280.png`.
+- **Effort:** S    **Risk:** med
+- **Depends on:** none
+- **Priority score:** 8.0
+- **Notes:** Risk `med` because this is the one change in this group that alters what the app accepts on a path that currently works: a paper whose url carries an interior control character would stop rendering a link. Criterion 2 is the safety valve — if an implementer misreads the trim ordering they will reject every whitespace-padded url instead. Impact is 2 and confidence 4 deliberately: the verifier proved the *mechanism* in real Chromium but also proved the scheme cannot change, so this is defence in depth and the score must not be inflated to suggest an open XSS. OBS-B in `.improve/reports/verify-IMP-151b.md`, which stated the obligation this item discharges. Do not tighten the scheme requirement in the same change — `http` must stay accepted until IMP-152 has shipped and the shards have been rebuilt.
+
 ## Tier 7.5
 
 ### IMP-127 — Precompute a lowercased search haystack
@@ -2362,6 +2614,25 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** IMP-037
 - **Priority score:** 7.5
 - **Notes:** Risk `med` because `window.confirm` must be stubbed, and stubbing it incorrectly makes the delete tests pass vacuously. Assert both the confirmed and the cancelled branch.
+
+### IMP-163 — Close the three IMP-024 extraction-regression test gaps
+- **Status:** TODO
+- **Category:** Test coverage & test quality
+- **Type:** test
+- **Area / files:** `tests/test_paper_collector.py:195` (`_write_attack_archive`, whose `../../../pwned_deep.txt` member escapes the test's own sandbox), `tests/test_paper_collector.py:230-236` (`_files_outside`, an `os.walk(self.base)` that cannot see an escape into `$TMPDIR`), `tests/test_paper_collector.py:334` (the log assertion that accidentally catches one mutant), `scripts/paper-collector.py:46-50` (`rejection_reason`'s docstring, whose `commonpath`-not-`startswith` claim is unpinned)
+- **Intent:** IMP-024's test suite is genuinely load-bearing — 15 of 16 mutants caught — but three holes remain, and two of them are false confidence rather than mere absence. First, `_files_outside` only walks `self.base`, while the attack archive's `../../../pwned_deep.txt` member resolves from `base/extracted/A Paper Title` to **`$TMPDIR/pwned_deep.txt`**, outside `self.base`; the verifier proved the blind spot by showing mutant M16 still wrote that file into the real temp directory even though the suite passed. Second, the docstring's claim that `commonpath` stops `/…/Paper` matching `/…/Paper-evil` is not pinned — mutant M10 (`commonpath(...) != '/'`) passes all 44 tests, so nothing would catch a regression to a `startswith` prefix check. Third, no test pins the `errorlevel` trap: a bare `extractall(dest, filter="data")` raises on the first rejected member and discards every later one, so a regression to that form would silently lose a legitimate arXiv tarball's tail.
+- **Acceptance criteria:**
+  1. The escape assertion covers the real escape surface. Either a sentinel member is targeted inside `self.base` (e.g. `../pwned_deep.txt` with a dedicated `self.sentinel/pwned_deep.txt` destination), or `$TMPDIR` is snapshotted around the extraction and diffed, or the absolute `$TMPDIR` path is asserted not to exist afterwards. Whichever is chosen, no file may be created outside the test's own tempdir by **any** code path — the verifier had to delete the stray file itself.
+  2. A sibling-prefix member is added to `_write_attack_archive` — `../A Paper Title-evil/sibling_evil.txt` — and the test asserts it is rejected. Deleting the `commonpath` call in favour of a `startswith` prefix check must turn this test red; prove it in a `/tmp` copy and record the failed-test count.
+  3. A test builds an archive whose **last** member is hostile and whose earlier members are benign, and asserts every benign member was extracted and exactly one warning names the hostile one. This pins the pre-screen design (pass `members=safe_members` to `extractall`) against a regression to a bare `extractall(dest, filter="data")`, which aborts on the first rejection.
+  4. The same three assertions are exercised on the forced-fallback branch (`TARFILE_HAS_FILTER` stubbed to `False`) as well as the `filter="data"` branch, so the two code paths are held to one contract.
+  5. `/usr/local/bin/python3.11 -m unittest discover -s tests -v` passes (44 pre-existing + the new cases), **none of them skipping**, and no pre-existing expectation is weakened or removed.
+  6. All escape targets stay inside the test's own `tempfile` sandbox, so a reverting mutant cannot litter `$TMPDIR` — this is the claim `impl-IMP-024.md:126` made and the verifier disproved.
+- **Verification method:** `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; then `ls $TMPDIR | grep -i pwned` must print nothing after a full run; then in a `/tmp` copy revert each of the three shapes in turn (M10's `commonpath` swap, the `filter="data"` bare call, and the `is_inside` relaxation) and confirm the suite goes red each time, recording the counts in the PR body.
+- **Effort:** M    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 7.5
+- **Notes:** Effort is `M`, not `S`, because all three gaps must be closed and the fallback branch driven separately — three test changes plus a second code path, not one assertion. Impact is 3 and confidence 5: every claim here was measured by mutation testing on five interpreters, not inferred. The value is entirely criterion 6 — an escape test that cannot see its own escape is worse than no test, because it converts a live hole into a documented pass. R2 and R3 in `.improve/reports/verify-IMP-024-r2.md`, D1 and D9 in `.improve/reports/discovered-IMP-024.md`. Test-only: no file under `scripts/` may change except the docstring wording in criterion 2's target, and a docstring change must be paired with the test that makes it true.
 
 ## Tier 6.7
 
