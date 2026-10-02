@@ -20,6 +20,10 @@ jobs:
 
   web-tests:
     runs-on: ubuntu-latest
+    # Job-wide backstop. The index step below may use up 15 of these, so the
+    # remaining 10 minutes cover checkout + both dependency installs + the
+    # npm steps, which measure ~120 s on CI: comfortably >5x headroom.
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: web
@@ -44,6 +48,21 @@ jobs:
         run: npm test
       - name: Build the paper index
         working-directory: .
+        # Must stay ABOVE the client's worst case for one page, or this step
+        # dies on GitHub's generic timeout instead of build_index.py's own
+        # "Refusing to write an index: the arXiv query failed for ..." (IMP-004).
+        #
+        # Worst case here is one page fetch (--max-per-category 5 caps page_size
+        # at 5, so the normal run makes a single request and measures ~0.3 s).
+        # On the connect-timeout path arxiv retries num_retries=5 times, i.e.
+        # 6 attempts, and does NOT space them: arxiv records _last_request_dt
+        # only after a *successful* get, so the delay_seconds branch is skipped
+        # on every retry. 6 x 60 s = 360 s, measured 360.08 s with attempt
+        # offsets 0/60/120/180/240/300 s.
+        #
+        # 15 min = 900 s is 2.5x that 360 s worst case. A legitimate run is
+        # ~0.3 s, so the cap is ~3000x the happy path and cannot flake.
+        timeout-minutes: 15
         run: python scripts/build_index.py --category cs.CV --max-per-category 5 --out-dir web/public/data
       - name: Build
         run: npm run build

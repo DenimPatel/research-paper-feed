@@ -9,21 +9,83 @@ place.
 import logging
 
 import arxiv
+import requests
 
 logging.basicConfig(level=logging.INFO)
 
 DEFAULT_PAGE_SIZE = 1000
 DEFAULT_DELAY_SECONDS = 10
 DEFAULT_NUM_RETRIES = 5
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 60
+
+
+class TimeoutNotInstalled(RuntimeError):
+    """Raised when the request timeout could not be attached to a client."""
+
+
+class TimeoutSession(requests.Session):
+    """A ``requests.Session`` that bounds any request that omits a timeout.
+
+    ``arxiv.Client`` issues its queries as ``self._session.get(url, ...)``, and
+    ``requests.Session.get`` delegates straight to ``Session.request``, so
+    overriding ``request`` is the one hook that covers the library's internal
+    call without patching the client. The default is additive (``setdefault``),
+    so a caller that passes its own timeout keeps it.
+
+    ``requests`` applies the value per socket operation rather than to the
+    request as a whole, so a server that dribbles one byte at a time can still
+    outlast it. The workflow-level ``timeout-minutes`` on the index step is what
+    bounds that case.
+    """
+
+    default_timeout = DEFAULT_REQUEST_TIMEOUT_SECONDS
+
+    def request(self, *args, **kwargs):
+        kwargs.setdefault("timeout", self.default_timeout)
+        return super().request(*args, **kwargs)
+
+
+def install_request_timeout(client, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS):
+    """Bound every request ``client`` makes to ``timeout`` seconds.
+
+    ``arxiv.Client.__init__`` takes only ``page_size``/``delay_seconds``/
+    ``num_retries`` in 2.1.3 and in the 3.0.0 that CI resolves -- there is no
+    timeout parameter -- and the constructor ends with a bare
+    ``self._session = requests.Session()``. So ``Client._session`` is the only
+    hook available.
+
+    That attribute is PRIVATE and version-fragile, which makes this a floor and
+    not a guarantee: if a future arxiv renames it or stops routing through the
+    session, a plain assignment would create a dead attribute and the client
+    would silently go back to running unbounded. So the session is located and
+    type-checked first, and a missing one raises rather than degrading -- an
+    unbounded request costs a whole runner's job limit, which is far worse than
+    a build that fails loudly on an arxiv upgrade.
+    """
+    session = getattr(client, "_session", None)
+    if not isinstance(session, requests.Session):
+        raise TimeoutNotInstalled(
+            "arxiv.Client has no requests.Session at '_session' (found %s), so "
+            "this version of arxiv cannot be given a request timeout."
+            % type(session).__name__
+        )
+    if not isinstance(session, TimeoutSession):
+        # Swap the class on the library's own session instead of replacing the
+        # object, so anything arxiv configured on it survives the hook.
+        session.__class__ = TimeoutSession
+    session.default_timeout = timeout
+    return session
 
 
 def build_client(max_results):
-    """Create an arXiv client sized for ``max_results``."""
-    return arxiv.Client(
+    """Create an arXiv client sized for ``max_results``, with bounded requests."""
+    client = arxiv.Client(
         page_size=max(1, min(DEFAULT_PAGE_SIZE, max_results)),
         delay_seconds=DEFAULT_DELAY_SECONDS,
         num_retries=DEFAULT_NUM_RETRIES,
     )
+    install_request_timeout(client, DEFAULT_REQUEST_TIMEOUT_SECONDS)
+    return client
 
 
 def new_status():
@@ -68,7 +130,12 @@ def iter_results(query, max_results, status=None):
             yielded += 1
             if max_results is not None and yielded >= max_results:
                 break
-    except arxiv.ArxivError as exc:
+    except (arxiv.ArxivError, requests.exceptions.Timeout) as exc:
+        # ``arxiv`` retries only ``HTTPError``, ``UnexpectedEmptyPageError``
+        # and ``ConnectionError``, so the timeout added above escapes its retry
+        # loop and lands here. Routing it through the same status holder is what
+        # keeps a hung request on the same hard-fail path as a 5xx, and it
+        # costs no extra requests: the timeout can only shorten a run.
         if status is not None:
             status.update(failed=True, error=str(exc))
         logging.error("ArXiv search failed for %r: %s", query, exc)

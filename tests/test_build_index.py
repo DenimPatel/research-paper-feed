@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import unittest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -10,6 +11,11 @@ from types import SimpleNamespace
 MODULE_PATH = os.path.join(
     os.path.dirname(__file__), "..", "scripts", "build_index.py"
 )
+DEPLOY_PATH = os.path.join(
+    os.path.dirname(__file__), "..", ".github", "workflows", "deploy.yml"
+)
+DEPLOY_INDEX_RUN = re.compile(r"^\s*run:\s*python scripts/build_index\.py\s*$")
+TIMEOUT_LINE = re.compile(r"^\s*timeout-minutes:\s*(\d+)\s*(?:#.*)?$")
 
 
 def load_module():
@@ -672,6 +678,66 @@ class CategoryArgumentTests(unittest.TestCase):
             self.assertEqual(raised.exception.code, 2)
         finally:
             build_index.collect_papers = original
+
+
+class DeployStepTimeoutTests(unittest.TestCase):
+    """A deploy run must be able to report which categories failed.
+
+    deploy.yml runs the whole pipeline, so unlike the CI step it queries every
+    default category, and ``collect_papers`` records a failed category and moves
+    on to the next. A total network partition therefore costs one worst-case
+    page fetch *per category* before ``main`` finally logs them all and returns
+    1. If the step's cap were tighter than that, GitHub would cancel the run and
+    the one diagnostic that names the categories would never be printed.
+    """
+
+    def _index_step_timeout_minutes(self):
+        with open(DEPLOY_PATH, encoding="utf-8") as handle:
+            lines = handle.readlines()
+        for index, line in enumerate(lines):
+            if not DEPLOY_INDEX_RUN.match(line):
+                continue
+            # The cap is a sibling key of ``run:``, so it is the first thing
+            # above it once blanks and comments are skipped. Anything else means
+            # the step has no cap, which is reported rather than papered over by
+            # matching a cap from an earlier step.
+            for candidate in reversed(lines[:index]):
+                stripped = candidate.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                match = TIMEOUT_LINE.match(candidate)
+                self.assertIsNotNone(
+                    match,
+                    "deploy.yml:%d: the index step has no timeout-minutes"
+                    % (index + 1),
+                )
+                return int(match.group(1))
+        self.fail("deploy.yml no longer runs 'python scripts/build_index.py'")
+
+    def test_the_index_step_outlasts_a_whole_pipeline_failure(self):
+        worst_case = (
+            len(build_index.DEFAULT_CATEGORIES)
+            * (build_index.arxiv_common.DEFAULT_NUM_RETRIES + 1)
+            * build_index.arxiv_common.DEFAULT_REQUEST_TIMEOUT_SECONDS
+        )
+        self.assertEqual(worst_case, 1800)
+
+        minutes = self._index_step_timeout_minutes()
+        self.assertGreater(
+            minutes * 60,
+            worst_case,
+            "deploy.yml caps the index step at %d min (%d s), but a partitioned "
+            "run needs %d s (%d categories x %d attempts x %d s) before "
+            "main() can report them."
+            % (
+                minutes,
+                minutes * 60,
+                worst_case,
+                len(build_index.DEFAULT_CATEGORIES),
+                build_index.arxiv_common.DEFAULT_NUM_RETRIES + 1,
+                build_index.arxiv_common.DEFAULT_REQUEST_TIMEOUT_SECONDS,
+            ),
+        )
 
 
 if __name__ == "__main__":

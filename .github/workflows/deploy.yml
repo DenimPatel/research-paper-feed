@@ -20,6 +20,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Job-wide backstop. The index step below may use up 75 of these, leaving
+    # 15 minutes for checkout, both dependency installs, the npm build and the
+    # Pages artifact upload -- together ~120 s on CI, so >7x headroom.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +35,23 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build the paper index
+        # Same rule as ci.yml's index step: the cap must be looser than the
+        # client's worst case, or this dies on GitHub's generic timeout instead
+        # of build_index.py's own "Refusing to write an index: the arXiv query
+        # failed for ..." (IMP-004).
+        #
+        # A deploy run is the FULL pipeline -- all 5 default categories with
+        # --max-per-category unset, so page_size is 1000. collect_papers records
+        # a failed category and moves to the next one, so a total network
+        # partition costs one worst-case page fetch per category:
+        #     5 categories x (num_retries 5 + 1) x 60 s = 1800 s
+        # Measured at 1/30 scale (60.17 s at a 2 s timeout) and projected:
+        # 1805.1 s = 30.1 min, after which main() logs the category list and
+        # returns 1 without writing an index.
+        #
+        # 75 min = 4500 s is 2.5x that 1800 s worst case, the same 2.5x margin
+        # ci.yml uses. A healthy deploy is ~2-5 min, so ~15x headroom.
+        timeout-minutes: 75
         run: python scripts/build_index.py
 
       - uses: actions/setup-node@v4
@@ -56,6 +77,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # actions/deploy-pages just waits for the upload to go live (tens of
+    # seconds), but `concurrency.cancel-in-progress` is false, so a deploy that
+    # wedges here would block every later deploy too. Cheap insurance.
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
