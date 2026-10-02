@@ -151,7 +151,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Risk is `med` because the failure-reporting shape is a real design choice (hard fail vs. degraded index with a visible flag) and hard-failing could turn a partial outage into a red deploy. The choice must be recorded. | verifier PASS 3/3; 39 py tests
 
 ### IMP-005 — Make component and DOM testing possible
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Test coverage & test quality
 - **Type:** tooling
 - **Area / files:** `web/vite.config.ts:7-10` (`test.environment: "node"`, `test.include: ["src/**/*.test.ts"]`), `web/package.json:6-25` (scripts and devDependencies), `web/package-lock.json`
@@ -164,7 +164,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** S    **Risk:** med
 - **Depends on:** none
 - **Priority score:** 25.0
-- **Notes:** Dependency cost, as required by the profile: three dev-only packages, none shipped in the Pages bundle (`react` + `react-dom` remain the only runtime dependencies). `web/package-lock.json` is on the do-not-touch list, so this item — together with IMP-137 — is one of only two places that may change it, and only via `npm install`. Effort is `S` because the change is three devDependencies plus two config lines; the lockfile regeneration is one command. If `@testing-library/user-event` proves unnecessary for the first smoke test, drop it rather than carrying an unused dep.
+- **Notes:** Dependency cost, as required by the profile: three dev-only packages, none shipped in the Pages bundle (`react` + `react-dom` remain the only runtime dependencies). `web/package-lock.json` is on the do-not-touch list, so this item — together with IMP-137 — is one of only two places that may change it, and only via `npm install`. Effort is `S` because the change is three devDependencies plus two config lines; the lockfile regeneration is one command. If `@testing-library/user-event` proves unnecessary for the first smoke test, drop it rather than carrying an unused dep. | commit 894fb9b
 
 ### IMP-143 — Export and test `readHash` / `writeHash`
 - **Status:** TODO
