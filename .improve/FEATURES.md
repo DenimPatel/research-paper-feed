@@ -371,7 +371,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 
 ### IMP-015 — Make a single failed shard non-fatal
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** bug-fix
 - **Area / files:** `web/src/lib/paperIndex.ts:150-157` (`Promise.all` over needed shards), `web/src/lib/paperIndex.ts:100-127` (`loadShard` throws)
@@ -385,7 +385,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending; attempt 2 (AC2 completed)
 ### IMP-016 — Distinguish "papers failed to load" from "no papers available"
 - **Status:** TODO
 - **Category:** Error handling & edge cases

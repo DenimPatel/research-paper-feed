@@ -23,6 +23,37 @@ export interface LoadProgress {
   total: number;
 }
 
+/** A shard that could not be loaded, named so the missing week is reportable. */
+export interface ShardLoadFailure {
+  readonly file: string;
+  readonly message: string;
+}
+
+/**
+ * What `loadPapers` resolves to: the papers from every shard that loaded, with
+ * the shards that did not riding along. It is still the `Paper[]` callers have
+ * always received — `papers` is that same array — so `setPapers(result)` and
+ * `result.length` keep working, while a caller that has to tell the user which
+ * week is missing reads `failedFiles` instead of guessing. Both properties are
+ * non-enumerable, so the result still compares equal to a bare list.
+ */
+export type PapersLoadResult = Paper[] & {
+  readonly papers: Paper[];
+  readonly failedFiles: ShardLoadFailure[];
+};
+
+function papersResult(
+  papers: Paper[],
+  failedFiles: ShardLoadFailure[],
+): PapersLoadResult {
+  const result = papers as PapersLoadResult;
+  Object.defineProperties(result, {
+    papers: { value: result, enumerable: false },
+    failedFiles: { value: failedFiles, enumerable: false },
+  });
+  return result;
+}
+
 const INDEX_HELP =
   "No paper index was found. Run `python scripts/build_index.py` locally, " +
   "or wait for the scheduled GitHub Action that builds and deploys the index.";
@@ -157,15 +188,26 @@ export class PaperIndex {
    * Load every shard overlapping the last ``days`` and return the papers
    * published within that exact window, newest first. Shards are cached, so
    * widening the window only fetches the newly needed weeks.
+   *
+   * A shard that fails is not fatal: the papers from the shards that did load
+   * are returned and the failures ride along in `failedFiles`, because one 404,
+   * one corrupt body, or one transient 500 must degrade the feed instead of
+   * discarding every other week. Nothing is cached for a failed shard, so the
+   * next load retries it and a transient failure heals itself.
+   *
+   * Two failures stay fatal. A failed *manifest* throws from `getManifest`
+   * before this method reaches a shard, because there is nothing to show
+   * without it; and a window in which every shard failed throws rather than
+   * resolving to an empty list the user would read as "no papers yet".
    */
   async loadPapers(
     days: RecencyDays | number,
     onProgress?: (progress: LoadProgress) => void,
-  ): Promise<Paper[]> {
+  ): Promise<PapersLoadResult> {
     const manifest = await this.getManifest();
     const reference = latestIndexDate(manifest);
     if (!reference) {
-      return [];
+      return papersResult([], []);
     }
     const start = windowStart(reference, days);
     const needed = selectShards(manifest, start);
@@ -174,7 +216,8 @@ export class PaperIndex {
     let loaded = 0;
     onProgress?.({ loaded, total });
 
-    const batches = await Promise.all(
+    // `allSettled`, not `all`: one rejected shard must not discard the rest.
+    const settled = await Promise.allSettled(
       needed.map(async (shard) => {
         const papers = await this.loadShard(shard);
         loaded += 1;
@@ -183,9 +226,37 @@ export class PaperIndex {
       }),
     );
 
-    return batches
-      .flat()
-      .filter((paper) => paper.published && paper.published >= start)
-      .sort((a, b) => (a.published < b.published ? 1 : -1));
+    const batches: Paper[][] = [];
+    const failedFiles: ShardLoadFailure[] = [];
+    let firstReason: unknown;
+    for (const [position, outcome] of settled.entries()) {
+      if (outcome.status === "fulfilled") {
+        batches.push(outcome.value);
+        continue;
+      }
+      firstReason ??= outcome.reason;
+      failedFiles.push({
+        file: needed[position].file,
+        message:
+          outcome.reason instanceof Error
+            ? outcome.reason.message
+            : String(outcome.reason),
+      });
+    }
+
+    if (total > 0 && failedFiles.length === total) {
+      // Every shard in the window failed, so reject exactly as `Promise.all`
+      // used to — with the first shard's own error — rather than resolving to
+      // an empty feed that reads as "no papers in this window yet".
+      throw firstReason;
+    }
+
+    return papersResult(
+      batches
+        .flat()
+        .filter((paper) => paper.published && paper.published >= start)
+        .sort((a, b) => (a.published < b.published ? 1 : -1)),
+      failedFiles,
+    );
   }
 }

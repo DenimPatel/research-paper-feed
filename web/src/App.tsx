@@ -17,7 +17,11 @@ import {
   saveState,
   type ExportPayload,
 } from "./lib/collections";
-import { PaperIndex, type LoadProgress } from "./lib/paperIndex";
+import {
+  PaperIndex,
+  type LoadProgress,
+  type ShardLoadFailure,
+} from "./lib/paperIndex";
 import { rankPapers, scorePaper, tokenize } from "./lib/search";
 import type { IndexManifest, Paper, RecencyDays, SortMode } from "./lib/types";
 import {
@@ -81,6 +85,11 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<LoadProgress>({ loaded: 0, total: 0 });
+  // Shards that were asked for and did not arrive. A partial failure no longer
+  // rejects the load (IMP-015), so without this the feed would render short and
+  // say nothing: correct papers, silently incomplete week. The error state above
+  // cannot cover it either, because the load succeeded.
+  const [failedShards, setFailedShards] = useState<ShardLoadFailure[]>([]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [manifestAttempts, setManifestAttempts] = useState(0);
   const retriedRef = useRef(false);
@@ -160,11 +169,20 @@ export function App() {
       .then((list) => {
         if (!cancelled) {
           setPapers(list);
+          // `list` is still the `Paper[]` `setPapers` has always taken, and it
+          // also carries the shards that failed. Reading them off the same value
+          // is what lets one load drive both the feed and the completeness
+          // notice, with no second request and no chance of the two disagreeing.
+          setFailedShards(list.failedFiles);
           setLoading(false);
         }
       })
       .catch((cause: unknown) => {
         if (!cancelled) {
+          // Every shard failed, so there is no partial result to describe: the
+          // hard error panel below is the whole story, and leaving an older
+          // partial notice up would double-report a state that no longer holds.
+          setFailedShards([]);
           setError(cause instanceof Error ? cause.message : String(cause));
           setLoading(false);
         }
@@ -464,6 +482,36 @@ export function App() {
                 {error && (
                   <p className="banner banner--warning" role="alert">
                     {error}
+                  </p>
+                )}
+
+                {failedShards.length > 0 && (
+                  // A shard that failed is no longer fatal, but its week is
+                  // still missing — so this is the one case where the feed is
+                  // honest about being incomplete, and silently dropping it
+                  // would trade an obvious empty feed for a plausible wrong one.
+                  // Same `banner banner--error` pair and `role="alert"` as the
+                  // storage notice IMP-011 added, so the two read as one kind of
+                  // thing and need no new styling. Mounted only while the
+                  // failures last and keyed to nothing but its own condition, so
+                  // the assertive announcement fires once per degraded load and
+                  // not again on every later render. The shard names go in
+                  // `title`: IMP-015 wants the missing week named, IMP-017 AC2
+                  // bars a file name or an `Error.message` from the visible
+                  // text, and `title` is the one place that satisfies both.
+                  <p
+                    className="banner banner--error"
+                    role="alert"
+                    title={failedShards
+                      .map((failure) => `${failure.file}: ${failure.message}`)
+                      .join("\n")}
+                  >
+                    <strong>Some papers could not be loaded.</strong>{" "}
+                    {failedShards.length === 1
+                      ? "One week"
+                      : `${failedShards.length} weeks`}{" "}
+                    in this window failed to load, so the feed below is
+                    incomplete. Everything that did load is shown.
                   </p>
                 )}
 

@@ -6,6 +6,7 @@ import {
   selectShards,
   windowStart,
 } from "../paperIndex";
+import type { LoadProgress } from "../paperIndex";
 import type { IndexManifest, Paper } from "../types";
 
 function makePaper(id: string, published: string): Paper {
@@ -352,5 +353,170 @@ describe("PaperIndex", () => {
       await expect(index.refreshManifest(), label).resolves.toEqual(MANIFEST);
       expect(mock, label).toHaveBeenCalledTimes(2);
     }
+  });
+});
+
+/** A 7-day window from the fixture manifest needs exactly W09 and W08. */
+const TWO_SHARD_WINDOW = 7;
+
+describe("PaperIndex partial shard failures", () => {
+  it("keeps the shards that loaded when one shard 404s", async () => {
+    installFetch({ "papers-2024-W09.json": SHARDS["papers-2024-W09.json"] });
+
+    const result = await new PaperIndex().loadPapers(TWO_SHARD_WINDOW);
+
+    // Still the plain list the app consumes, and the same papers `Promise.all`
+    // used to throw away along with the failed week.
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.map((paper) => paper.id)).toEqual(["w09a", "w09b"]);
+    expect(result.papers.map((paper) => paper.id)).toEqual(["w09a", "w09b"]);
+    expect(result.failedFiles).toEqual([
+      {
+        file: "papers-2024-W08.json",
+        message: "Failed to load papers-2024-W08.json (HTTP 404).",
+      },
+    ]);
+  });
+
+  it("keeps the shards that loaded when one shard has a malformed body", async () => {
+    const mock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/index.json")) {
+        return jsonResponse(MANIFEST);
+      }
+      if (url.endsWith("papers-2024-W08.json")) {
+        return new Response("<html>not json", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return jsonResponse(SHARDS["papers-2024-W09.json"]);
+    });
+    vi.stubGlobal("fetch", mock);
+
+    const result = await new PaperIndex().loadPapers(TWO_SHARD_WINDOW);
+
+    expect(result.map((paper) => paper.id)).toEqual(["w09a", "w09b"]);
+    expect(result.failedFiles).toEqual([
+      {
+        file: "papers-2024-W08.json",
+        message:
+          "Shard papers-2024-W08.json is missing or malformed. Try regenerating the index.",
+      },
+    ]);
+  });
+
+  it("reports every failed shard, not only the first", async () => {
+    installFetch({ "papers-2024-W09.json": SHARDS["papers-2024-W09.json"] });
+
+    const result = await new PaperIndex().loadPapers(30);
+
+    expect(result.map((paper) => paper.id)).toEqual(["w09a", "w09b"]);
+    expect(result.failedFiles.map((failure) => failure.file)).toEqual([
+      "papers-2024-W08.json",
+      "papers-2024-W05.json",
+    ]);
+  });
+
+  it("rejects when every shard in the window fails", async () => {
+    installFetch({});
+
+    await expect(
+      new PaperIndex().loadPapers(TWO_SHARD_WINDOW),
+    ).rejects.toThrow("Failed to load papers-2024-W09.json (HTTP 404).");
+  });
+
+  it("still rejects when the manifest fails, even though shards are involved", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        return url.endsWith("/index.json")
+          ? new Response("not found", { status: 404 })
+          : jsonResponse(SHARDS["papers-2024-W09.json"]);
+      }),
+    );
+
+    await expect(
+      new PaperIndex().loadPapers(TWO_SHARD_WINDOW),
+    ).rejects.toBeInstanceOf(IndexUnavailableError);
+  });
+
+  it("reports no failures when every shard loads", async () => {
+    installFetch();
+
+    const result = await new PaperIndex().loadPapers(TWO_SHARD_WINDOW);
+
+    expect(result.failedFiles).toEqual([]);
+    expect(result.papers).toHaveLength(2);
+  });
+
+  it("retries a failed shard on the next load instead of caching the failure", async () => {
+    // W08 carries a paper inside the 7-day window so a recovered shard has
+    // something visible to contribute.
+    const recovered = { papers: [makePaper("w08-fresh", "2024-02-26")] };
+    let w08available = false;
+    const mock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/index.json")) {
+        return jsonResponse(MANIFEST);
+      }
+      const file = url.split("/").pop() ?? "";
+      if (file === "papers-2024-W08.json") {
+        return w08available
+          ? jsonResponse(recovered)
+          : new Response("server error", { status: 500 });
+      }
+      if (file in SHARDS) {
+        return jsonResponse(SHARDS[file]);
+      }
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", mock);
+
+    const index = new PaperIndex();
+    const first = await index.loadPapers(TWO_SHARD_WINDOW);
+    expect(first.map((paper) => paper.id)).toEqual(["w09a", "w09b"]);
+    expect(first.failedFiles.map((failure) => failure.file)).toEqual([
+      "papers-2024-W08.json",
+    ]);
+
+    // The shard recovers on the next load, and the week that already loaded is
+    // still served from the cache.
+    w08available = true;
+    const requestsAfterFirstLoad = mock.mock.calls.length;
+    const second = await index.loadPapers(TWO_SHARD_WINDOW);
+    expect(second.map((paper) => paper.id)).toEqual(["w09a", "w09b", "w08-fresh"]);
+    expect(second.failedFiles).toEqual([]);
+    expect(mock.mock.calls.length - requestsAfterFirstLoad).toBe(1);
+  });
+
+  it("counts only the shards that loaded toward progress", async () => {
+    installFetch({ "papers-2024-W09.json": SHARDS["papers-2024-W09.json"] });
+
+    const progress: LoadProgress[] = [];
+    await new PaperIndex().loadPapers(TWO_SHARD_WINDOW, (next) =>
+      progress.push(next),
+    );
+
+    expect(progress).toEqual([
+      { loaded: 0, total: 2 },
+      { loaded: 1, total: 2 },
+    ]);
+  });
+
+  it("returns no failures for an empty manifest instead of throwing", async () => {
+    installFetch();
+    vi.mocked(fetch).mockImplementation(
+      async (input: RequestInfo | URL) =>
+        String(input).endsWith("/index.json")
+          ? jsonResponse({ ...MANIFEST, shards: [], totalPapers: 0 })
+          : new Response("not found", { status: 404 }),
+    );
+
+    const result = await new PaperIndex().loadPapers(TWO_SHARD_WINDOW);
+
+    expect(result).toEqual([]);
+    expect(result.failedFiles).toEqual([]);
   });
 });
