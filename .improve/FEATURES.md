@@ -470,7 +470,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Risk `med` because widening the types may surface compile errors in `PaperCard.tsx` and `App.tsx` filter code (`App.tsx:211-212` uses `paper.primaryCategory` in a `Set` lookup, which is fine for `null` but changes the filter semantics subtly). **Advisory carried forward from `.improve/reports/verify-IMP-151b.md` OBS-D, which must survive this item:** widening the types to `string | null` makes it *tempting* to simplify `hasSafeUrls` (`web/src/lib/collections.ts:96-101`) from `url == null || isHttpUrl(url)` down to `isHttpUrl(paper.absUrl)`. Do not. `parseExportPayload` validates a file read off disk, so a `null` is reachable there regardless of what the declared type says, and `PaperCard.tsx:33-35`'s `safeHref(url: string | undefined)` is likewise now inaccurate about what it receives. The `null` exemption is load-bearing for correctness, and `isHttpUrl`'s `(value: unknown)` parameter is what makes it safe — narrowing that parameter to `string` would let a `null` flow straight into an `href`. | commit pending
 
 ### IMP-020 — Make the retention window a filter, not only an ordered `break`
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `scripts/build_index.py:215-219` (`collect_papers` retention check), `scripts/build_index.py:194-200` (`_result_datetime` returning `None`), `scripts/build_index.py:149-151` (`build_shards` grouping by `iso_week_key`)
@@ -483,7 +483,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** med
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** Risk `med` because dropping non-`datetime` records changes what reaches the index for any upstream shape change; verify a real run still produces ~the same paper count before merging. The baseline index on disk is `totalPapers: 2812` across 2 shards; a smoke run of `--category cs.CV --max-per-category 300` is the comparison to record.
+- **Notes:** Risk `med` because dropping non-`datetime` records changes what reaches the index for any upstream shape change; verify a real run still produces ~the same paper count before merging. The baseline index on disk is `totalPapers: 2812` across 2 shards; a smoke run of `--category cs.CV --max-per-category 300` is the comparison to record. | commit pending
 
 ### IMP-021 — Write the manifest before deleting stale shards
 - **Status:** DONE

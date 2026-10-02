@@ -208,7 +208,12 @@ def _result_datetime(result):
 
 
 def collect_papers(
-    categories, retention_days, max_per_category, abstract_chars, failures=None
+    categories,
+    retention_days,
+    max_per_category,
+    abstract_chars,
+    failures=None,
+    assume_newest_first=False,
 ):
     """Query each category and return raw (not yet deduplicated) records.
 
@@ -217,6 +222,15 @@ def collect_papers(
     holder, and an ``ArxivError`` raised out of it is caught here too, so a
     mid-run outage is never mistaken for a category that simply has no new
     papers.
+
+    Retention is enforced one record at a time: a result with no usable
+    ``published`` datetime and a result older than the cutoff are each dropped
+    on their own merits, whatever order the results arrive in.
+    ``assume_newest_first`` is the extra shortcut, not the filter -- it stops
+    reading a category at its first out-of-window result instead of paging
+    through the rest of the feed, which is only sound because arXiv answers
+    newest-first. It is off by default so the filter cannot be defeated by an
+    unexpected order; callers that can vouch for the sort opt in.
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
     limit = max_per_category if max_per_category > 0 else UNLIMITED
@@ -226,16 +240,31 @@ def collect_papers(
         query = f"cat:{category}"
         logging.info("Querying %s (limit %s) ...", query, limit)
         count = 0
+        undated = 0
         status = arxiv_common.new_status()
         try:
             for result in arxiv_common.iter_results(query, limit, status):
                 published = _result_datetime(result)
-                if published is not None and published < cutoff:
-                    break
+                if published is None:
+                    # Without a datetime there is no age to compare against the
+                    # cutoff, so the record cannot be proven to be in window.
+                    undated += 1
+                    continue
+                if published < cutoff:
+                    # Load-bearing on arxiv_common.py's SubmittedDate/Descending sort.
+                    if assume_newest_first:
+                        break
+                    continue
                 records.append(record_from_result(result, abstract_chars))
                 count += 1
         except arxiv_common.arxiv.ArxivError as exc:
             status.update(failed=True, error=str(exc))
+        if undated:
+            logging.warning(
+                "  dropped %d result(s) with no usable published date for %s",
+                undated,
+                category,
+            )
         if status["failed"]:
             failures.append(category)
             logging.error(
@@ -369,6 +398,9 @@ def main(argv=None):
         args.max_per_category,
         args.abstract_chars,
         failures,
+        # This caller knows the query is the one arxiv_common sorts by
+        # submission date, newest first, so it can stop paging early.
+        assume_newest_first=True,
     )
     if failures:
         logging.error(

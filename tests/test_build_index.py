@@ -4,7 +4,7 @@ import io
 import json
 import os
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 MODULE_PATH = os.path.join(
@@ -345,6 +345,108 @@ class CollectPapersTests(unittest.TestCase):
         records = build_index.collect_papers(["cs.CV"], 60, 0, 500, failures)
         self.assertEqual(records, [])
         self.assertEqual(failures, ["cs.CV"])
+
+
+class CollectPapersRetentionTests(unittest.TestCase):
+    """Retention is a per-record filter, not an ordered ``break``.
+
+    A result whose ``published`` is not a ``datetime`` used to fail the
+    ``is not None`` guard and be kept regardless of age -- a string
+    ``"2001-01-01"`` produced a ``papers-2001-W01.json`` shard inside a 60-day
+    index -- and the ``break`` that dropped old records did so only while
+    results arrived newest-first.
+    """
+
+    RETENTION_DAYS = 60
+
+    def setUp(self):
+        self.original = build_index.arxiv_common.iter_results
+        self.now = datetime.now(timezone.utc)
+        self.stale = self.now - timedelta(days=365)
+
+    def tearDown(self):
+        build_index.arxiv_common.iter_results = self.original
+
+    def _install(self, results):
+        def fake_iter_results(query, max_results, status=None):
+            for result in results:
+                yield result
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+
+    def _collect(self, **kwargs):
+        failures = []
+        records = build_index.collect_papers(
+            ["cs.CV"], self.RETENTION_DAYS, 0, 500, failures, **kwargs
+        )
+        self.assertEqual(failures, [])
+        return records
+
+    def test_only_fresh_records_survive_out_of_order_iteration(self):
+        # Newest, then oldest, then a record that is not a datetime at all, and
+        # then a fresh one again: the last result is the one the old ordered
+        # ``break`` threw away, so it is what makes this test fail without the
+        # per-record filter.
+        self._install([
+            make_result("2401.00001", self.now),
+            make_result("2401.00002", self.stale),
+            make_result("2401.00003", "2001-01-01"),
+            make_result("2401.00004", self.now - timedelta(days=1)),
+        ])
+        records = self._collect()
+        self.assertEqual(
+            [record["id"] for record in records],
+            ["2401.00001", "2401.00004"],
+        )
+        cutoff = (self.now - timedelta(days=self.RETENTION_DAYS)).date()
+        for record in records:
+            with self.subTest(record=record["id"]):
+                self.assertGreaterEqual(
+                    build_index.iso_date(record["published"]), cutoff.isoformat()
+                )
+
+    def test_result_without_a_datetime_published_is_dropped(self):
+        self._install([
+            make_result("2001.00001", "2001-01-01"),
+            make_result("2401.00002", self.now),
+        ])
+        records = self._collect()
+        self.assertEqual([record["id"] for record in records], ["2401.00002"])
+        _, shard_files = build_index.build_shards(records, generated_at=self.now)
+        self.assertNotIn("papers-2001-W01.json", shard_files)
+        self.assertEqual(len(shard_files), 1)
+
+    def test_undated_results_are_excluded_from_the_reported_count(self):
+        self._install([
+            make_result("2001.00001", "2001-01-01"),
+            make_result("2001.00002", "not-a-date"),
+            make_result("2401.00003", self.now),
+        ])
+        with self.assertLogs(level="INFO") as captured:
+            records = self._collect()
+        self.assertEqual([record["id"] for record in records], ["2401.00003"])
+        log = "\n".join(captured.output)
+        self.assertIn("1 papers within retention window for cs.CV", log)
+        self.assertIn("dropped 2 result", log)
+
+    def test_newest_first_assumption_only_stops_the_stream(self):
+        yielded = []
+
+        def recording_iter_results(query, max_results, status=None):
+            for result in (make_result("2401.00001", self.stale),
+                           make_result("2401.00002", self.now)):
+                yielded.append(result)
+                yield result
+
+        build_index.arxiv_common.iter_results = recording_iter_results
+        failures = []
+        records = build_index.collect_papers(
+            ["cs.CV"], self.RETENTION_DAYS, 0, 500, failures,
+            assume_newest_first=True,
+        )
+        self.assertEqual(records, [])
+        self.assertEqual(len(yielded), 1)
+        self.assertEqual(failures, [])
 
 
 class MainTests(unittest.TestCase):
