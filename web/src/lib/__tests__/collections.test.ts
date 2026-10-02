@@ -544,6 +544,82 @@ describe("producer-null urls in imported papers", () => {
   });
 });
 
+/**
+ * The third `getattr(result, …, None)` field. `record_from_result` publishes
+ * `primaryCategory: null` whenever arXiv names no primary category, so a gate
+ * that requires a string here deletes a paper the index really did publish.
+ * The key must still be present: `undefined` is the field-missing case IMP-154
+ * added the check for, and it stays rejected.
+ */
+describe("producer-null primaryCategory in imported papers", () => {
+  function parseImported(papers: unknown[]): ExportPayload | null {
+    return parseExportPayload(
+      JSON.parse(
+        JSON.stringify({
+          version: 1,
+          exportedAt: "2026-10-02T00:00:00.000Z",
+          collection: {
+            id: "c1",
+            name: "Imported",
+            createdAt: "2026-10-02",
+            paperIds: (papers as Array<{ id: string }>).map((paper) => paper.id),
+          },
+          papers,
+        }),
+      ),
+    );
+  }
+
+  it("keeps a paper whose primaryCategory is null", () => {
+    const payload = parseImported([
+      { ...makePaper("2401.00001"), primaryCategory: null },
+      makePaper("2401.00002"),
+    ]);
+
+    expect(payload?.papers.map((paper) => paper.id)).toEqual([
+      "2401.00001",
+      "2401.00002",
+    ]);
+    expect(payload?.papers[0].primaryCategory).toBeNull();
+  });
+
+  it("still drops a paper whose primaryCategory key is absent", () => {
+    const absent = { ...makePaper("2401.00001") } as Record<string, unknown>;
+    delete absent.primaryCategory;
+
+    const payload = parseImported([absent, makePaper("2401.00002")]);
+
+    expect(payload?.papers.map((paper) => paper.id)).toEqual(["2401.00002"]);
+  });
+
+  it("keeps a null primaryCategory through a localStorage round trip", () => {
+    const storage = new MemoryStorage();
+    const paper = { ...makePaper("2401.00001"), primaryCategory: null };
+    storage.setItem(PAPERS_KEY, JSON.stringify({ [paper.id]: paper }));
+    storage.setItem(
+      COLLECTIONS_KEY,
+      JSON.stringify([
+        { id: "c1", name: "Vision", createdAt: "2026-10-02", paperIds: [paper.id] },
+      ]),
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.papers[paper.id]?.primaryCategory).toBeNull();
+    expect(loaded.collections[0].paperIds).toEqual([paper.id]);
+  });
+
+  it("leaves the url guard untouched for a null primaryCategory", () => {
+    const payload = parseImported([
+      { ...makePaper("2401.00001"), primaryCategory: null, absUrl: "javascript:alert(1)" },
+      { ...makePaper("2401.00002"), primaryCategory: null, pdfUrl: "data:text/html,x" },
+      { ...makePaper("2401.00003"), primaryCategory: null },
+    ]);
+
+    expect(payload?.papers.map((paper) => paper.id)).toEqual(["2401.00003"]);
+  });
+});
+
 describe("loadState / saveState", () => {
   it("round-trips collections and papers", () => {
     const storage = new MemoryStorage();

@@ -353,7 +353,12 @@ export function App() {
     const active = new Set(activeCategories);
     const inCategories = papers.filter(
       (paper) =>
-        active.has(paper.primaryCategory) ||
+        // A null `primaryCategory` is "the producer named no primary", not a
+        // category that happens to be unselected, so it can never be in the set
+        // and the lookup is skipped. The `categories` clause below still matches
+        // it, which is how such a paper stays reachable through the filter.
+        (paper.primaryCategory !== null &&
+          active.has(paper.primaryCategory)) ||
         paper.categories.some((category) => active.has(category)),
     );
 

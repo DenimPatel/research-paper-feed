@@ -454,7 +454,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** The boundary is a safety net; it does not replace IMP-098 (runtime validation) — a boundary that silently hides a schema violation would be worse than the bug. | commit pending
 
 ### IMP-019 — Align `web/src/lib/types.ts` nullability with `record_from_result`
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `web/src/lib/types.ts:10-12` (`primaryCategory: string`, `absUrl: string`, `pdfUrl: string`), `scripts/build_index.py:111-113` (`getattr(result, "primary_category", None)`, `getattr(result, "entry_id", None)`, `getattr(result, "pdf_url", None)`)
@@ -467,10 +467,10 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** med
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** Risk `med` because widening the types may surface compile errors in `PaperCard.tsx` and `App.tsx` filter code (`App.tsx:211-212` uses `paper.primaryCategory` in a `Set` lookup, which is fine for `null` but changes the filter semantics subtly). **Advisory carried forward from `.improve/reports/verify-IMP-151b.md` OBS-D, which must survive this item:** widening the types to `string | null` makes it *tempting* to simplify `hasSafeUrls` (`web/src/lib/collections.ts:96-101`) from `url == null || isHttpUrl(url)` down to `isHttpUrl(paper.absUrl)`. Do not. `parseExportPayload` validates a file read off disk, so a `null` is reachable there regardless of what the declared type says, and `PaperCard.tsx:33-35`'s `safeHref(url: string | undefined)` is likewise now inaccurate about what it receives. The `null` exemption is load-bearing for correctness, and `isHttpUrl`'s `(value: unknown)` parameter is what makes it safe — narrowing that parameter to `string` would let a `null` flow straight into an `href`.
+- **Notes:** Risk `med` because widening the types may surface compile errors in `PaperCard.tsx` and `App.tsx` filter code (`App.tsx:211-212` uses `paper.primaryCategory` in a `Set` lookup, which is fine for `null` but changes the filter semantics subtly). **Advisory carried forward from `.improve/reports/verify-IMP-151b.md` OBS-D, which must survive this item:** widening the types to `string | null` makes it *tempting* to simplify `hasSafeUrls` (`web/src/lib/collections.ts:96-101`) from `url == null || isHttpUrl(url)` down to `isHttpUrl(paper.absUrl)`. Do not. `parseExportPayload` validates a file read off disk, so a `null` is reachable there regardless of what the declared type says, and `PaperCard.tsx:33-35`'s `safeHref(url: string | undefined)` is likewise now inaccurate about what it receives. The `null` exemption is load-bearing for correctness, and `isHttpUrl`'s `(value: unknown)` parameter is what makes it safe — narrowing that parameter to `string` would let a `null` flow straight into an `href`. | commit pending
 
 ### IMP-020 — Make the retention window a filter, not only an ordered `break`
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `scripts/build_index.py:215-219` (`collect_papers` retention check), `scripts/build_index.py:194-200` (`_result_datetime` returning `None`), `scripts/build_index.py:149-151` (`build_shards` grouping by `iso_week_key`)

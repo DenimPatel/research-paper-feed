@@ -451,3 +451,77 @@ describe("choosing between all categories and a subset", () => {
     expect(window.location.hash).not.toContain("cat=");
   });
 });
+
+/**
+ * The filter reads `paper.primaryCategory` through a `Set<string>` that is
+ * populated from the manifest, and the producer publishes `null` for it
+ * whenever arXiv names no primary category. A null can never be a member of
+ * that set, so the lookup is skipped rather than coerced — the observable
+ * contract being: such a paper is reachable through its own `categories` and
+ * through nothing else. Its own shard and manifest are used here so the
+ * seventeen cases above are not disturbed.
+ */
+describe("filtering papers whose primaryCategory is null", () => {
+  const NULL_PRIMARY_CV: Paper = {
+    ...paper("2401.00010", "cs.CV"),
+    primaryCategory: null,
+  };
+  const NULL_PRIMARY_LG: Paper = {
+    ...paper("2401.00011", "cs.LG"),
+    primaryCategory: null,
+  };
+
+  function installNullPrimaryFetch(): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        jsonResponse(
+          String(input).endsWith("/index.json")
+            ? MANIFEST
+            : { ...SHARD, papers: [NULL_PRIMARY_CV, NULL_PRIMARY_LG] },
+        ),
+      ),
+    );
+  }
+
+  it("shows both under All, since no primary category is a category at all", async () => {
+    installNullPrimaryFetch();
+
+    await renderFeed();
+
+    expect(await screen.findByText(NULL_PRIMARY_CV.title)).toBeTruthy();
+    expect(screen.getByText(NULL_PRIMARY_LG.title)).toBeTruthy();
+  });
+
+  it("matches on the paper's own categories and nothing else", async () => {
+    installNullPrimaryFetch();
+    window.location.hash = "#cat=cs.CV";
+
+    await renderFeed();
+
+    expect(await screen.findByText(NULL_PRIMARY_CV.title)).toBeTruthy();
+    // The null primary is not a wildcard: this paper's categories list holds
+    // only cs.LG, so a cs.CV filter must not pull it in.
+    expect(screen.queryByText(NULL_PRIMARY_LG.title)).toBeNull();
+  });
+
+  it("keeps a null-primary paper out of a filter it does not belong to", async () => {
+    installNullPrimaryFetch();
+    window.location.hash = "#cat=cs.LG";
+
+    await renderFeed();
+
+    expect(await screen.findByText(NULL_PRIMARY_LG.title)).toBeTruthy();
+    expect(screen.queryByText(NULL_PRIMARY_CV.title)).toBeNull();
+  });
+
+  it("reports no unknown category, because null is not a named one", async () => {
+    installNullPrimaryFetch();
+
+    const group = await renderFeed();
+
+    expect(await screen.findByText(NULL_PRIMARY_CV.title)).toBeTruthy();
+    expect(pressedCategoryLabels(group)).toEqual(["cs.CV", "cs.LG"]);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});

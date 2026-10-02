@@ -29,8 +29,20 @@ function formatDate(value: string): string {
   });
 }
 
-/** Snapshots can predate import validation, so never hand an unverified url to href. */
-function safeHref(url: string | undefined): string | undefined {
+/**
+ * Snapshots can predate import validation, so never hand an unverified url to href.
+ *
+ * The declared type is honest about all three shapes this actually receives —
+ * a url, a producer `null`, and a `undefined` from a snapshot that predates the
+ * field — and none of the three may reach `href`. The `isHttpUrl` call is the
+ * reason that holds: it takes `unknown`, and `String(null)`/`String(undefined)`
+ * are `"null"`/`"undefined"`, neither of which matches the anchored pattern, so
+ * all three resolve to `undefined` and the caller omits the link. The guard is
+ * load-bearing even though the type now promises the value — a shard is a bare
+ * `as ShardFile` cast and an import is unvalidated JSON, so the compiler has
+ * never checked either path.
+ */
+function safeHref(url: string | null | undefined): string | undefined {
   return isHttpUrl(url) ? String(url).trim() : undefined;
 }
 

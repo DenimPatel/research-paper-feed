@@ -591,3 +591,45 @@ describe("PaperIndex partial shard failures", () => {
     expect(result.failedFiles).toEqual([]);
   });
 });
+
+/**
+ * `record_from_result` builds `primaryCategory`/`absUrl`/`pdfUrl` with
+ * `getattr(result, …, None)` (`scripts/build_index.py:118-120`), so a paper
+ * whose arXiv entry omits one of them is published with JSON `null` in that
+ * field. The declaration at `types.ts:24-26` is what this fixture is holding to:
+ * it only typechecks while those three are `string | null`, so the test fails
+ * `npm run typecheck` against the old non-nullable declaration.
+ */
+describe("producer-null url fields on a shard", () => {
+  const NULL_URL_PAPER: Paper = {
+    ...makePaper("w09-null", "2024-03-01"),
+    primaryCategory: null,
+    absUrl: null,
+    pdfUrl: null,
+  };
+
+  it("loads a fixture paper whose pdfUrl is null without dropping it", async () => {
+    installFetch({
+      "papers-2024-W09.json": {
+        week: "2024-W09",
+        from: "2024-02-26",
+        to: "2024-03-03",
+        papers: [NULL_URL_PAPER, makePaper("w09b", "2024-02-27")],
+      },
+    });
+
+    const papers = await new PaperIndex().loadPapers(30);
+    const paper = papers.find((entry) => entry.id === "w09-null");
+
+    expect(paper).toBeDefined();
+    expect(paper?.pdfUrl).toBeNull();
+    expect(paper?.absUrl).toBeNull();
+    expect(paper?.primaryCategory).toBeNull();
+    // `null` and a field the JSON never carried are different on the wire, and
+    // the loader must not quietly convert one into the other: the key stays
+    // present and its value stays JSON `null`, which is what the render-time
+    // `safeHref` guard and the `hasSafeUrls` import exemption both rely on.
+    expect(Object.keys(paper ?? {})).toContain("pdfUrl");
+    expect(papers.map((entry) => entry.id)).toContain("w09b");
+  });
+});

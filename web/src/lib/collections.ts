@@ -87,7 +87,17 @@ function isPaper(value: unknown): value is Paper {
     typeof paper.abstract === "string" &&
     Array.isArray(paper.categories) &&
     paper.categories.every((category) => typeof category === "string") &&
-    typeof paper.primaryCategory === "string" &&
+    // `record_from_result` reads this with `getattr(result, …, None)`, so an
+    // explicit `null` is a real producer record, not a malformed one — and
+    // rejecting it here would drop a paper the index actually published. The
+    // key must still be *present*: `undefined` (absent) stays rejected, because
+    // that is the field-missing case this gate exists for. A null is safe to
+    // keep because every read of it is now null-aware. The parentheses matter:
+    // `&&` binds tighter than `||`, so an ungrouped disjunction here would
+    // silently turn every check above it into an alternative rather than a
+    // requirement.
+    (typeof paper.primaryCategory === "string" ||
+      paper.primaryCategory === null) &&
     typeof paper.published === "string"
   );
 }
