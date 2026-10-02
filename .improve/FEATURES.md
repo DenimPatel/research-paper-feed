@@ -103,7 +103,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 
 ### IMP-002 — Sanitize `--topic` before it reaches the CLI output paths
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Security
 - **Type:** bug-fix
 - **Area / files:** `scripts/paper-collector.py:138` (`df.to_csv(topic + "_papers.csv", ...)`), `scripts/paper-collector.py:142` (`filename = f"{args.output_dir}/{topic}-..."`), `scripts/paper-collector.py:21-23` (`safe_filename`)
@@ -117,9 +117,9 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:**
-
+- **Notes:** commit d3b4a1e
 ### IMP-003 — Stop memoizing a rejected manifest promise in `PaperIndex`
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `web/src/lib/paperIndex.ts:62,66-71` (`manifestPromise` assignment), `web/src/lib/paperIndex.ts:73-98` (`fetchManifest`), `web/src/App.tsx:148-166` (manifest effect with `[]` deps)
@@ -133,7 +133,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-004 — Refuse to write an index after any category's arXiv query failed
 - **Status:** TODO
 - **Category:** Correctness
@@ -182,6 +182,24 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:** This is a pure move plus one new test file; no behaviour may change. The profile forbids moving modules "as a side effect of a feature change" — this item **is** the move, so it is in scope here. `RecencyDays`/`SortMode` stay in `web/src/lib/types.ts` and are imported, not redeclared.
+
+### IMP-151 — Stop `__proto__` from passing the `id in papers` membership check
+- **Status:** TODO
+- **Category:** Security
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/collections.ts:129` (`mergeImport`'s `.filter((id) => id in papers)`), `web/src/lib/collections.ts:115-117` (`mergeImport`'s `if (!papers[paper.id])` skip), `web/src/lib/collections.ts:283` (`loadState`'s `collection.paperIds.filter((id) => id in papers)`), `web/src/lib/collections.ts:51-62` (`isPaper`, which accepts any string `id`), `web/src/components/PaperCard.tsx:56` (`const canExpand = paper.abstract.length > ABSTRACT_PREVIEW_CHARS`) and `web/src/components/PaperCard.tsx:50` (the same dereference inside the `useMemo`)
+- **Intent:** `in` walks the prototype chain, so `"__proto__" in papers` is true for a plain object literal even though no such own key exists. `mergeImport` therefore skips assigning the paper (at `:115`, `papers["__proto__"]` reads `Object.prototype`, which is truthy), but the filter at `:129` keeps `"__proto__"` in `collection.paperIds`. `CollectionsView` then resolves `state.papers["__proto__"]` to `Object.prototype` and hands it to `PaperCard`, where `paper.abstract.length` at `:56` throws `TypeError: Cannot read properties of undefined (reading 'length')`. No error boundary sits above the view, so one crafted import file permanently blanks the collections view for that user until they clear `localStorage`. The same `in` at `:283` lets the poisoned id survive a reload, so the damage is persisted, not one-shot. Confirmed pre-existing: the identical probe run against `git show HEAD:web/src/lib/collections.ts` produces byte-identical output, so this is neither introduced nor worsened by IMP-001.
+- **Acceptance criteria:**
+  1. Both membership checks become own-property checks — `mergeImport` filters with `Object.hasOwn(papers, id)` at `:129` and `loadState` filters with `Object.hasOwn(papers, id)` at `:283` — and no `in` operator remains anywhere in `web/src/lib/collections.ts`.
+  2. `isPaper` (or an equivalent guard inside `parseExportPayload`) rejects prototype-key ids: a paper whose `id` is `"__proto__"`, `"constructor"`, or `"prototype"` is dropped alongside the other `isPaper` rejections, and a payload whose papers array contains only such papers still returns `papers: []` rather than `null`.
+  3. `mergeImport` never persists a `paperId` with no own snapshot: importing a payload whose `collection.paperIds` names a paper absent from `papers` yields a stored collection whose `paperIds` excludes that id.
+  4. Regression test naming the malicious payload, in `web/src/lib/__tests__/collections.test.ts`: a payload whose `papers` array contains `{ "id": "__proto__", "title": "proto", "authors": [], "abstract": "x" }` plus one valid sibling `{ "id": "2401.00001", … }`, with `"collection": { …, "paperIds": ["__proto__", "2401.00001"] }`. Assert that (a) `parseExportPayload` returns only the sibling, (b) the merged collection's `paperIds` is exactly `["2401.00001"]`, and (c) `Object.prototype.hasOwnProperty.call(state.papers, "__proto__")` is `false`. A second test drives `loadState` with a `Storage` fake whose `rpf.collections.v1` payload names `"__proto__` and asserts the returned collection's `paperIds` is empty.
+  5. `cd web && npm run typecheck && npm test` passes with no pre-existing expectation weakened or removed.
+- **Verification method:** `cd web && npm run typecheck && npm test` (expect 4 files, 40+ tests); then `cd web && npm run dev -- --port 5199 --strictPort`, open `http://localhost:5199/research-paper-feed/#view=collections`, and import a hand-written JSON containing the `"__proto__"` paper from criterion 4. The collections view must render normally with the sibling card visible, `[...document.querySelectorAll('a')].every(a => !a.getAttribute('href')?.startsWith('javascript:'))` must be `true`, and the console must show no `TypeError`. Screenshot to `.improve/artifacts/IMP-151/collections-import-proto-desktop-1280.png`. Then clear `localStorage` and import the same file again to prove the crash is gone rather than masked by stale state.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 25.0
+- **Notes:** Same threat model as IMP-001 (a file someone sent you) with higher impact, because IMP-001's `isHttpUrl` filter does not touch this path. IMP-018 (a React error boundary around `<App />`) would blunt the symptom — a crash becomes a `role="alert"` fallback instead of a blank page — but not the defect, since the poisoned id is still written into `paperIds` and `localStorage`; it is a complement, not a substitute. Deliberately scoped to own-property semantics: OBS-1 in `.improve/reports/verify-IMP-001.md` (an array-valued `absUrl` survives `isHttpUrl` because `String(["https://x"])` stringifies to a valid prefix) is not exploitable and belongs with IMP-019's type widening, not here. Found and reported — not fixed — by the independent IMP-001 verifier.
 
 ## Tier 20.0
 
@@ -1579,6 +1597,23 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because measuring the panel requires a layout read (e.g. `getBoundingClientRect`) inside a component that currently has no DOM measurement; confirm it does not cause a layout thrash on scroll, and that the existing 390px `.save-menu__body { right: auto; left: 0 }` rule at `web/src/styles.css:749-752` still applies.
 
+### IMP-152 — Emit `https://` arXiv `absUrl` values from the index builder
+- **Status:** TODO
+- **Category:** Security
+- **Type:** bug-fix
+- **Area / files:** `scripts/build_index.py:111-113` (`"absUrl": getattr(result, "entry_id", None)`, taken verbatim), `tests/test_paper_collector.py` (the shard-writing assertions), `web/src/lib/collections.ts:68-70` (`isHttpUrl`, which accepts `http://` as well as `https://`)
+- **Intent:** `arxiv.Result.entry_id` is the arXiv API's canonical identifier and it comes back as `http://arxiv.org/abs/<id>v1`, so `absUrl` is plaintext on every card while `pdfUrl` (from `pdf_url`) is already `https://`. Counting the committed shards shows all 2,812 papers carry an `http` `absUrl` and all 50 visible cards in the running app link over `http://arxiv.org/abs/…`. Every outbound paper link is therefore a silent TLS downgrade — no certificate, no HSTS, no integrity guarantee — and the inconsistency with `pdfUrl` reads as a bug to anyone reading a shard. Recorded as D-1 by IMP-001's implementer, who correctly declined to widen that item's spec, which mandates accepting both schemes.
+- **Acceptance criteria:**
+  1. `scripts/build_index.py` normalizes `absUrl` to `https://` before the value is written into a shard record — by rewriting a leading `http://` on `entry_id`, not by hand-assembling an arXiv URL, so an absent or `None` `entry_id` still yields `"absUrl": null` and no shard record gains a fabricated url.
+  2. `isHttpUrl` in `web/src/lib/collections.ts` keeps accepting both schemes, so the 2,812 already-imported collections that hold `http://` `absUrl` values do not silently lose their paper links.
+  3. A test in `tests/test_paper_collector.py` asserts a fake result whose `entry_id` is `http://arxiv.org/abs/2401.00001v1` produces a shard record with `"absUrl": "https://arxiv.org/abs/2401.00001v1"`, and a second case whose `entry_id` is `None` produces `"absUrl": null`. Both use fakes — no network.
+  4. `/usr/local/bin/python3.11 -m unittest discover -s tests` and `cd web && npm run typecheck && npm test` pass.
+- **Verification method:** `/usr/local/bin/python3.11 scripts/build_index.py --category cs.CV --max-per-category 20 --out-dir /tmp/rpf-httpscheck`, then `grep -c '"absUrl": "http://'` on the shard must be `0` and `grep -c '"absUrl": "https://'` must equal the paper count; save the shard to `.improve/artifacts/IMP-152/`. If the repo regenerates the committed shards on deploy rather than by hand, regenerate them here and confirm in the browser that the first card's title `href` begins `https://arxiv.org/abs/` — screenshot to `.improve/artifacts/IMP-152/feed-https-absurl-desktop-1280.png` against `.improve/artifacts/baseline/baseline-feed-desktop-1280.png`, which must be visually unchanged.
+- **Effort:** S    **Risk:** low
+- **Depends on:** none
+- **Priority score:** 15.0
+- **Notes:** Overlaps IMP-019, whose `Area / files` names `scripts/build_index.py:111-113` for the *nullability* of `absUrl`/`pdfUrl`/`primaryCategory`; the two changes are compatible but edit the same three lines, so land them together or state the ordering in the PR body. Impact is scored 3 rather than 5 because an `http` destination is a downgrade warning, not an injection — the page still renders and the visitor still reaches arXiv. Criterion 2 is load-bearing: tightening `isHttpUrl` to https-only before the shards are rebuilt would delete the link from all 50 live cards, which is exactly the trap IMP-001 documented.
+
 ---
 
 ## Tier 12.5
@@ -1701,6 +1736,25 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 12.0
 - **Notes:** Risk `med` because pinning reveals version-specific failures (the pandas chained-indexing deprecation and `tarfile.extractall` filtering both differ by version). Add one version at a time and fix what surfaces rather than adding the matrix and the fixes in the same PR.
+
+### IMP-153 — Scrub non-`http(s)` urls already persisted in `localStorage` on load
+- **Status:** TODO
+- **Category:** Data validation
+- **Type:** bug-fix
+- **Area / files:** `web/src/lib/collections.ts:255-291` (`loadState`, whose per-snapshot guard at `:274` calls `isPaper` alone), `web/src/lib/collections.ts:72-77` (`hasSafeUrls`, the import-time filter added by IMP-001), `web/src/components/PaperCard.tsx:33-35` (`safeHref`, the render-time guard)
+- **Intent:** IMP-001 filters hostile urls at `parseExportPayload` only. A paper imported before that fix is still in `localStorage`, and `loadState` re-validates every snapshot with `isPaper` (`:274`), which never inspects `absUrl`/`pdfUrl` — so a `javascript:` or `data:text/html` url survives every reload indefinitely. IMP-001's `safeHref` makes such values inert *today* (verified: pre-fix snapshots injected straight into `localStorage` render zero anchors), but that render guard is the only thing holding them, and it guards one consumer. The backlog already plans two more readers of `paper.absUrl` — IMP-133's per-paper deep link and IMP-069's "Copy BibTeX" control, whose `buildBibTeX(paper)` embeds `absUrl` in clipboard text — either of which turns a stored hostile value live again with no test failing.
+- **Acceptance criteria:**
+  1. `loadState` applies the same value filter `parseExportPayload` uses at `collections.ts:232` to every snapshot it reads at `:274`, so a persisted paper whose `absUrl` or `pdfUrl` is present and does not match `isHttpUrl` is never placed into `state.papers`.
+  2. That filter is a single named export shared by both call sites rather than a second copy of the regex; `isHttpUrl` itself is unchanged.
+  3. Ordering is explicit: the url filter runs while building `papers` (before `:283`), so the `Object.hasOwn` filter that trims `paperIds` afterwards also drops the id of every discarded paper and no collection is left naming a snapshot that is not in `state.papers`.
+  4. A new test in `web/src/lib/__tests__/collections.test.ts` drives `loadState` with a `Storage` fake holding two papers — one with `"absUrl": "javascript:alert(1)"`, one with `"absUrl": "https://arxiv.org/abs/2401.00001"` — and asserts the hostile paper is absent from `state.papers`, the valid one is present, and the collection's `paperIds` is exactly `["2401.00001"]`.
+  5. A paper persisted with **no** `absUrl` and no `pdfUrl` at all is still loaded, matching IMP-001's "absent urls are kept" rule.
+  6. `cd web && npm run typecheck && npm test` passes with no pre-existing expectation weakened.
+- **Verification method:** `cd web && npm run typecheck && npm test`; then seed `localStorage` directly (bypassing the import path) under `rpf.papers.v1` with a paper whose `absUrl` is `javascript:alert(1)`, hard-reload `http://localhost:5199/research-paper-feed/#view=collections`, and confirm the card list renders with no `TypeError` in the console and no anchor whose `href` starts with `javascript:`. Trigger one save, then assert `JSON.parse(localStorage.getItem("rpf.papers.v1"))` no longer contains that paper. Console stays clean per profile §4.2.
+- **Effort:** S    **Risk:** med
+- **Depends on:** none
+- **Priority score:** 12.0
+- **Notes:** Risk `med` because this *deletes* user-visible saved papers rather than merely deactivating a field — a user who deliberately saved a paper carrying an odd url loses it, so the PR body must state that trade-off instead of presenting the change as a pure win. Recorded as OBS-2 in `.improve/reports/verify-IMP-001.md`, where the verifier confirmed the render guard already renders these inert and explicitly deferred the scrub to a separate item. Independent of IMP-151: that item fixes the own-property membership check, this one filters url *values*, and they touch `loadState` at different lines — so neither needs to wait for the other.
 
 ## Tier 10.0
 

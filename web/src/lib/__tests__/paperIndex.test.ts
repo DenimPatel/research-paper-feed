@@ -146,6 +146,19 @@ describe("PaperIndex", () => {
     );
   });
 
+  it("retries the manifest after a rejection instead of memoizing it", async () => {
+    const mock = vi.fn(async () => jsonResponse(MANIFEST));
+    mock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", mock);
+
+    const index = new PaperIndex();
+    await expect(index.getManifest()).rejects.toBeInstanceOf(
+      IndexUnavailableError,
+    );
+    await expect(index.getManifest()).resolves.toEqual(MANIFEST);
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+
   it("treats an HTML fallback for a missing manifest as unavailable", async () => {
     vi.stubGlobal(
       "fetch",

@@ -65,7 +65,12 @@ export class PaperIndex {
 
   async getManifest(): Promise<IndexManifest> {
     if (!this.manifestPromise) {
-      this.manifestPromise = this.fetchManifest();
+      // Clear the memoized promise on failure so a retry refetches instead of
+      // replaying the same rejection forever.
+      this.manifestPromise = this.fetchManifest().catch((error: unknown) => {
+        this.manifestPromise = null;
+        throw error;
+      });
     }
     return this.manifestPromise;
   }
