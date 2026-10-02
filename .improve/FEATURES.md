@@ -650,7 +650,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** `images/feed_example.png` is on the profile's "do not touch unless the item is specifically about it" list — this is that item.
 
 ### IMP-031 — Fix `CONTRIBUTING.md`'s Python command and add a venv step
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Onboarding & developer experience
 - **Type:** docs
 - **Area / files:** `CONTRIBUTING.md:8` (`pip install -r requirements.txt`) and `CONTRIBUTING.md:10` (`python -m unittest discover -s tests -v`), `readme.md:37-40` and `readme.md:76-78` (same problem)
@@ -663,10 +663,10 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** The repo has no venv of its own and the profile's working command is `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; the docs should not hardcode that machine-specific path.
+- **Notes:** The repo has no venv of its own and the profile's working command is `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; the docs should not hardcode that machine-specific path. | commit pending; attempt 2 PASS
 
 ### IMP-032 — Document the `web/` test and build workflow in `CONTRIBUTING.md`
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Onboarding & developer experience
 - **Type:** docs
 - **Area / files:** `CONTRIBUTING.md` (25 lines, no mention of `web/` at all), `web/package.json:6-13`
@@ -679,7 +679,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** If IMP-026 adds a build gate, this is the doc side of it. Combine the two PRs if convenient.
+- **Notes:** If IMP-026 adds a build gate, this is the doc side of it. Combine the two PRs if convenient. | commit pending; same commit
 
 ### IMP-033 — Add an upper bound to `arxiv` in `requirements.txt`
 - **Status:** DONE
@@ -3363,7 +3363,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 ## Tier 20.0 — new from the IMP-193 / IMP-025 / IMP-026 verification round
 
 ### IMP-198 — Bound the arXiv HTTP request with a real timeout and a CI job timeout
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `scripts/arxiv_common.py:20-26` (`build_client`, the only place an `arxiv.Client` is constructed — it passes `page_size`, `delay_seconds`, `num_retries` and nothing else), `.github/workflows/ci.yml:21-49` (the `web-tests` job, which since IMP-193 runs a live network call at `:45-47`), `.github/workflows/ci.yml:45-47` (the `Build the paper index` step), `.github/workflows/deploy.yml:33-34` (the same script on the weekly deploy, with the same exposure)
