@@ -2,10 +2,14 @@
 import { describe, expect, it } from "vitest";
 import {
   readHash,
+  resolveCategories,
   writeHash,
   type HashState,
   type HashWriter,
 } from "../urlState";
+
+/** `scripts/build_index.py:32` DEFAULT_CATEGORIES, as the manifest ships them. */
+const MANIFEST_CATEGORIES = ["cs.CV", "cs.LG", "cs.CL", "cs.AI", "cs.RO"];
 
 const DEFAULT_STATE: HashState = {
   view: "feed",
@@ -104,6 +108,133 @@ describe("readHash", () => {
       "cs.CV",
       "cs.LG",
     ]);
+  });
+
+  it("de-duplicates a repeated category key", () => {
+    expect(readHash("#cat=cs.CV,cs.CV,cs.LG").categories).toEqual([
+      "cs.CV",
+      "cs.LG",
+    ]);
+  });
+
+  it("never validates cat, because the manifest is not in hand yet", () => {
+    // `readHash` runs before the index is fetched and never re-runs, so it has
+    // no way to know what the index contains. Dropping unknown values is
+    // `resolveCategories`' job, at the call site that has the manifest.
+    expect(readHash("#cat=cs.CV,cs.BI").categories).toEqual(["cs.CV", "cs.BI"]);
+    expect(readHash("#cat=cs.BI").categories).toEqual(["cs.BI"]);
+  });
+});
+
+describe("resolveCategories", () => {
+  it("returns a null selection when the hash named no category", () => {
+    expect(resolveCategories(null, MANIFEST_CATEGORIES)).toEqual({
+      selected: null,
+      unknown: [],
+    });
+  });
+
+  it("keeps a null selection so all categories stay representable", () => {
+    expect(resolveCategories(null, null).selected).toBeNull();
+    expect(resolveCategories(null, undefined).selected).toBeNull();
+  });
+
+  it("keeps an explicitly empty selection empty", () => {
+    expect(resolveCategories([], MANIFEST_CATEGORIES)).toEqual({
+      selected: [],
+      unknown: [],
+    });
+  });
+
+  it("keeps the selection intact while the manifest is unknown", () => {
+    expect(resolveCategories(["cs.BI", "cs.XX"], null)).toEqual({
+      selected: ["cs.BI", "cs.XX"],
+      unknown: [],
+    });
+    expect(resolveCategories(["cs.BI"], undefined).unknown).toEqual([]);
+  });
+
+  it("intersects with the manifest and reports every dropped value", () => {
+    expect(
+      resolveCategories(["cs.BI", "cs.CV", "cs.NOPE"], MANIFEST_CATEGORIES),
+    ).toEqual({
+      selected: ["cs.CV"],
+      unknown: ["cs.BI", "cs.NOPE"],
+    });
+  });
+
+  it("preserves the requested order rather than the manifest order", () => {
+    expect(
+      resolveCategories(["cs.RO", "cs.CV"], MANIFEST_CATEGORIES).selected,
+    ).toEqual(["cs.RO", "cs.CV"]);
+  });
+
+  it("de-duplicates before validating so a repeat cannot be reported twice", () => {
+    expect(
+      resolveCategories(["cs.BI", "cs.BI", "cs.CV", "cs.CV"], MANIFEST_CATEGORIES),
+    ).toEqual({ selected: ["cs.CV"], unknown: ["cs.BI"] });
+  });
+
+  it("drops unicode and look-alike values that are not in the manifest", () => {
+    expect(
+      resolveCategories(
+        ["cs.ＣＶ", "csv", " cs.CV", "cs.CV "],
+        MANIFEST_CATEGORIES,
+      ),
+    ).toEqual({ selected: [], unknown: ["cs.ＣＶ", "csv", " cs.CV", "cs.CV "] });
+  });
+
+  // Membership is exact on purpose. arXiv category names are case-sensitive
+  // strings, and a fuzzy match would invent a filter the user never asked for —
+  // the exact failure this item removes. Reporting a near miss as unknown and
+  // naming it in the notice is the recoverable version of that failure.
+  it("does not fuzzy-match a near miss onto a category the index does have", () => {
+    expect(
+      resolveCategories(["cs.cv", "CS.CV", "cs.Cv"], MANIFEST_CATEGORIES),
+    ).toEqual({
+      selected: [],
+      unknown: ["cs.cv", "CS.CV", "cs.Cv"],
+    });
+  });
+
+  it("treats an empty manifest list as declaring nothing valid", () => {
+    expect(resolveCategories(["cs.CV"], [])).toEqual({
+      selected: [],
+      unknown: ["cs.CV"],
+    });
+  });
+
+  it("accepts a manifest list that repeats a category", () => {
+    expect(
+      resolveCategories(["cs.CV"], [...MANIFEST_CATEGORIES, "cs.CV"]).selected,
+    ).toEqual(["cs.CV"]);
+  });
+
+  it("does not mutate the requested list", () => {
+    const requested = ["cs.BI", "cs.CV", "cs.BI"];
+    resolveCategories(requested, MANIFEST_CATEGORIES);
+    expect(requested).toEqual(["cs.BI", "cs.CV", "cs.BI"]);
+  });
+
+  it("leaves the selection alone when the manifest list is malformed", () => {
+    // The manifest reaches the app through a bare cast, so the shape `as
+    // string[]` promises is not one the runtime guarantees. The casts below are
+    // what the app's own types would hide.
+    const nonArrayEntry = ["cs.CV", {}, 7] as unknown as string[];
+    expect(resolveCategories(["cs.BI"], nonArrayEntry)).toEqual({
+      selected: ["cs.BI"],
+      unknown: [],
+    });
+    const blankEntry = ["cs.CV", ""] as string[];
+    expect(resolveCategories(["cs.BI"], blankEntry).selected).toEqual([
+      "cs.BI",
+    ]);
+  });
+
+  it("does not read a bare string as a list of one-character categories", () => {
+    expect(
+      resolveCategories(["cs.CV", "cs.LG"], "cs.CV" as unknown as string[]).selected,
+    ).toEqual(["cs.CV", "cs.LG"]);
   });
 });
 

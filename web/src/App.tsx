@@ -22,6 +22,7 @@ import { rankPapers, scorePaper, tokenize } from "./lib/search";
 import type { IndexManifest, Paper, RecencyDays, SortMode } from "./lib/types";
 import {
   readHash,
+  resolveCategories,
   writeHash,
   type HashState,
   type View,
@@ -169,10 +170,23 @@ export function App() {
     };
   }, [manifest, urlState.recency]);
 
-  const activeCategories = useMemo(
-    () => urlState.categories ?? manifest?.categories ?? [],
+  // A shared link can name categories this index does not have, and `readHash`
+  // cannot tell: it runs before the manifest is fetched and never re-runs.
+  // Intersecting here, during render, means the render that `setManifest`
+  // triggers re-derives this for free — no second fetch, no awaited parse, no
+  // effect — while the request is in flight `valid` is `undefined` and the
+  // selection passes through untouched, so a slow or failed index still lands
+  // the deep link unchanged. Every consumer below (the chips, the feed filter,
+  // and `toggleCategory`) reads this one value, so they cannot disagree.
+  const categoryResolution = useMemo(
+    () => resolveCategories(urlState.categories, manifest?.categories),
     [urlState.categories, manifest],
   );
+  // `selected: null` means the hash named no category at all, which is the
+  // existing encoding for "every category the index has".
+  const activeCategories =
+    categoryResolution.selected ?? manifest?.categories ?? [];
+  const unknownCategories = categoryResolution.unknown;
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -224,12 +238,30 @@ export function App() {
     applyState({ ...urlState, sort }, "replace");
   };
 
+  // Seed from `activeCategories`, not from the raw hash list: with
+  // `#cat=cs.CV,cs.BI` intersected down to `["cs.CV"]`, deselecting the one
+  // visible chip off the raw list would write `cs.BI` — the dropped, unpressable
+  // value — straight back into the URL, reinstating the filter this hides.
   const toggleCategory = (category: string) => {
-    const current = urlState.categories ?? activeCategories;
+    const current = activeCategories;
     const next = current.includes(category)
       ? current.filter((item) => item !== category)
       : [...current, category];
     applyState({ ...urlState, categories: next }, "replace");
+  };
+
+  // Keeps whatever the index does have and drops only the values it reported as
+  // unknown. When nothing survived, the surviving list is empty, and an empty
+  // `cat=` is itself an empty-feed trap, so fall back to `null` — "no category
+  // filter", which `writeHash` writes as no `cat=` at all.
+  const resetUnknownCategories = () => {
+    applyState(
+      {
+        ...urlState,
+        categories: activeCategories.length > 0 ? activeCategories : null,
+      },
+      "replace",
+    );
   };
 
   const isSaved = (collectionId: string, paperId: string) =>
@@ -393,6 +425,34 @@ export function App() {
                 {error && (
                   <p className="banner banner--warning" role="alert">
                     {error}
+                  </p>
+                )}
+
+                {unknownCategories.length > 0 && (
+                  // Names the dropped values so the link's real cause is visible
+                  // and removable, instead of an empty feed with no explanation.
+                  // Shown on a partial drop too, not only a total one: the user
+                  // has to learn that `cs.BI` is the reason nothing matches.
+                  // Reuses `banner banner--warning` and `button button--ghost`
+                  // so no `styles.css` rule is needed.
+                  <p className="banner banner--warning" role="alert">
+                    <strong>
+                      Unknown categor
+                      {unknownCategories.length === 1 ? "y" : "ies"}:{" "}
+                      {unknownCategories.join(", ")}.
+                    </strong>{" "}
+                    {activeCategories.length === 0
+                      ? "This index does not have that category, so nothing can match."
+                      : "This index does not have that category, so those papers are hidden."}{" "}
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={resetUnknownCategories}
+                    >
+                      {activeCategories.length === 0
+                        ? "Reset category filter"
+                        : "Keep only indexed categories"}
+                    </button>
                   </p>
                 )}
 

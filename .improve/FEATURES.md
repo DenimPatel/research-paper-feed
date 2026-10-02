@@ -274,7 +274,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 - **Notes:** commit pending; attempt 2 PASS
 ### IMP-009 — Validate `#cat=` values against the manifest
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `web/src/App.tsx:47-55` (`readHash` passing `cat` through), `web/src/App.tsx:198-201` (`activeCategories`), `web/src/components/FeedControls.tsx:50-51` (chips iterate `categories`, not `selectedCategories`)
@@ -288,7 +288,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-010 — Make the category selection reversible and representable
 - **Status:** TODO
 - **Category:** UX flows & interactivity
