@@ -45,7 +45,8 @@ project with its own `package.json`, `package-lock.json`, `tsconfig.json`, `vite
 is deliberate and should be preserved when adding modules. On the web side the 1:1 mirror holds
 under `web/src/lib/__tests__/`; cross-module and DOM tests live in `web/src/__tests__/` (see §5.3).
 
-**Maturity.** Early but actively maintained. 25 commits, real tests on both stacks, strict
+**Maturity.** Early but actively maintained. 85 commits — 59 of them since this loop's own baseline
+`fc77a40` — real tests on both stacks, strict
 TypeScript, conventional commits, gitignored build output, docs that mostly match reality.
 No external contributors, no releases, no issue templates.
 
@@ -81,22 +82,34 @@ python3 -m venv /tmp/rpf-venv          # keep it OUTSIDE the repo
 /tmp/rpf-venv/bin/python -m unittest discover -s tests -v
 ```
 
-`requirements.txt` is two floors with no upper bounds: `arxiv>=2.1.0`, `pandas>=2.0.0`. A fresh
-resolve today yields `arxiv 4.0.1` / `pandas 3.0.6` — which is exactly how PY-1 exists.
+`requirements.txt` is `arxiv>=2.1.0,<4` and `pandas>=2.0.0`, with **no lockfile**. The `arxiv`
+upper bound is IMP-033's (`bbe2d18`); `pandas` still has no upper bound. A fresh resolve today
+yields `arxiv 3.0.0` / `pandas 3.0.6`. **Before that pin, a fresh resolve yielded `arxiv 4.0.1`**,
+which is exactly how PY-1 existed — 4.x removed `Result.download_pdf` / `download_source`, so
+`--download-pdfs` and `--download-sources` crashed. The bound makes 4.x *uninstallable*; it does
+**not** repair those two flags (IMP-093 owns that).
 
 ### 3.2 Python tests
 
 ```shell
 # from repo root
-/usr/local/bin/python3.11 -m unittest discover -s tests -v     # 44 tests, OK, ~0.06s
+/usr/local/bin/python3.11 -m unittest discover -s tests -v     # 78 tests, OK, ~0.05s
 ```
 
-Baseline: **`Ran 44 tests` / `OK`, exit 0.** Fully offline and hermetic — every test injects a fake
-arXiv client; no network, no real clock, no filesystem beyond `tempfile`. Breakdown:
-`test_arxiv_common.py` (8), `test_build_index.py` (24), `test_paper_collector.py` (12).
+Baseline: **`Ran 78 tests` / `OK`, exit 0.** *(Re-measured 2026-10-02; this row previously read 44,
+which was accurate when written and is now stale — re-measure rather than trusting either number.)*
+Fully offline and hermetic — every test injects a fake arXiv client; no network, no real clock, no
+filesystem beyond `tempfile`. Confirmed hermetic by re-running with `socket.connect` /
+`create_connection` / `getaddrinfo` blocked: 78 run, 0 failures. Breakdown:
+`test_arxiv_common.py` (8), `test_build_index.py` (42), `test_paper_collector.py` (28).
+
+Note the suite is hermetic in the strong sense: it passes identically on `arxiv` 2.1.3, 3.0.0 **and
+4.0.1**, because every arXiv touch point is a fake and no test constructs a real `arxiv.Result`. A
+green suite therefore proves nothing about the installed `arxiv` version — do not use it as evidence
+for a dependency pin (IMP-033's verifier drew exactly this conclusion).
 
 ```shell
-python -m pytest tests -q        # WORKS — 44 passed, but ONLY after `pip install pytest`
+python -m pytest tests -q        # WORKS — 78 passed, but ONLY after `pip install pytest`
 ```
 
 `pytest` is **not installed** in the provisioned 3.11 (`No module named pytest`) and is **not a
@@ -117,23 +130,63 @@ All from **`web/`**. `node_modules` is present and complete (62 packages, lockfi
 ```shell
 cd web
 npm run typecheck    # tsc --noEmit          -> exit 0, no output
-npm test             # vitest run            -> 5 files, 69 tests passed, ~1.2s
-npm run build        # tsc --noEmit && vite build -> 39 modules, ~0.4s
+npm test             # vitest run            -> 16 files, 253 tests passed, ~4.5s
+npm run build        # tsc --noEmit && vite build -> 41 modules, ~0.4s
 ```
 
-Baseline artifact sizes (useful for spotting an accidental bundle regression): JS 163.72 kB
-(gzip 52.63), CSS 10.93 kB (gzip 2.86). The JS figure drifts a few hundred bytes per feature
-commit as modules gain exports; the CSS figure is stable at 10.93 kB since recon.
+Baseline artifact sizes (useful for spotting an accidental bundle regression), all re-measured
+2026-10-02: **JS 171.45 kB** (171,472 B, gzip 54.92), **CSS 10.93 kB** (10,927 B, gzip 2.86),
+**41 modules**.
 
-Test files, 69 tests across 5:
+> **The historical baseline figure that used to live here — "163.72 kB, 39 modules" — was wrong at
+> the commit it was measured against.** A read-only rebuild of `1c075b3` (the restyle commit it was
+> attributed to) measures **163,185 B / 163.19 kB / 38 modules**, off by 535 bytes and one module
+> before any of this loop's work landed. It is recorded here so the correction is auditable rather
+> than silently overwritten: the true historical baseline is 163.19 kB / 38 modules, the true
+> current figure is 171.45 kB / 41 modules, and the +8.29 kB delta is 100% attributable to the
+> commits in between (IMP-019/IMP-173/IMP-020 rewrote `App.tsx` and added three runtime modules).
+> **`.github/workflows/ci.yml` contributes 0 bytes** — proven three ways: it is not an input to
+> `vite build`; a tree carrying the modified `ci.yml` emits a byte-identical bundle (same content
+> hash `index-D7spZXJu.js`) as a clean `git archive HEAD`; and the `node_modules` rendered total is
+> identical (147,232 B) at both `1c075b3` and HEAD. No YAML-only change can move a bundle, which is
+> why this correction is a profile fix and not an IMP-026 defect.
+
+The JS figure drifts a few hundred bytes per feature commit as modules gain exports — at 53 commits
+that mechanism produced the full 8.29 kB, so the old "±1 kB" tolerance no longer holds and should be
+read as historical, not enforced. The CSS figure remains stable at 10.93 kB (measured delta exactly 0
+across the same range). **Data presence does not affect the bundle at all**: the index is copied in as
+files, never inlined, so the JS and CSS content hashes are identical whether `web/public/data` is
+present, absent, or empty.
+
+Test files, **253 tests across 16** — re-measured 2026-10-02 (this table previously read 69 tests
+across 5 and was accurate only at the commit that created it):
 
 | File | Tests | Environment |
 | --- | --- | --- |
-| `web/src/lib/__tests__/urlState.test.ts` | 18 | `node` (`// @vitest-environment node` docblock — the hash module needs no DOM) |
+| `web/src/lib/__tests__/urlState.test.ts` | 50 | `node` (`// @vitest-environment node` docblock — the hash module needs no DOM) |
+| `web/src/lib/__tests__/collections.test.ts` | 41 | jsdom (global default) |
+| `web/src/lib/__tests__/paperIndex.test.ts` | 28 | jsdom (global default) |
 | `web/src/lib/__tests__/search.test.ts` | 12 | jsdom (global default) |
-| `web/src/lib/__tests__/collections.test.ts` | 25 | jsdom (global default) |
-| `web/src/lib/__tests__/paperIndex.test.ts` | 11 | jsdom (global default) |
+| `web/src/lib/__tests__/failureCopy.test.ts` | 8 | jsdom (global default) |
+| `web/src/__tests__/App.loadFailure.test.tsx` | 26 | jsdom, RTL |
+| `web/src/__tests__/App.categories.test.tsx` | 21 | jsdom, RTL |
+| `web/src/__tests__/feedControls.test.tsx` | 14 | jsdom, RTL |
+| `web/src/__tests__/errorBoundary.test.tsx` | 11 | jsdom, RTL |
+| `web/src/__tests__/App.partialShard.test.tsx` | 9 | jsdom, RTL |
+| `web/src/__tests__/App.storage.test.tsx` | 8 | jsdom, RTL |
+| `web/src/__tests__/App.retry.test.tsx` | 7 | jsdom, RTL |
+| `web/src/__tests__/paperCardNullUrls.test.tsx` | 7 | jsdom, RTL |
+| `web/src/__tests__/malformedImport.test.tsx` | 5 | jsdom, RTL |
+| `web/src/__tests__/App.relevance.test.tsx` | 3 | jsdom, RTL |
 | `web/src/__tests__/domEnvironment.test.tsx` | 3 | jsdom, RTL |
+
+**The test layout spans BOTH directories, and the verified baseline includes component/DOM tests.**
+139 of the 253 live under `web/src/lib/__tests__/` (pure-module, mirroring `web/src/lib/<module>.ts`)
+and 114 under `web/src/__tests__/` (cross-module and component tests, including 111 that drive React
+components through `@testing-library/react`). `App.tsx` alone is covered by 74 tests across six
+`App.*.test.tsx` files; every one of the four components has its own file. So "component tests are
+structurally impossible here" (INF-08) and "`App.tsx` and all four components are still untested"
+(PE-13) were both true when written and are **both false now** — see the rows below and §10.
 
 Other scripts that exist: `npm run dev` (Vite, auto-increments the port — 5173/5174 are often
 taken by unrelated local projects here, so prefer `npm run dev -- --port 5199 --strictPort`),
@@ -236,9 +289,14 @@ cd web && npm run dev -- --port 5199 --strictPort
   `setupFiles: ["src/test-setup.ts"]`, with `jsdom`, `@testing-library/react` and
   `@testing-library/user-event` as devDependencies. So a component change can be verified by
   `@testing-library/react` render assertions *in addition to* typecheck, build and eyeballing.
-  Coverage is still thin: only `web/src/__tests__/domEnvironment.test.tsx` (3 tests) exercises the
-  DOM today, and `App.tsx` plus all four components remain untested. Items IMP-037 and IMP-129
-  through IMP-132 own that work. **Caveat:** both workflows still request floating
+  Coverage is **no longer** thin — **this paragraph was stale for a full loop.** As of 2026-10-02,
+  111 of the 253 tests under `web/src/__tests__/` drive React components through
+  `@testing-library/react`: `App.tsx` alone has 74 across six `App.*.test.tsx` files
+  (categories 21, loadFailure 26, partialShard 9, relevance 3, retry 7, storage 8), and
+  `feedControls` (14), `errorBoundary` (11), `paperCardNullUrls` (7) and `malformedImport` (5)
+  each have their own file. `domEnvironment.test.tsx` (3 tests) is now a *fixture check* rather than
+  the only DOM test. Items IMP-037 and IMP-129 through IMP-132 remain the owners of whatever is left.
+  **Caveat:** both workflows still request floating
   `node-version: "20"` and there is no `engine-strict`, so a `jsdom@29` engine mismatch would be an
   `EBADENGINE` warning, not a hard failure.
 - A JS file that needs real Node APIs (e.g. `node:fs`) may opt out of jsdom with a
@@ -512,7 +570,7 @@ any of the following to a new change, and must not claim credit for "fixing" an 
 | PE-10 | **CI has no coverage, no Python matrix (single floating `3.x`), no pip cache, no `permissions:`, no `concurrency:`, no `timeout-minutes:`, no `path:` filters, and actions pinned to mutable tags not SHAs.** | `ci.yml` | baseline |
 | PE-11 | **Deploy has no quality gate.** The `build` job runs no tests, no typecheck, no lint — it jumps straight to `build_index.py` then `npm run build`. Cross-workflow `needs:` is impossible, so anything landing on `main` publishes whether or not CI is green. | `deploy.yml:21-54` | baseline |
 | PE-12 | **`.venv/` and `.pytest_cache/` are not gitignored**, so following the readme's own instructions dirties `git status`. Same for `extracted/`, `*.pdf`, `*.tar.gz`, `*_papers.csv` in the repo root. | root `.gitignore` | baseline |
-| PE-13 | **~~Zero component/DOM test coverage, and it is structurally impossible today.~~ FIXED as an *infrastructure* gap by IMP-005 (commit `894fb9b`): `vite.config.ts:7-10` is now `environment: "jsdom"` with `include: ["src/**/*.test.ts", "src/**/*.test.tsx"]` and `setupFiles: ["src/test-setup.ts"]`, and `jsdom` / `@testing-library/react` / `@testing-library/user-event` are devDependencies. **The coverage gap itself is still open** — `App.tsx` and all four components are still untested; only `domEnvironment.test.tsx` (3 tests) exercises the DOM. Items IMP-037 and IMP-129–IMP-132 own the tests. | `vite.config.ts`; `web/package.json`; `web/src/__tests__/` | fixed (infrastructure) / live (coverage) |
+| PE-13 | **~~Zero component/DOM test coverage, and it is structurally impossible today.~~ FIXED — infrastructure by IMP-005 (commit `894fb9b`), coverage by the items in §10.** `vite.config.ts:7-10` is `environment: "jsdom"` with `include: ["src/**/*.test.ts", "src/**/*.test.tsx"]` and `setupFiles: ["src/test-setup.ts"]`, with `jsdom` / `@testing-library/react` / `@testing-library/user-event` as devDependencies. **The coverage half is also closed** — the "still open" clause here was true when written and is false as of 2026-10-02: 111 component/DOM tests now exist under `web/src/__tests__/`, including 74 against `App.tsx`. **`@vitest/coverage-v8` is still absent**, so there is no coverage *report* — line and branch percentages remain unmeasured, and that is what IMP-037 / IMP-129–IMP-132 are for. | `vite.config.ts`; `web/package.json`; `web/src/__tests__/` | fixed (infrastructure and coverage) / live (coverage report) |
 | PE-14 | **`scripts/paper-collector.py` duplicates the `arxiv` client construction that `scripts/arxiv_common.py` was created to centralize**, and uses a *different* record schema (Title-Cased `Title/Date/Id/Summary/URL/…`) than `build_index.py` (camelCase `id/title/published/abstract/…`). | `paper-collector.py:14, 61-71` | baseline |
 | PE-15 | Stale `__pycache__/*.pyc` for cpython-311/312/314 on disk; `.DS_Store` present. All correctly gitignored, untracked, harmless. | `git status` clean | noise only |
 | PE-16 | The README hero image `images/feed_example.png` is a **2023 screenshot of the legacy CLI's HTML output**, not the React feed — 465 KB, the heaviest asset in the repo, and it misrepresents the project. | `readme.md:11` | real doc bug |
@@ -802,9 +860,9 @@ supposed to fix that row, in which case the row must be updated in this file.**
 | ID | Defect | Location |
 | --- | --- | --- |
 | PY-26 | **Broken documented feature: `--download-pdfs` / `--download-sources` raise `AttributeError` on arxiv 4.x** (`Result.download_pdf`/`download_source` removed); the handler catches only `(arxiv.ArxivError, OSError, tarfile.TarError)`, so the error escapes and aborts the whole run on the first result | `paper-collector.py:75, 77, 80`; `readme.md:101-102` |
-| PY-27 | `safe_filename` is not a sanitizer: doesn't replace `.`, so `safe_filename("..") == ".."`; the slug is used as a **directory name** for extraction. No length cap, no reserved-name handling. **Still open — IMP-023.** Note IMP-024's `filter="data"` does *not* substitute for this: the filter constrains members to `dest`, not `dest` itself. | `paper-collector.py:30, 172` |
+| PY-27 | ~~`safe_filename` is not a sanitizer~~ **FIXED — IMP-023, commit `297ed71`.** It is now a real sanitizer: `MAX_SLUG_BYTES = 200` caps the slug (which becomes both a filename and a directory name), `truncate_to_bytes` cuts on UTF-8 boundaries, `FALLBACK_SLUG = "_"` covers inputs that leave nothing usable, and `WINDOWS_RESERVED_NAMES` defuses `CON`/`PRN`/`AUX`/`NUL`/`COM1-9`/`LPT1-9`. Verified: `safe_filename("..") == "_"`, `"." == "_"`, `"   " == "_"`, `"CON" == "CON_"`, and a 300-character input is capped to 200 bytes. | `paper-collector.py:30-45, 55-60` |
 | PY-28 | Path traversal: the raw `--topic` is interpolated into both output paths with no sanitization — `--topic '../../escape'` writes outside `results/`; a `/` in the topic raises `FileNotFoundError`; the readme's own example topic produces a filename with `:` and `"` (illegal on Windows) | `paper-collector.py:138, 142`; `readme.md:83` |
-| PY-29 | `--save-csv` ignores `--output-dir` — the CSV lands in CWD, where the `results/*.csv` ignore rule does not cover it | `paper-collector.py:138` |
+| PY-29 | ~~`--save-csv` ignores `--output-dir` — the CSV lands in CWD~~ **FIXED — IMP-002, commit `d3b4a1e`, and locked in by IMP-025, commit `058acc0`.** The CSV path is `os.path.join(args.output_dir, f"{topic_slug}_papers.csv")` and `os.makedirs(args.output_dir, exist_ok=True)` runs unconditionally **before** the write, so the directory exists first and the CSV never lands in the CWD. `.gitignore:6` (`results/*.csv`) covers the default location. IMP-025 added a non-vacuous test (`MainOutputPathTests.test_save_csv_writes_into_output_dir_and_never_the_cwd`) that fails on the old bare-CWD write, on a stray CWD duplicate, and if `makedirs` is moved after the write. **This row said "open" and cited `paper-collector.py:138`, which is the write's former line — it is `:306`, with `makedirs` at `:303`.** Re-raise only against a regression, not against this row. | `paper-collector.py:303, 306` |
 | PY-30 | **FIXED — IMP-024, commit `19f8dbb`.** `tarfile.extractall` now receives `filter="data"` on interpreters that have it (`paper-collector.py:123`, gated on the `TARFILE_HAS_FILTER` capability constant at `:24`, which uses `inspect.signature`, not a version check). Members are pre-screened so one rejected member cannot abort the rest of the archive, and each rejection is logged. **Residual (tracked separately):** the hand-rolled fallback for pre-3.8.17 interpreters preserves privileged mode bits, and its test helper's escape scan misses writes outside its own tempdir. | `paper-collector.py:24, 43-67, 78-123`; `ci.yml:15` |
 | PY-31 | Downloads and extractions land in CWD, not `--output-dir`; the `.tar.gz` is never deleted after extraction, so `--download-sources` accumulates multi-MB archives | `paper-collector.py:74-79` |
 | PY-32 | `exit` code is always 0 — `main()`'s return value is discarded (unlike `build_index.py:309`'s `sys.exit(main())`) | `paper-collector.py:149` |
@@ -826,12 +884,12 @@ supposed to fix that row, in which case the row must be updated in this file.**
 
 | ID | Defect | Location |
 | --- | --- | --- |
-| INF-01 | CI never runs `npm run build` — a broken Vite build only fails on `main` in `deploy.yml` | `ci.yml:21-38` |
+| INF-01 | ~~CI never runs `npm run build`~~ **FIXED — IMP-026, commit `2ec06d0`.** The `web-tests` job now ends with a `Build` step running `npm run build`, and IMP-193 (`5684b1b`) added the index build at `ci.yml:45-47` immediately before it, so the gate runs in the same populated state as the deploy build it pre-screens. **Verified load-bearing**, not decorative: in a `/tmp` copy, a missing `./__missing-asset.png` import in `src/main.tsx` gives typecheck 0 / test 0 / **build 1**. **Known limits, do not over-claim:** (a) a plain CSS **syntax** error is *not* caught — Vite/PostCSS tolerates an unterminated rule and the build still exits 0, shipping an 11.86 kB CSS instead of 10.93 kB; only CSS *resolution/pipeline* errors fail it; (b) CI pins `node-version: "20"` and every local verification ran a different major, so the exact CI runtime is untested. | `ci.yml:45-49` |
 | INF-02 | Deploy cron is `0 6 * * 0` (weekly, Sunday) while its own comment and the readme both say daily | `deploy.yml:5-6`; `readme.md:122-123` |
 | INF-03 | `CONTRIBUTING.md`'s documented Python command fails on macOS and it never mentions the `web/` app, its tests, or its build | `CONTRIBUTING.md:2-4` |
 | INF-04 | No lint configured for either stack; no lint step in either workflow; `npm run lint` does not exist | `web/package.json:6-13` |
 | INF-05 | No `pyproject.toml` at all, so no `[tool.ruff]`/`[tool.pytest]`/coverage config can live anywhere | repo root |
-| INF-06 | `requirements.txt` has no upper bounds, no lockfile, no hashes; resolves across two majors today | `requirements.txt:1-2` |
+| INF-06 | **Partly fixed — IMP-033, commit `bbe2d18`.** `arxiv` now carries a real upper bound (`arxiv>=2.1.0,<4`), with a comment block explaining that 4.0.0 removed `Result.download_pdf`/`download_source` and that the bound is a **floor, not the fix** (IMP-093 owns the port). Still open: `pandas` has no upper bound, and there is **still no lockfile and no hashes** for either stack. Note that `<4` makes 4.x *uninstallable* rather than *supported* — `--download-pdfs`/`--download-sources` remain broken in principle (PY-26/IMP-093) and the Python suite cannot detect it, since it passes on 4.0.1 too. | `requirements.txt:1-13` |
 | INF-07 | `pandas` is installed on every deploy but is only needed by `paper-collector.py`; `build_index.py` never imports it | `deploy.yml:31`; `paper-collector.py:14` |
 | INF-08 | ~~Component tests are structurally impossible~~ **FIXED — IMP-005, commit `894fb9b`.** `vite.config.ts:7-10` is now `environment: "jsdom"` with `include: ["src/**/*.test.ts", "src/**/*.test.tsx"]` and `setupFiles: ["src/test-setup.ts"]`; `jsdom` / `@testing-library/react` / `@testing-library/user-event` are devDependencies. **`@vitest/coverage-v8` is still absent**, so there is no coverage report. | `vite.config.ts`; `web/package.json` |
 | INF-09 | CI has no coverage, no Python matrix, no pip cache, no `permissions:`, no `concurrency:`, no `timeout-minutes:`, no `path:` filters; actions pinned to mutable tags, not SHAs | `ci.yml` |
@@ -841,45 +899,96 @@ supposed to fix that row, in which case the row must be updated in this file.**
 | INF-13 | `readme.md:61-67` documents `npm test` and `npm run build` but **not** `npm run typecheck` (which is what CI actually runs) | `readme.md:61-67`; `ci.yml:36` |
 | INF-14 | `readme.md:42-44` documents the `build_index` flags but **not** `--category` | `readme.md:42-44`; `build_index.py:270-274` |
 | INF-15 | `readme.md:30` claims the recency filters "fetch only the week shards they need"; `selectShards` uses `shard.to >= windowStart` (boundary-inclusive), so a 7-day window still pulls the older boundary shard | `readme.md:30`; `paperIndex.ts:54-59` |
-| INF-16 | `readme.md:122-125` says CI runs "the Python `unittest` suite and the web typecheck/tests" — accurate but omits that CI never builds and never lints | `readme.md:122-125` |
+| INF-16 | `readme.md:133-134` says CI runs "the Python `unittest` suite and the web typecheck/tests" — accurate as far as it goes, but it now omits two things CI does: the **web build** (IMP-026) and the **paper index generation** (IMP-193), which is a live network call. Never lints, correctly — no lint exists. The line cite here was `readme.md:122-125`, which now points at the notebook paragraph after earlier readme edits shifted it. | `readme.md:133-134`; `ci.yml:45-49` |
 | INF-17 | The README hero image is a 2023 screenshot of the *legacy CLI's* HTML output, not the React feed; 465 KB and misleading | `readme.md:11`; `images/feed_example.png` |
 | INF-18 | 5 open npm advisories (1 critical vitest, 1 high vite, 3 moderate) and no `.github/dependabot.yml` | `web/package-lock.json` |
 | INF-19 | 7 outdated npm packages, every one a breaking-major bump; no `engines` field and no `.nvmrc` (Node 20 is pinned only inside the workflows) | `web/package.json` |
 | INF-20 | `readme.md` is lowercase; no `docs/`, no changelog, no issue/PR templates, no CODEOWNERS, no release process | repo root |
 
 ### Baseline (do not "fix" without being asked)
-Zero failing checks at HEAD: Python 44/44 OK, `tsc --noEmit` clean, vitest 69/69 across 5 files,
-`npm run build` clean (39 modules, JS 163.72 kB, CSS 10.93 kB). The only genuine command-level
-failures are the notebook (PE-7) and the missing `npm run lint` script (PE-4/INF-04), both absences
-by design rather than regressions.
+Zero failing checks at HEAD: **Python 78/78 OK**, `tsc --noEmit` clean, **vitest 253/253 across 16
+files**, `npm run build` clean (**41 modules, JS 171.45 kB, CSS 10.93 kB**). Re-measured
+2026-10-02; this paragraph previously read "Python 44/44 … vitest 69/69 across 5 files … 39 modules,
+JS 163.72 kB", which was accurate when written and is now stale — re-measure rather than trusting
+either number. The only genuine command-level failures are the notebook (PE-7) and the missing
+`npm run lint` script (PE-4/INF-04), both absences by design rather than regressions.
+
+**Two non-flaky "green" results are weaker than they look — do not treat them as coverage.**
+(1) The Python suite passes identically on `arxiv` 2.1.3, 3.0.0 and 4.0.1, so it cannot detect the
+4.x API removal that breaks `--download-pdfs`. (2) `npm test` runs in **fixed order**; the
+order-dependent alert-count race that lived in `App.loadFailure.test.tsx` was invisible to it and
+only appeared under `--sequence.shuffle` (IMP-192 fixed it). A green plain run is evidence that the
+fixed order passes, not that the suite is order-independent.
 
 ---
 
 ## 10. Recently fixed — do not re-report
 
-Nine items are committed. Each was implemented, then independently verified; the verifier's
-acceptance criteria all passed. **A verifier who re-raises any of these as a new defect is
-reporting a fixed bug.** Re-verify against the current source before believing either the row or
-this list.
+**Twenty-nine items are committed** (`git log --oneline fc77a40..HEAD` is 59 commits; one third are
+`chore(improve)` bookkeeping). Each was implemented, then independently verified; the verifier's
+acceptance criteria all passed. **A verifier who re-raises any of these as a new defect is reporting
+a fixed bug.** Re-verify against the current source before believing either the row or this list —
+several rows in §9 were stale for a full loop after their fix landed, so the drift runs in both
+directions.
 
 | Item | Commit | What landed | Profile rows closed |
 | --- | --- | --- | --- |
 | IMP-001 / IMP-151b | `0beec1b`, `7a2ed82` | `javascript:` (and `data:`/`vbscript:`/`file:`/`blob:`) URLs rejected on the **import** path by `isHttpUrl` (`collections.ts:86-88`) + `hasSafeUrls` (`:96-101`); null/absent URLs treated as "no URL" rather than hostile | WEB-20 |
-| IMP-002 | `d3b4a1e` | `--topic` routed through `safe_filename` before either CLI output path; `--save-csv` now honours `--output-dir` | trap 5 (half), PY-28, PY-29 |
+| IMP-002 | `d3b4a1e` | `--topic` routed through `safe_filename` before either CLI output path; `--save-csv` now honours `--output-dir` (write at `paper-collector.py:306`, `makedirs` at `:303`) | trap 5 (half), PY-28, PY-29 |
 | IMP-003 | `768a5ae` | `paperIndex.manifestPromise` cleared in a `.catch` that rethrows — a rejected manifest is no longer memoized | WEB-01 (half), trap 11 (half) |
-| IMP-004 | `468b80d` | `iter_results` surfaces `ArxivError`; the index build hard-fails with exit 1 and writes nothing on any failed category | PY-6, trap 3 |
+| IMP-004 | `468b80d` | `iter_results` surfaces `ArxivError`; the index build hard-fails with exit 1 and writes nothing on any failed category (verified: HTTP 500 → 6 attempts → exit 1 → empty out-dir, ~51 s) | PY-6, trap 3 |
 | IMP-005 | `894fb9b` | Component/DOM testing enabled: `jsdom` + `@testing-library/react` + `@testing-library/user-event`, `vite.config.ts` `environment: "jsdom"`, `src/test-setup.ts`, `src/__tests__/domEnvironment.test.tsx` | PE-13 (infrastructure half), INF-08 |
-| IMP-143 | `5320db6` | `readHash`/`writeHash` moved to `web/src/lib/urlState.ts` with 18 tests; no behavior change | WEB-37 |
-| IMP-024 | `19f8dbb` | `filter="data"` on `tarfile.extractall` with a hand-rolled, tested fallback for pre-3.8.17 interpreters; members pre-screened so one rejection cannot abort the archive | PY-30 |
-| IMP-151 | `34ea96c` | Prototype-key membership checks replaced with `PROTOTYPE_KEYS` + `hasOwnKey` throughout `collections.ts` | (was WEB-20's sibling route) |
+| IMP-007 | `ac1fae2` | "Try again" button on the index-unavailable panel, wired to `refreshManifest` | WEB-26 (half) |
+| IMP-008 | `67ee0a4` | Relevance sort agrees with the Relevance chip; `#sort=relevance` without a query self-normalizes to Newest | WEB-29 (half) |
+| IMP-009 | `228d48d` | Hash categories validated against the manifest; an unknown category is named and hidden rather than silently emptying the feed | WEB-24 (half) |
+| IMP-010 | `42e0edb` | Category selection is reversible and representable: `cat=` empty and absent are distinct; "Select all" and "Reset category filter" both work | WEB-16, WEB-17, WEB-18 |
+| IMP-011 | `2e3f6e8` | `localStorage` save failures surface as a `role="alert"` banner instead of a silent optimistic update | WEB-24 (half) |
 | IMP-012 | `0ad375c` | `--text-muted` darkened to `#666661` — clears WCAG AA (4.5:1) on `--bg`, `--surface` and `--surface-muted` | WEB-52 (muted-text half) |
+| IMP-015 | `ff3f331` | A single failed shard is non-fatal: the feed shows an "incomplete feed" notice and the papers that did load | WEB-13 |
+| IMP-016 | `166066d` | Load failure (no shard could be loaded) is distinguished from genuinely-no-papers; the hard-failure panel never claims a window is empty | WEB-14, WEB-15 |
+| IMP-017 | `8aceee1` | Raw loader errors replaced with reader-facing copy (`failureCopy.ts`); the partial-shard notice announces "Some papers could not be loaded", not a file name | WEB-19 |
+| IMP-018 | `45e24ed` | React `ErrorBoundary` around the app (`ErrorBoundary.tsx`), mounted from `main.tsx` | (new surface — previously unowned) |
+| IMP-019 | `8bc73f9` | `Paper` type nullability aligned with the Python producer | WEB-39 (half) |
+| IMP-020 | `8801da8` | Retention window made order-independent | PY-5 (half) |
+| IMP-021 | `ee95af3` | Index manifest written **before** stale shards are swept, so a crash mid-sweep cannot leave a manifest pointing at deleted files | PY-7 |
+| IMP-022 | `298d3b1` | Every flag validated in both scripts: `--retention-days 0`, `--category 'cs.CV foo'`, `--abstract-chars -3`, `--max-papers -1` all exit 2 | PY-1, PY-2, PY-3, PY-4 |
+| IMP-023 | `297ed71` | `safe_filename` made a real sanitizer: `MAX_SLUG_BYTES = 200`, `truncate_to_bytes`, `FALLBACK_SLUG`, `WINDOWS_RESERVED_NAMES` | PY-27 |
+| IMP-024 | `19f8dbb` | `filter="data"` on `tarfile.extractall` with a hand-rolled, tested fallback for pre-3.8.17 interpreters; members pre-screened so one rejection cannot abort the archive | PY-30 |
+| IMP-026 | `2ec06d0` | `npm run build` added to CI's `web-tests` job — a missing asset now fails there first, not only on `main` in `deploy.yml` | INF-01 |
+| IMP-033 | `bbe2d18` | `arxiv>=2.1.0,<4` — 4.0.0 removed `Result.download_pdf`/`download_source` and swapped `feedparser` for `lxml`; the bound is a **floor, not the fix** (IMP-093) | INF-06 (half), PY-1 (half) |
+| IMP-143 | `5320db6` | `readHash`/`writeHash` moved to `web/src/lib/urlState.ts` with tests (now 50); no behavior change | WEB-37 |
+| IMP-151 | `34ea96c` | Prototype-key membership checks replaced with `PROTOTYPE_KEYS` + `hasOwnKey` throughout `collections.ts` | (was WEB-20's sibling route) |
+| IMP-154 | `2367a80` | `isPaper` validates `categories` and `published`, not just URLs | WEB-21 (half) |
+| IMP-173 | `64bd3f1` | A JSON `null` manifest no longer hangs the app forever | WEB-02 |
+| IMP-192 | `2c73ec9` | Order-dependent alert-count flakes fixed: `findByRole("alert")` + `getAllByRole("alert")).toHaveLength(2)` replaced with a settling `waitFor` | (test-quality; see §3.3 caveat) |
+| IMP-193 | `5684b1b` | CI generates the paper index (`--category cs.CV --max-per-category 5 --out-dir web/public/data`) before `Build`, so the build gate is no longer green on an empty checkout. **Adds a live network call to `web-tests`** — see INF-198 (filed in the backlog) for the timeout this now needs | INF-16 (half) |
+| IMP-025 | `058acc0` | Non-vacuous test that `--save-csv` writes inside `--output-dir` and never the CWD; `readme.md` note added below the flag table | PY-29 (locked in) |
+| REGRESSION-1 | `7a2ed82` | Null-URL papers are no longer dropped on collection import | WEB-20 (half) |
+| REGRESSION-3 | `819a6d9` | Duplicate recovery control removed; no save-failure alert on a cold boot with nothing stored | (found by sweep 3) |
+
+**Four things in this table are still worth knowing, and none of them are defects:**
+- **`arxiv`'s upper bound (IMP-033) is a floor, not a fix.** `--download-pdfs` / `--download-sources`
+  are still written against helpers a future major can remove, and the Python suite cannot detect it
+  (it passes on 4.0.1 too). IMP-093 owns the port.
+- **`web-tests` now performs a live network call** (IMP-193). The arXiv client sets **no HTTP
+  timeout** on any resolvable `arxiv` version — verified against both 2.1.3 and 3.0.0: `Client.
+  __init__` takes only `page_size`/`delay_seconds`/`num_retries`, and the request goes out as
+  `self._session.get(url, headers=…)` with no `timeout=`. A hung endpoint blocks until GitHub's
+  360-minute job limit. Tracked as **IMP-198** (backlog, `FEATURES.md`).
+- **The Python suite's green is version-agnostic.** Every arXiv touch point is a fake, so it cannot
+  observe a library API removal.
+- **`npm test` runs in fixed order.** A green plain run says nothing about order-independence; use
+  `--sequence.shuffle` when you need that claim.
 
 **Not a defect, by design:** the live index emits `http://arxiv.org/abs/…` (`build_index.py:111`),
 so `isHttpUrl` accepts `http:` as well as `https:`. An https-only allowlist would strip every card
 link. `scripts/paper-collector.py` and `notebooks/paper-collector.ipynb` are separate surfaces —
 a fix to one is not a fix to the other (trap 6).
 
-**Still-open halves of "fixed" items** — do not close these early: IMP-007 (no retry button),
-IMP-019 (`types.ts` still declares `absUrl`/`pdfUrl` as non-nullable `string` while `null` is
-carried on the wire; safe only while `isHttpUrl` takes `unknown`), IMP-023 (`safe_filename` is still
-not a sanitizer), IMP-013 (`--border` contrast).
+**Still-open halves of "fixed" items** — do not close these early: IMP-019 (`types.ts` is
+nullability-aligned, but `isHttpUrl` must keep taking `unknown`; the manifest/TS wire contract is
+still hand-mirrored and unvalidated — trap 1), IMP-024 (the pre-3.8.17 fallback still preserves
+privileged mode bits and its own test helper's escape scan misses writes outside its tempdir),
+IMP-006 (the two-key `localStorage` write is still non-atomic — IMP-011 made it *visible* as a
+banner, which is not the same as fixed), IMP-013 (`--border` contrast), and every NB-1…NB-6 notebook
+row, none of which any CLI fix touches.
