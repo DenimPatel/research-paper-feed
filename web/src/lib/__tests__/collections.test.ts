@@ -248,6 +248,53 @@ describe("parseExportPayload", () => {
     expect(payload?.papers).toHaveLength(1);
   });
 
+  it("drops papers whose urls are not http(s) and keeps valid siblings", () => {
+    const payload = parseExportPayload({
+      version: 1,
+      exportedAt: "2024-02-01",
+      collection: {
+        id: "c1",
+        name: "Vision",
+        createdAt: "2024-01-08",
+        paperIds: ["2401.00001", "2401.12345", "2401.99999"],
+      },
+      papers: [
+        makePaper("2401.00001"),
+        makePaper("2401.12345"),
+        makePaper("2401.99999", { absUrl: "javascript:alert(1)" }),
+        makePaper("2401.88888", { pdfUrl: "javascript:alert(1)" }),
+      ],
+    });
+    expect(payload?.papers.map((paper) => paper.id)).toEqual([
+      "2401.00001",
+      "2401.12345",
+    ]);
+    expect(
+      parseExportPayload({
+        collection: { id: "c1", name: "Vision", paperIds: [] },
+        papers: [makePaper("2401.99999", { absUrl: "javascript:alert(1)" })],
+      })?.papers,
+    ).toEqual([]);
+  });
+
+  it("keeps an https paper url", () => {
+    const payload = parseExportPayload({
+      version: 1,
+      exportedAt: "2024-02-01",
+      collection: {
+        id: "c1",
+        name: "Vision",
+        createdAt: "2024-01-08",
+        paperIds: ["2401.12345"],
+      },
+      papers: [
+        makePaper("2401.12345", { absUrl: "https://arxiv.org/abs/2401.12345" }),
+      ],
+    });
+    expect(payload?.papers).toHaveLength(1);
+    expect(payload?.papers[0].absUrl).toBe("https://arxiv.org/abs/2401.12345");
+  });
+
   it("drops invalid papers and rejects malformed payloads", () => {
     const payload = parseExportPayload({
       collection: { id: "c1", name: "Vision", paperIds: [] },

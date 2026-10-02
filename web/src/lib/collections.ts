@@ -61,6 +61,21 @@ function isPaper(value: unknown): value is Paper {
   );
 }
 
+/**
+ * Absolute http(s) only. Papers reach the renderer as clickable hrefs, and React
+ * does not block `javascript:` there, so anything else must not survive import.
+ */
+export function isHttpUrl(value: unknown): boolean {
+  return /^https?:\/\//i.test(String(value).trim());
+}
+
+function hasSafeUrls(value: Paper): boolean {
+  const paper = value as Partial<Paper>;
+  return [paper.absUrl, paper.pdfUrl].every(
+    (url) => url === undefined || isHttpUrl(url),
+  );
+}
+
 function isCollection(value: unknown): value is Collection {
   if (!value || typeof value !== "object") {
     return false;
@@ -214,7 +229,7 @@ export function parseExportPayload(raw: unknown): ExportPayload | null {
   if (!Array.isArray(candidate.papers)) {
     return null;
   }
-  const papers = candidate.papers.filter(isPaper);
+  const papers = candidate.papers.filter(isPaper).filter(hasSafeUrls);
   return {
     version: 1,
     exportedAt:

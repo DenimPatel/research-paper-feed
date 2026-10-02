@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import type { Collection } from "../lib/collections";
+import { isHttpUrl, type Collection } from "../lib/collections";
 import type { Paper } from "../lib/types";
 
 const ABSTRACT_PREVIEW_CHARS = 260;
@@ -29,6 +29,11 @@ function formatDate(value: string): string {
   });
 }
 
+/** Snapshots can predate import validation, so never hand an unverified url to href. */
+function safeHref(url: string | undefined): string | undefined {
+  return isHttpUrl(url) ? String(url).trim() : undefined;
+}
+
 export function PaperCard({
   paper,
   collections,
@@ -49,14 +54,20 @@ export function PaperCard({
   }, [expanded, paper.abstract]);
 
   const canExpand = paper.abstract.length > ABSTRACT_PREVIEW_CHARS;
+  const absHref = safeHref(paper.absUrl);
+  const pdfHref = safeHref(paper.pdfUrl);
 
   return (
     <article className="paper">
       <header className="paper__header">
         <h3 className="paper__title">
-          <a href={paper.absUrl} target="_blank" rel="noreferrer">
-            {paper.title}
-          </a>
+          {absHref ? (
+            <a href={absHref} target="_blank" rel="noreferrer">
+              {paper.title}
+            </a>
+          ) : (
+            <span>{paper.title}</span>
+          )}
         </h3>
         <div className="paper__meta">
           <time dateTime={paper.published}>{formatDate(paper.published)}</time>
@@ -88,21 +99,29 @@ export function PaperCard({
       {paper.abstractTruncated && (
         <p className="paper__note">
           Abstract truncated —{" "}
-          <a href={paper.absUrl} target="_blank" rel="noreferrer">
-            view the full text on arXiv
-          </a>
+          {absHref ? (
+            <a href={absHref} target="_blank" rel="noreferrer">
+              view the full text on arXiv
+            </a>
+          ) : (
+            "view the full text on arXiv"
+          )}
           .
         </p>
       )}
 
       <footer className="paper__footer">
         <div className="paper__links">
-          <a href={paper.absUrl} target="_blank" rel="noreferrer">
-            arXiv
-          </a>
-          <a href={paper.pdfUrl} target="_blank" rel="noreferrer">
-            PDF
-          </a>
+          {absHref && (
+            <a href={absHref} target="_blank" rel="noreferrer">
+              arXiv
+            </a>
+          )}
+          {pdfHref && (
+            <a href={pdfHref} target="_blank" rel="noreferrer">
+              PDF
+            </a>
+          )}
         </div>
 
         <div className="paper__actions">
