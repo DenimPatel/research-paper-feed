@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COLLECTIONS_KEY,
   EMPTY_STATE,
+  PAPERS_KEY,
   collectionsReducer,
   createCollection,
   exportCollection,
@@ -9,6 +10,7 @@ import {
   parseExportPayload,
   saveState,
   type CollectionsState,
+  type ExportPayload,
 } from "../collections";
 import type { Paper } from "../types";
 
@@ -306,6 +308,132 @@ describe("parseExportPayload", () => {
     expect(
       parseExportPayload({ collection: { id: "c1", name: "V", paperIds: [] } }),
     ).toBeNull();
+  });
+
+  it("drops papers whose id is an inherited Object.prototype key", () => {
+    const payload = parseExportPayload({
+      version: 1,
+      exportedAt: "2024-02-01",
+      collection: {
+        id: "c1",
+        name: "Vision",
+        createdAt: "2024-01-08",
+        paperIds: ["__proto__", "constructor", "prototype", "2401.00001"],
+      },
+      papers: [
+        { id: "__proto__", title: "proto", authors: [], abstract: "x" },
+        makePaper("constructor"),
+        makePaper("prototype"),
+        makePaper("2401.00001"),
+      ],
+    });
+    expect(payload?.papers.map((paper) => paper.id)).toEqual(["2401.00001"]);
+    expect(
+      parseExportPayload({
+        collection: {
+          id: "c1",
+          name: "Vision",
+          createdAt: "2024-01-08",
+          paperIds: ["__proto__"],
+        },
+        papers: [{ id: "__proto__", title: "proto", authors: [], abstract: "x" }],
+      })?.papers,
+    ).toEqual([]);
+  });
+});
+
+describe("prototype-keyed import payloads", () => {
+  const PROTO_PAPER = {
+    id: "__proto__",
+    title: "proto",
+    authors: [],
+    abstract: "x",
+  };
+
+  function protoPayload() {
+    return {
+      version: 1 as const,
+      exportedAt: "2024-02-01",
+      collection: {
+        id: "c1",
+        name: "Imported",
+        createdAt: "2024-02-01",
+        paperIds: ["__proto__", "2401.00001"],
+      },
+      papers: [PROTO_PAPER, makePaper("2401.00001")],
+    };
+  }
+
+  it("keeps the valid sibling and never stores an own __proto__ snapshot", () => {
+    const payload = parseExportPayload(JSON.parse(JSON.stringify(protoPayload())));
+    expect(payload).not.toBeNull();
+    expect(payload?.papers.map((paper) => paper.id)).toEqual(["2401.00001"]);
+
+    const state = collectionsReducer(EMPTY_STATE, {
+      type: "mergeImport",
+      payload: payload as ExportPayload,
+    });
+    expect(state.collections[0].paperIds).toEqual(["2401.00001"]);
+    expect(Object.prototype.hasOwnProperty.call(state.papers, "__proto__")).toBe(
+      false,
+    );
+  });
+
+  it("drops a __proto__ paperId that has no own snapshot in mergeImport", () => {
+    const parsed = protoPayload();
+    const state = collectionsReducer(EMPTY_STATE, {
+      type: "mergeImport",
+      payload: {
+        ...parsed,
+        collection: { ...parsed.collection, paperIds: ["__proto__", "ghost"] },
+        papers: [makePaper("2401.00001")],
+      },
+    });
+    expect(state.collections[0].paperIds).toEqual([]);
+  });
+
+  it("drops every inherited Object.prototype key from loadState", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      COLLECTIONS_KEY,
+      JSON.stringify([
+        {
+          id: "c1",
+          name: "Vision",
+          createdAt: "2024-01-08",
+          paperIds: ["__proto__", "2401.00001"],
+        },
+      ]),
+    );
+    expect(loadState(storage).collections[0].paperIds).toEqual([]);
+  });
+
+  it("survives a poisoned papers record in storage", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      PAPERS_KEY,
+      JSON.stringify({
+        __proto__: makePaper("2401.00001"),
+        "2401.00001": makePaper("2401.00001"),
+      }),
+    );
+    storage.setItem(
+      COLLECTIONS_KEY,
+      JSON.stringify([
+        {
+          id: "c1",
+          name: "Vision",
+          createdAt: "2024-01-08",
+          paperIds: ["__proto__", "constructor", "toString", "2401.00001"],
+        },
+      ]),
+    );
+    const loaded = loadState(storage);
+    expect(loaded.collections[0].paperIds).toEqual(["2401.00001"]);
+    expect(Object.prototype.hasOwnProperty.call(loaded.papers, "__proto__")).toBe(
+      false,
+    );
+    expect(Object.getPrototypeOf(loaded.papers)).toBe(Object.prototype);
   });
 });
 

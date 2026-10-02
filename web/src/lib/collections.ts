@@ -32,6 +32,23 @@ export type CollectionsAction =
 
 export const EMPTY_STATE: CollectionsState = { collections: [], papers: {} };
 
+/**
+ * Keys inherited from `Object.prototype`. An untrusted `id` matching one of
+ * these resolves through the prototype chain instead of being an own snapshot,
+ * so it must never be stored or resolved as a paper.
+ */
+const PROTOTYPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Own-key membership. A bare bracket read walks the prototype chain, which
+ * lets an imported `"__proto__"` id masquerade as a stored paper.
+ * `Object.hasOwn` would read better but needs the ES2022 lib; `lib` here is
+ * ES2020, so use the equivalent `hasOwnProperty` call.
+ */
+function hasOwnKey(map: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(map, key);
+}
+
 export function newId(): string {
   const cryptoObj = globalThis.crypto;
   if (cryptoObj && typeof cryptoObj.randomUUID === "function") {
@@ -55,6 +72,7 @@ function isPaper(value: unknown): value is Paper {
   const paper = value as Partial<Paper>;
   return (
     typeof paper.id === "string" &&
+    !PROTOTYPE_KEYS.has(paper.id) &&
     typeof paper.title === "string" &&
     Array.isArray(paper.authors) &&
     typeof paper.abstract === "string"
@@ -112,7 +130,7 @@ function mergeImport(
 ): CollectionsState {
   const papers: Record<string, Paper> = { ...state.papers };
   for (const paper of payload.papers) {
-    if (!papers[paper.id]) {
+    if (!hasOwnKey(papers, paper.id)) {
       papers[paper.id] = paper;
     }
   }
@@ -126,7 +144,7 @@ function mergeImport(
       (payload.collection.paperIds.length > 0
         ? payload.collection.paperIds
         : payload.papers.map((paper) => paper.id)
-      ).filter((id) => id in papers),
+      ).filter((id) => hasOwnKey(papers, id)),
     ),
   );
 
@@ -212,6 +230,7 @@ export function exportCollection(
     return null;
   }
   const papers = collection.paperIds
+    .filter((id) => hasOwnKey(state.papers, id))
     .map((id) => state.papers[id])
     .filter((paper): paper is Paper => Boolean(paper));
   return { version: 1, exportedAt: now, collection, papers };
@@ -271,7 +290,7 @@ export function loadState(
       for (const [id, paper] of Object.entries(
         parsedPapers as Record<string, unknown>,
       )) {
-        if (isPaper(paper)) {
+        if (!PROTOTYPE_KEYS.has(id) && isPaper(paper)) {
           papers[id] = paper;
         }
       }
@@ -280,7 +299,7 @@ export function loadState(
     const collections = Array.isArray(parsedCollections)
       ? parsedCollections.filter(isCollection).map((collection) => ({
           ...collection,
-          paperIds: collection.paperIds.filter((id) => id in papers),
+          paperIds: collection.paperIds.filter((id) => hasOwnKey(papers, id)),
         }))
       : [];
 

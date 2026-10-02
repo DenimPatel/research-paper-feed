@@ -184,7 +184,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** This is a pure move plus one new test file; no behaviour may change. The profile forbids moving modules "as a side effect of a feature change" — this item **is** the move, so it is in scope here. `RecencyDays`/`SortMode` stay in `web/src/lib/types.ts` and are imported, not redeclared. | commit 5320dbb
 
 ### IMP-151 — Stop `__proto__` from passing the `id in papers` membership check
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Security
 - **Type:** bug-fix
 - **Area / files:** `web/src/lib/collections.ts:129` (`mergeImport`'s `.filter((id) => id in papers)`), `web/src/lib/collections.ts:115-117` (`mergeImport`'s `if (!papers[paper.id])` skip), `web/src/lib/collections.ts:283` (`loadState`'s `collection.paperIds.filter((id) => id in papers)`), `web/src/lib/collections.ts:51-62` (`isPaper`, which accepts any string `id`), `web/src/components/PaperCard.tsx:56` (`const canExpand = paper.abstract.length > ABSTRACT_PREVIEW_CHARS`) and `web/src/components/PaperCard.tsx:50` (the same dereference inside the `useMemo`)
@@ -199,7 +199,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 25.0
-- **Notes:** Same threat model as IMP-001 (a file someone sent you) with higher impact, because IMP-001's `isHttpUrl` filter does not touch this path. IMP-018 (a React error boundary around `<App />`) would blunt the symptom — a crash becomes a `role="alert"` fallback instead of a blank page — but not the defect, since the poisoned id is still written into `paperIds` and `localStorage`; it is a complement, not a substitute. Deliberately scoped to own-property semantics: OBS-1 in `.improve/reports/verify-IMP-001.md` (an array-valued `absUrl` survives `isHttpUrl` because `String(["https://x"])` stringifies to a valid prefix) is not exploitable and belongs with IMP-019's type widening, not here. Found and reported — not fixed — by the independent IMP-001 verifier.
+- **Notes:** Same threat model as IMP-001 (a file someone sent you) with higher impact, because IMP-001's `isHttpUrl` filter does not touch this path. IMP-018 (a React error boundary around `<App />`) would blunt the symptom — a crash becomes a `role="alert"` fallback instead of a blank page — but not the defect, since the poisoned id is still written into `paperIds` and `localStorage`; it is a complement, not a substitute. Deliberately scoped to own-property semantics: OBS-1 in `.improve/reports/verify-IMP-001.md` (an array-valued `absUrl` survives `isHttpUrl` because `String(["https://x"])` stringifies to a valid prefix) is not exploitable and belongs with IMP-019's type widening, not here. Found and reported — not fixed — by the independent IMP-001 verifier. | commit pending
 
 ## Tier 20.0
 
@@ -285,7 +285,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 
 ### IMP-012 — Darken `--text-muted` until it clears 4.5:1 on every surface
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Accessibility
 - **Type:** bug-fix
 - **Area / files:** `web/src/styles.css:9` (`--text-muted: #7a7a73`), used at `web/src/styles.css:285` (`.controls__count`), `web/src/styles.css:350` (`.tag`), `web/src/components/PaperCard.tsx:61-64` (`.paper__meta`), `web/src/styles.css:703` (`.site-footer p`)
