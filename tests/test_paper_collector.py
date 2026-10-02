@@ -151,5 +151,192 @@ class MainOutputPathTests(unittest.TestCase):
         )
 
 
+class ExtractSourceArchiveTests(unittest.TestCase):
+    """``--download-sources`` must not let an archive write outside its own directory."""
+
+    def setUp(self):
+        import tarfile
+        import tempfile
+
+        self.tarfile = tarfile
+        self.original_cwd = os.getcwd()
+        self.base = tempfile.mkdtemp()
+        self.sentinel = os.path.join(self.base, "sentinel")
+        os.makedirs(self.sentinel)
+        os.chdir(self.base)
+
+    def tearDown(self):
+        os.chdir(self.original_cwd)
+        shutil.rmtree(self.base, ignore_errors=True)
+
+    def _dest(self, name="A Paper Title"):
+        return os.path.join(self.base, "extracted", name)
+
+    def _write_archive(self, name, extra_members=()):
+        """Build a tarball with a benign member, an in-tree link, and ``extra_members``."""
+        path = os.path.join(self.base, name)
+        with self.tarfile.open(path, "w:gz") as archive:
+            self._add_file(archive, "main.tex", b"% arXiv source\n")
+            link = self.tarfile.TarInfo("paper.ps")
+            link.type = self.tarfile.SYMTYPE
+            link.linkname = "main.tex"
+            archive.addfile(link)
+            for member_name, payload in extra_members:
+                self._add_file(archive, member_name, payload)
+        return path
+
+    def _write_attack_archive(self, name):
+        """Build a tarball where every member tries to escape the destination."""
+        path = os.path.join(self.base, name)
+        sentinel = os.path.join(self.sentinel, "escape.txt")
+        with self.tarfile.open(path, "w:gz") as archive:
+            self._add_file(archive, "main.tex", b"% arXiv source\n")
+            self._add_file(archive, "../escape.txt")
+            self._add_file(archive, "../../../pwned_deep.txt")
+            self._add_file(archive, os.path.join(self.sentinel, "abs.txt"))
+            self._add_file(archive, os.path.join("symdir", "thru_sym.txt"))
+            self._add_link(archive, "abs_link", self.sentinel)
+            self._add_link(archive, "rel_link", "../../../pwned_rel")
+            self._add_link(archive, "symdir", self.sentinel)
+            self._add_link(archive, "inner_link", "main.tex")
+            for member_name, kind in (
+                ("chardev", self.tarfile.CHRTYPE),
+                ("fifo", self.tarfile.FIFOTYPE),
+            ):
+                member = self.tarfile.TarInfo(member_name)
+                member.type = kind
+                member.devmajor, member.devminor = 1, 3
+                archive.addfile(member)
+        return path, sentinel
+
+    def _add_file(self, archive, member_name, payload=b"pwned\n"):
+        member = self.tarfile.TarInfo(member_name)
+        member.size = len(payload)
+        archive.addfile(member, io.BytesIO(payload))
+
+    def _add_link(self, archive, member_name, linkname):
+        member = self.tarfile.TarInfo(member_name)
+        member.type = self.tarfile.SYMTYPE
+        member.linkname = linkname
+        archive.addfile(member)
+
+    def _files_under_base(self):
+        return [
+            os.path.join(root, filename)
+            for root, _, names in os.walk(self.base)
+            for filename in names
+        ]
+
+    def _files_outside(self, dest, before):
+        """Anything created inside the sandbox since ``before`` that is not inside ``dest``."""
+        inside = os.path.realpath(dest) + os.sep
+        return [
+            path for path in set(self._files_under_base()) - before
+            if not os.path.realpath(path).startswith(inside)
+        ]
+
+    def _extract_capturing_logs(self, archive, dest, has_filter):
+        """Extract with the capability flag forced on or off; return log lines and escapes."""
+        before = set(self._files_under_base())
+        original = paper_collector.TARFILE_HAS_FILTER
+        paper_collector.TARFILE_HAS_FILTER = has_filter
+        try:
+            with self.assertLogs(level="WARNING") as logs:
+                paper_collector.extract_source_archive(archive, dest)
+            return list(logs.output), self._files_outside(dest, before)
+        finally:
+            paper_collector.TARFILE_HAS_FILTER = original
+
+    def _skip_without_filter(self):
+        if not paper_collector.TARFILE_HAS_FILTER:
+            self.skipTest(
+                "tarfile extraction filters need Python 3.8.17+/3.9.17+/"
+                f"3.10.12+/3.11.4+, running {sys.version.split()[0]}"
+            )
+
+    def test_traversal_member_is_skipped_logged_and_stays_inside_dest(self):
+        self._skip_without_filter()
+        archive = self._write_archive("source.tar.gz", [("../escape.txt", b"pwned\n")])
+        dest = self._dest()
+
+        logs, escaped = self._extract_capturing_logs(archive, dest, has_filter=True)
+
+        self.assertEqual(escaped, [], "a member escaped the destination")
+        self.assertTrue(os.path.exists(os.path.join(dest, "main.tex")))
+        self.assertTrue(os.path.islink(os.path.join(dest, "paper.ps")))
+        self.assertTrue(any("escape.txt" in line for line in logs), logs)
+
+    def test_extractall_is_called_with_the_data_filter(self):
+        self._skip_without_filter()
+        archive = self._write_archive("source.tar.gz", [("../escape.txt", b"pwned\n")])
+        dest = self._dest()
+        calls = []
+        original_extractall = self.tarfile.TarFile.extractall
+
+        def recording_extractall(archive_file, path=".", members=None, **kwargs):
+            calls.append({
+                "path": path,
+                "members": [member.name for member in (members or [])],
+                "filter": kwargs.get("filter"),
+            })
+            return original_extractall(archive_file, path, members, **kwargs)
+
+        self.tarfile.TarFile.extractall = recording_extractall
+        try:
+            with self.assertLogs(level="WARNING"):
+                paper_collector.extract_source_archive(archive, dest)
+        finally:
+            self.tarfile.TarFile.extractall = original_extractall
+
+        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(calls[0]["filter"], "data", 'extractall must get filter="data"')
+        self.assertEqual(calls[0]["path"], dest)
+        self.assertIn("main.tex", calls[0]["members"])
+        self.assertNotIn("../escape.txt", calls[0]["members"])
+
+    def test_rewritten_member_name_is_reported(self):
+        self._skip_without_filter()
+        archive = self._write_archive(
+            "absolute.tar.gz",
+            [(os.path.join(self.sentinel, "abs.txt"), b"x")],
+        )
+        dest = self._dest()
+
+        logs, escaped = self._extract_capturing_logs(archive, dest, has_filter=True)
+
+        self.assertTrue(
+            any("Sanitized member" in line and "abs.txt" in line for line in logs),
+            f"a silently relocated member must be reported: {logs}",
+        )
+        self.assertEqual(escaped, [])
+
+    def test_interpreter_without_filter_still_blocks_traversal(self):
+        archive = self._write_archive("source.tar.gz", [("../escape.txt", b"pwned\n")])
+        dest = self._dest()
+
+        logs, escaped = self._extract_capturing_logs(archive, dest, has_filter=False)
+
+        self.assertEqual(escaped, [], "fallback let a member escape")
+        self.assertTrue(os.path.exists(os.path.join(dest, "main.tex")))
+        self.assertTrue(os.path.islink(os.path.join(dest, "paper.ps")))
+        self.assertTrue(any("escape.txt" in line for line in logs), logs)
+
+    def test_interpreter_without_filter_blocks_every_escape_route(self):
+        archive, sentinel = self._write_attack_archive("attack.tar.gz")
+        dest = self._dest()
+
+        logs, escaped = self._extract_capturing_logs(archive, dest, has_filter=False)
+
+        self.assertEqual(escaped, [], "fallback let a member escape")
+        self.assertFalse(os.path.exists(sentinel))
+        self.assertTrue(os.path.exists(os.path.join(dest, "main.tex")))
+        self.assertTrue(os.path.islink(os.path.join(dest, "inner_link")))
+        for skipped in ("../escape.txt", "pwned_deep.txt", "abs_link", "rel_link",
+                        "symdir", "chardev", "fifo"):
+            self.assertTrue(
+                any(skipped in line for line in logs), f"{skipped} was not reported: {logs}"
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

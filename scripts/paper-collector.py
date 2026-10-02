@@ -1,5 +1,6 @@
 import argparse
 import html
+import inspect
 import logging
 import os
 import re
@@ -17,10 +18,109 @@ import arxiv_common  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 
+# ``extractall(filter=...)`` landed in 3.12 and was backported to 3.8.17, 3.9.17,
+# 3.10.12 and 3.11.4, so a version number is not a usable check. Without a filter,
+# extractall is the CVE-2007-4559 path-traversal primitive.
+TARFILE_HAS_FILTER = (
+    "filter" in inspect.signature(tarfile.TarFile.extractall).parameters
+    and hasattr(tarfile, "data_filter")
+)
+
 
 def safe_filename(title):
     """Strip characters that are illegal in filenames on common filesystems."""
     return re.sub(r'[\\/:"*?<>|]+', "_", title).strip()
+
+
+def is_inside(root, path):
+    """Return True when ``path`` is ``root`` or sits underneath it."""
+    try:
+        return os.path.commonpath([root, path]) == root
+    except ValueError:
+        return False
+
+
+def rejection_reason(member, dest):
+    """Return why an archive member must not be extracted into ``dest``, else None.
+
+    A hand-rolled stand-in for ``tarfile.data_filter`` used only on interpreters
+    that predate extraction filters. realpath resolves symlinks in the member's
+    parent directories, so a member routed through a symlinked directory is
+    rejected too, not just one that spells out ``..``.
+    """
+    root = os.path.realpath(dest)
+    try:
+        if not is_inside(root, os.path.realpath(os.path.join(root, member.name))):
+            return "would be extracted outside %s" % root
+        if member.issym():
+            link = os.path.join(root, os.path.dirname(member.name), member.linkname)
+        elif member.islnk():
+            link = os.path.join(root, member.linkname)
+        else:
+            link = None
+        if link is not None and not is_inside(root, os.path.realpath(link)):
+            return "links to %r, which is outside %s" % (member.linkname, root)
+        if link is None and not (member.isfile() or member.isdir()):
+            return "is a special file"
+    except ValueError as exc:
+        return "has an unusable name (%s)" % exc
+    return None
+
+
+def mode_str(mode):
+    """Render a member mode for logging; link members carry no mode."""
+    return "unset" if mode is None else "%o" % mode
+
+
+def extract_source_archive(archive_path, dest):
+    """Extract a source tarball into ``dest``, skipping members that escape it."""
+    with tarfile.open(archive_path) as file:
+        if not TARFILE_HAS_FILTER:
+            logging.warning(
+                "This interpreter's tarfile has no extraction filter (added in "
+                "3.8.17, 3.9.17, 3.10.12 and 3.11.4); screening %s for path "
+                "traversal by hand instead.", archive_path,
+            )
+            safe_members = []
+            for member in file.getmembers():
+                reason = rejection_reason(member, dest)
+                if reason:
+                    logging.warning(
+                        "Skipped unsafe member %r in %s: it %s",
+                        member.name, archive_path, reason,
+                    )
+                    continue
+                safe_members.append(member)
+            file.extractall(dest, members=safe_members)
+            return
+        # extractall applies the filter itself, but at the default errorlevel it
+        # raises on the first rejected member, which would throw away the rest of
+        # a legitimate archive. Screen the members first so each rejection is
+        # logged and only the unsafe ones are dropped.
+        safe_members = []
+        for member in file.getmembers():
+            try:
+                filtered = tarfile.data_filter(member, dest)
+            except (tarfile.FilterError, ValueError) as exc:
+                logging.warning(
+                    "Skipped unsafe member %r in %s: %s", member.name, archive_path, exc
+                )
+                continue
+            # data_filter relocates absolute paths and strips privileged bits
+            # instead of rejecting them, so report those rewrites too.
+            mode_changed = (
+                member.mode is not None
+                and filtered.mode is not None
+                and filtered.mode != member.mode
+            )
+            if filtered.name != member.name or mode_changed:
+                logging.warning(
+                    "Sanitized member %r in %s: name %r, mode %s -> %s",
+                    member.name, archive_path, filtered.name,
+                    mode_str(member.mode), mode_str(filtered.mode),
+                )
+            safe_members.append(member)
+        file.extractall(dest, members=safe_members, filter="data")
 
 
 def parse_args():
@@ -75,8 +175,9 @@ def fetch_papers(topic, max_papers, download_pdfs=False, download_sources=False)
                 result.download_pdf(filename=f"{title_slug}.pdf")
             if download_sources:
                 result.download_source(filename=f"{title_slug}.tar.gz")
-                with tarfile.open(f"{title_slug}.tar.gz") as file:
-                    file.extractall(f"./extracted/{title_slug}")
+                extract_source_archive(
+                    f"{title_slug}.tar.gz", f"./extracted/{title_slug}"
+                )
         except (arxiv.ArxivError, OSError, tarfile.TarError) as exc:
             logging.warning("Failed to download resources for %r: %s", result.title, exc)
         all_data.append(record)
