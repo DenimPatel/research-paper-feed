@@ -21,3 +21,5 @@
 2026-10-02T12:58:51Z | IMP-016      | DONE     | 166066d
 2026-10-02T13:25:57Z | IMP-017      | DONE     | 8aceee1
 2026-10-02T14:02:33Z | REGRESSION-3 | FOUND    | duplicate recovery affordance (IMP-010 x IMP-009); spurious save-failure alert on cold boot (IMP-011)2026-10-02T14:25:58Z | REGRESSION-3 | FIXED | 819a6d9
+2026-10-02T15:04:35Z | IMP-018 | DONE | 45e24ed
+ee95af3 | IMP-021 | DONE | 
