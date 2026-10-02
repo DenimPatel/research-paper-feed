@@ -1,2 +1,14 @@
-arxiv>=2.1.0
+# Verified against arxiv 3.0.0 (2026-10-02). The upper bound is load-bearing:
+# arxiv 4.0.0 removed Result.download_pdf and Result.download_source, which
+# scripts/paper-collector.py calls for --download-pdfs / --download-sources.
+# Everything the scheduled index build (scripts/arxiv_common.py,
+# scripts/build_index.py) uses -- Client(page_size, delay_seconds,
+# num_retries), Search(query, max_results, sort_by, sort_order),
+# SortCriterion.SubmittedDate, SortOrder.Descending, ArxivError and every
+# Result attribute record_from_result reads -- is unchanged through 4.x, so
+# <4 costs the deploy nothing and keeps the documented CLI flags working.
+# This is a floor, not the fix: paper-collector.py is still written against
+# APIs a future major can remove. Porting it to the 4.x API is tracked
+# separately (IMP-093); do not read this bound as that work being done.
+arxiv>=2.1.0,<4
 pandas>=2.0.0

@@ -682,7 +682,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** If IMP-026 adds a build gate, this is the doc side of it. Combine the two PRs if convenient.
 
 ### IMP-033 — Add an upper bound to `arxiv` in `requirements.txt`
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Packaging & installation
 - **Type:** bug-fix
 - **Area / files:** `requirements.txt:1` (`arxiv>=2.1.0`), `requirements.txt:2` (`pandas>=2.0.0`), `scripts/paper-collector.py:75,77` (the 4.x breakage)
@@ -695,7 +695,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** This item is a *floor* fix, not a substitute for IMP-093 (replace the removed APIs) — pinning to 2.x would also "fix" the crash while leaving the code on a dead API. State that in the PR.
+- **Notes:** This item is a *floor* fix, not a substitute for IMP-093 (replace the removed APIs) — pinning to 2.x would also "fix" the crash while leaving the code on a dead API. State that in the PR. | commit pending
 
 ### IMP-034 — Resolve the notebook's divergent fork and correct `readme.md:113-118`
 - **Status:** NEEDS-HUMAN
