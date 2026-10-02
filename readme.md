@@ -108,6 +108,9 @@ The extracted papers are saved under `results/` as an HTML feed.
 | `--download-sources` | Also download and extract each paper's LaTeX source archive. | off |
 | `--save-csv` | Also save the extracted metadata as a CSV file. | off |
 
+Both the HTML feed and the optional `--save-csv` file are written into
+`--output-dir`, which is created if it does not already exist.
+
 The ArXiv query syntax supports field prefixes and boolean operators, for example:
 
 - `cat:cs.CV AND "3d reconstruction"`

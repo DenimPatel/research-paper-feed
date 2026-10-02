@@ -553,7 +553,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Risk `med` because a real arXiv source archive may contain members that `filter="data"` rejects, and `--download-sources` is a documented flag. Test against a real source archive before merging and log every rejection so a user can see what was skipped. | commit 19f8dbb; attempt 2 PASS (attempt 1 FAILed — the no-`filter` fallback branch still allowed traversal: `FORCE_FALLBACK=1` measured 21 escape routes)
 
 ### IMP-025 — Make `--save-csv` honor `--output-dir`
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `scripts/paper-collector.py:138` (`df.to_csv(topic + "_papers.csv", index=False)`), `readme.md:103` (`--save-csv` documented without noting the CWD write)
@@ -567,7 +567,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending; AC1 already fixed by IMP-002
 ### IMP-026 — Add `npm run build` to CI
 - **Status:** DONE
 - **Category:** CI & automation

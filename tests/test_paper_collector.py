@@ -170,6 +170,14 @@ class MainOutputPathTests(unittest.TestCase):
             for name in names
         }
 
+    def _csvs_under(self, path):
+        return [
+            os.path.join(root, name)
+            for root, _, names in os.walk(path)
+            for name in names
+            if name.endswith("_papers.csv")
+        ]
+
     def _run_main(self, topic, *extra_args):
         """Run ``main()`` in a fresh sandbox and return its output dir and new files."""
         import tempfile
@@ -232,6 +240,37 @@ class MainOutputPathTests(unittest.TestCase):
             html_name,
             r"^cat_cs\.CV-1_papers_extracted_on_\d{2}-\d{2}-\d{4}-\d{2}-\d{2}-\d{2}\.html$",
         )
+
+    def test_save_csv_writes_into_output_dir_and_never_the_cwd(self):
+        """``--save-csv`` must honour ``--output-dir``, creating it if it is absent."""
+        workdir = os.path.join(self.base, "csv-work")
+        output_dir = os.path.join(self.base, "csv-out", "nested")
+        os.makedirs(workdir)
+        os.chdir(workdir)
+
+        self.assertFalse(os.path.exists(output_dir), "output-dir must start absent")
+
+        sys.argv = [
+            "paper-collector.py", "--topic", "cat:cs.CV",
+            "--save-csv", "--output-dir", output_dir,
+        ]
+        with contextlib.redirect_stdout(io.StringIO()):
+            paper_collector.main()
+
+        csv_path = os.path.join(output_dir, "cat_cs.CV_papers.csv")
+        self.assertTrue(os.path.isfile(csv_path), f"{csv_path} was not written")
+        self.assertEqual(
+            self._csvs_under(self.base),
+            [csv_path],
+            "expected exactly one CSV, inside --output-dir",
+        )
+        self.assertEqual(
+            self._csvs_under(workdir), [], "a *_papers.csv landed in the CWD"
+        )
+        with open(csv_path, encoding="utf-8") as handle:
+            header, row = handle.readline(), handle.readline()
+        self.assertIn("Title", header)
+        self.assertIn("A Paper About 3D Reconstruction", row)
 
 
 class MaxPapersArgumentTests(unittest.TestCase):
