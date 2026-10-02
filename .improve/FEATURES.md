@@ -86,7 +86,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 ## Tier 25.0 — the worst problems in the repo
 
 ### IMP-001 — Reject non-`http(s)` URLs in imported collection papers
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Security
 - **Type:** bug-fix
 - **Area / files:** `web/src/lib/collections.ts:51-62` (`isPaper`), `web/src/lib/collections.ts:206-227` (`parseExportPayload`), `web/src/components/PaperCard.tsx:57,91,100,103`
@@ -101,7 +101,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:**
-
+- **Notes:** commit 0beec1b
 ### IMP-002 — Sanitize `--topic` before it reaches the CLI output paths
 - **Status:** DONE
 - **Category:** Security
