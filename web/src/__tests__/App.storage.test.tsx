@@ -218,3 +218,61 @@ describe("a collections save that localStorage refuses", () => {
     expect(storage.store.has(PAPERS_KEY)).toBe(true);
   });
 });
+
+/**
+ * A first-time visitor has nothing stored, so the empty state is what the app
+ * started from rather than a change worth writing back. The notice below is
+ * about data the reader is about to lose, and on a cold boot there is none.
+ */
+describe("a cold boot with nothing saved", () => {
+  it("raises no alarm when a save could not have succeeded anyway", async () => {
+    // A quota that is already exhausted before the first render: the worst case
+    // for a first impression, and the state the mount-time write used to fail in
+    // front of a reader who had changed nothing.
+    storage.full = true;
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /Recent arXiv papers/ });
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    // Not suppressed copy either: a warning about losing changes the reader
+    // never made is false, so there must be no trace of one.
+    expect(document.body.textContent).not.toMatch(/could not be saved/i);
+    expect(document.body.textContent).not.toMatch(/will be lost/i);
+  });
+
+  it("writes nothing, so there is no save to have failed", async () => {
+    storage.full = true;
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /Recent arXiv papers/ });
+
+    // The root cause rather than a symptom: the mount run was persisting the
+    // empty state. Gating the notice on a write the reader caused means gating
+    // the write too, and `detectStorage`'s own probe key is removed again, so
+    // storage is still untouched.
+    expect(storage.store.has(COLLECTIONS_KEY)).toBe(false);
+    expect(storage.store.has(PAPERS_KEY)).toBe(false);
+    expect(storage.store.size).toBe(0);
+  });
+
+  it("still reports a failure the reader caused, and clears on the next good one", async () => {
+    // The gate has to be "a write was attempted", not "the app has been open a
+    // while": a real save of a real collection still has to be reported.
+    await openCollections();
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    storage.full = true;
+    createCollection("Vision");
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(saveFailedBanner().textContent).toContain(
+      "Collections could not be saved",
+    );
+
+    storage.full = false;
+    createCollection("NLP");
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(screen.getByRole("heading", { name: /^NLP/ })).toBeTruthy();
+    expect(storage.store.has(PAPERS_KEY)).toBe(true);
+  });
+});

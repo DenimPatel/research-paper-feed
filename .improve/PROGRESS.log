@@ -15,7 +15,9 @@
 2026-10-02T09:54:23Z | IMP-009      | DONE     | 228d48d (attempt 2; attempt 1 never wired App.tsx)
 2026-10-02T10:37:33Z | IMP-010      | DONE     | 42e0edb
 2026-10-02T10:52:04Z | IMP-023      | DONE     | 297ed71
-2026-10-02T11:10:19Z | REGRESSION-2 | CLEAN    | 34 browser states, 160 web tests x9 runs, 53 python tests2026-10-02T12:19:14Z | IMP-011 | DONE | 2e3f6e8
-ff3f331 | IMP-015 | DONE |  (attempt 2)
-2026-10-02T12:58:51Z | IMP-016 | DONE | 166066d
-2026-10-02T13:25:57Z | IMP-017 | DONE | 8aceee1
+2026-10-02T11:10:19Z | REGRESSION-2 | CLEAN    | 34 browser states, 160 web tests x9 runs, 53 python tests
+2026-10-02T12:19:14Z | IMP-011      | DONE     | 2e3f6e8
+2026-10-02T12:41:07Z | IMP-015      | DONE     | ff3f331 (attempt 2; attempt 1 never implemented AC2)
+2026-10-02T12:58:51Z | IMP-016      | DONE     | 166066d
+2026-10-02T13:25:57Z | IMP-017      | DONE     | 8aceee1
+2026-10-02T14:02:33Z | REGRESSION-3 | FOUND    | duplicate recovery affordance (IMP-010 x IMP-009); spurious save-failure alert on cold boot (IMP-011)

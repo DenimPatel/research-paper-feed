@@ -213,6 +213,24 @@ function tryAgain(): HTMLElement {
   return within(failurePanel()).getByRole("button", { name: /try again/i });
 }
 
+/**
+ * One save the reader caused, which is the only thing that arms IMP-011's
+ * notice — the mount run has nothing to write, so a failure has to be provoked
+ * by an action. Without it this file would be asserting a first-visit scare
+ * rather than the two notices coexisting. Returns to the feed, so the caller
+ * counts them in the view the load failure is rendered in.
+ */
+async function saveSomething(): Promise<void> {
+  fireEvent.click(screen.getByRole("button", { name: /^Collections/ }));
+  fireEvent.change(await screen.findByLabelText("New collection name"), {
+    target: { value: "Vision" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Create collection" }));
+  await screen.findByRole("heading", { name: /^Vision/ });
+  fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+  await screen.findByText(/Papers could not be loaded/);
+}
+
 beforeEach(() => {
   window.location.hash = "";
 });
@@ -751,6 +769,9 @@ describe("the load failure alongside the other notices", () => {
 
     render(<App />);
     await screen.findByRole("alert");
+    // A save the reader made, not a save the mount made: the storage notice has
+    // to be earned before the two can be compared side by side.
+    await saveSomething();
 
     expect(screen.getAllByRole("alert")).toHaveLength(2);
     const panel = failurePanel();

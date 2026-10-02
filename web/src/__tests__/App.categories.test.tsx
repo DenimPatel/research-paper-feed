@@ -245,20 +245,47 @@ describe("a deep link naming only unknown categories", () => {
     reset.focus();
     expect(document.activeElement).toBe(reset);
 
-    // Nothing is selected, so the feed says so in as many words instead of
-    // blaming the search or the window.
-    expect(await screen.findByText("No categories selected")).toBeTruthy();
+    // The feed body says nothing of its own here. IMP-010's "No categories
+    // selected" is a claim about a selection the reader made, and this reader
+    // made none — their category is simply not in this index, which the notice
+    // above already says. A second account of the same empty list would name a
+    // cause that did not happen.
+    expect(screen.queryByText("No categories selected")).toBeNull();
     expect(
       screen.queryByText(/No papers match the current filters/),
     ).toBeNull();
     expect(pressedCategoryLabels(group)).toEqual([]);
   });
 
+  /**
+   * One condition, one way out. IMP-009's reset and IMP-010's "Select all" both
+   * write `categories: null` from this state, so rendering both gave the reader
+   * two controls for one fact and told them the same thing twice.
+   */
+  it("offers exactly one control for recovering from it", async () => {
+    installFetch();
+    window.location.hash = "#cat=cs.BI";
+
+    await renderFeed();
+    await screen.findByRole("alert");
+
+    const controls = [
+      screen.queryByRole("button", { name: /select all categories/i }),
+      screen.queryByRole("button", { name: /reset category filter/i }),
+      screen.queryByRole("button", { name: /keep only indexed categories/i }),
+    ].filter((node) => node !== null);
+    expect(controls).toHaveLength(1);
+    expect(controls[0]?.textContent).toBe("Reset category filter");
+    // The one that survives is the one inside the notice, so the control and the
+    // explanation of what it fixes are the same block of text.
+    expect(unknownNotice().contains(controls[0] as HTMLElement)).toBe(true);
+  });
+
   it("recovers the whole feed when the reset is clicked", async () => {
     installFetch();
     window.location.hash = "#cat=cs.BI";
     const group = await renderFeed();
-    expect(await screen.findByText("No categories selected")).toBeTruthy();
+    await screen.findByRole("alert");
 
     fireEvent.click(
       within(unknownNotice()).getByRole("button", { name: /reset category filter/i }),
@@ -266,6 +293,7 @@ describe("a deep link naming only unknown categories", () => {
 
     expect(window.location.hash).not.toContain("cat=");
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("No categories selected")).toBeNull();
     expect(await screen.findByText(CV_PAPER.title)).toBeTruthy();
     expect(screen.getByText(LG_PAPER.title)).toBeTruthy();
     expect(pressedCategoryLabels(group)).toEqual(["cs.CV", "cs.LG"]);
@@ -320,6 +348,29 @@ describe("hashes that name no category", () => {
 
     expect(screen.queryByRole("alert")).toBeNull();
     expect(await screen.findByText("No categories selected")).toBeTruthy();
+  });
+
+  /**
+   * The mirror of the one-control rule for `#cat=cs.BI`: this is the state
+   * IMP-010 exists for, and the unknown-category notice must not swallow it. A
+   * `#cat=` reader did turn everything off, so the copy and the control that
+   * reverses it both belong here.
+   */
+  it("keeps its own reversible control, and the unknown-category notice out of it", async () => {
+    installFetch();
+    window.location.hash = "#cat=";
+
+    await renderFeed();
+    await screen.findByText("No categories selected");
+
+    const controls = [
+      screen.queryByRole("button", { name: /select all categories/i }),
+      screen.queryByRole("button", { name: /reset category filter/i }),
+      screen.queryByRole("button", { name: /keep only indexed categories/i }),
+    ].filter((node) => node !== null);
+    expect(controls).toHaveLength(1);
+    expect(controls[0]?.textContent).toBe("Select all categories");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 

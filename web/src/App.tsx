@@ -15,6 +15,7 @@ import {
   exportCollection,
   loadState,
   saveState,
+  type CollectionsAction,
   type ExportPayload,
 } from "./lib/collections";
 import {
@@ -299,8 +300,28 @@ export function App() {
 
   // `activeCategories` is empty until the manifest arrives, so "no categories
   // selected" is only a claim the index could already have refuted.
+  //
+  // Two different states land on that same empty list and must not borrow each
+  // other's copy. `#cat=` and a deselected-everything filter are a request for no
+  // papers, which IMP-010 names and offers to undo. A hash naming only unknown
+  // categories is IMP-009's: the reader asked for a category, this index does
+  // not have it, and the notice above already says so and owns the recovery.
+  // Reporting that one as "No categories selected" would tell the reader they
+  // had turned something off that they never had.
   const noCategoriesSelected =
-    manifest !== null && activeCategories.length === 0;
+    manifest !== null &&
+    activeCategories.length === 0 &&
+    unknownCategories.length === 0;
+  // The rest of that empty list: nothing matched because every value the link
+  // named was dropped, not because anything was turned off. The unknown-category
+  // notice is the whole account of this state — it names the value, says nothing
+  // can match, and offers the one control that undoes it — so the feed body adds
+  // no second explanation and no second control beside it. A partial drop
+  // (`#cat=cs.CV,cs.BI`) keeps its papers and is not this state.
+  const unknownOnlySelection =
+    manifest !== null &&
+    activeCategories.length === 0 &&
+    unknownCategories.length > 0;
 
   // The one distinction the empty state could not make: nothing on screen, and
   // an error explaining why. An empty `papers` array is otherwise
@@ -332,22 +353,38 @@ export function App() {
   }, [papers, activeCategories, urlState.query, urlState.sort]);
 
   const [storageAvailable] = useState(detectStorage);
-  const [collections, dispatch] = useReducer(collectionsReducer, undefined, () =>
+  const [collections, rawDispatch] = useReducer(collectionsReducer, undefined, () =>
     loadState(),
   );
   const [saveFailed, setSaveFailed] = useState(false);
+  // Whether a change is waiting to be written. Every path that can change the
+  // state goes through `dispatch`, so this is the difference between "the state
+  // changed" and "the reader changed something" — and the first thing the app
+  // does on a cold boot is produce a state that was never written by anyone.
+  const unsavedChanges = useRef(false);
+  const dispatch = (action: CollectionsAction) => {
+    unsavedChanges.current = true;
+    rawDispatch(action);
+  };
 
   // `saveState` reports a blocked or exhausted quota by returning false rather
   // than throwing, so this effect is the only place the failure can be
   // noticed. Without it the reducer state stays optimistic, the card shows the
-  // paper as saved, and everything is gone on the next reload. Setting the
-  // flag unconditionally is safe: `useState` bails out on an unchanged value,
-  // and this effect does not depend on it, so a steady stream of saves cannot
-  // loop.
+  // paper as saved, and everything is gone on the next reload.
+  //
+  // Gated on `unsavedChanges`, because the mount run is not a save the reader
+  // asked for: with nothing stored it has nothing to write, and persisting the
+  // empty state anyway meant a full or blocked quota produced a failure notice
+  // on a first visit — "anything you just changed will be lost" about a session
+  // in which nothing was changed. The write, and the failure only it can report,
+  // start at the dispatch. `useState` bails out on an unchanged value and this
+  // effect does not depend on the flag, so a steady stream of saves cannot loop.
   useEffect(() => {
-    if (storageAvailable) {
-      setSaveFailed(!saveState(collections));
+    if (!storageAvailable || !unsavedChanges.current) {
+      return;
     }
+    unsavedChanges.current = false;
+    setSaveFailed(!saveState(collections));
   }, [collections, storageAvailable]);
 
   const setView = (next: View) => {
@@ -714,7 +751,9 @@ export function App() {
                   // can undo, so this state names its own cause and offers the
                   // action that reverses it instead of the generic "nothing
                   // matched" line. Reuses `empty` and `button`, so no
-                  // `styles.css` rule is needed.
+                  // `styles.css` rule is needed. Only the state the reader
+                  // caused: a link whose values were all unknown renders
+                  // nothing here, because the notice above already owns it.
                   <>
                     <p className="empty">No categories selected</p>
                     <p>
@@ -727,7 +766,7 @@ export function App() {
                       </button>
                     </p>
                   </>
-                ) : (
+                ) : unknownOnlySelection ? null : (
                   <PaperList
                     papers={visiblePapers}
                     visibleCount={visibleCount}

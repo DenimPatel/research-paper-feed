@@ -144,9 +144,7 @@ function installFetchWithGatedShards(
  * makes IMP-011's banner reachable here, so both alerts can coexist.
  *
  * Full rather than blocked: `saveState` writes `COLLECTIONS_KEY` before
- * `PAPERS_KEY`, so only the second write has to overflow. `App.tsx:236` runs the
- * save effect on mount, which is why the notice is already up with no user
- * action at all.
+ * `PAPERS_KEY`, so only the second write has to overflow.
  */
 class FullStorage implements Storage {
   readonly store = new Map<string, string>();
@@ -203,6 +201,25 @@ function partialNotice(): HTMLElement {
     );
   }
   return matches[0];
+}
+
+/**
+ * One save the reader caused, which is the only thing that arms IMP-011's
+ * notice — the mount run has nothing to write, so a failure has to be provoked
+ * by an action. Without it this file would be asserting a first-visit scare
+ * rather than the two notices coexisting, which is what it is here to check.
+ * Returns to the feed so the caller can count the notices in the view the
+ * shard failure is rendered in.
+ */
+async function saveSomething(): Promise<void> {
+  fireEvent.click(screen.getByRole("button", { name: /^Collections/ }));
+  fireEvent.change(await screen.findByLabelText("New collection name"), {
+    target: { value: "Vision" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Create collection" }));
+  await screen.findByRole("heading", { name: /^Vision/ });
+  fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+  await screen.findByText(W09.title);
 }
 
 beforeEach(() => {
@@ -391,6 +408,9 @@ describe("the shard notice alongside the storage notice", () => {
 
     render(<App />);
     await screen.findByText(W09.title);
+    // A save the reader made, not a save the mount made: the notice has to be
+    // earned before the two can be compared side by side.
+    await saveSomething();
 
     const alerts = screen.getAllByRole("alert");
     expect(alerts).toHaveLength(2);
