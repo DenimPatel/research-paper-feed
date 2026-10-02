@@ -290,7 +290,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 - **Notes:** commit pending
 ### IMP-010 — Make the category selection reversible and representable
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** UX flows & interactivity
 - **Type:** improvement
 - **Area / files:** `web/src/App.tsx:198-201` (`activeCategories`, `urlState.categories ?? manifest?.categories ?? []`), `web/src/App.tsx:253-259` (`toggleCategory`), `web/src/App.tsx:69-71` (`writeHash` permanently emits `cat=` once a selection exists), `web/src/components/FeedControls.tsx:49-64` (category chips)
@@ -304,7 +304,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** S    **Risk:** low
 - **Depends on:** IMP-143
 - **Priority score:** 20.0
-- **Notes:** Depends on IMP-143 because criterion 4 needs the extracted, testable `writeHash`. IMP-106 (a broader "Clear filters" action) and IMP-009 (validating hash categories against the manifest) touch adjacent UI; keep the copy unambiguous about which control resets what.
+- **Notes:** Depends on IMP-143 because criterion 4 needs the extracted, testable `writeHash`. IMP-106 (a broader "Clear filters" action) and IMP-009 (validating hash categories against the manifest) touch adjacent UI; keep the copy unambiguous about which control resets what. | commit pending
 
 ### IMP-011 — Surface `saveState` failure to the user
 - **Status:** TODO
@@ -502,7 +502,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Adding validation ranges changes `--help` output, which profile §4.5 requires to be reconciled with `readme.md` in the same change — that is criterion 5. IMP-114 documents `--category` in the readme and should be sequenced with this item.
 
 ### IMP-023 — Make `safe_filename` a real sanitizer
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Security
 - **Type:** bug-fix
 - **Area / files:** `scripts/paper-collector.py:21-23` (`safe_filename`), `scripts/paper-collector.py:72,79` (slug used as a **directory** name for `extractall`)

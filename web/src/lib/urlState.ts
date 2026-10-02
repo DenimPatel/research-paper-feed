@@ -79,6 +79,41 @@ export function resolveCategories(
 }
 
 /**
+ * Whether `selected` names exactly the same categories as `all`, in any order
+ * and without repeats.
+ *
+ * "All categories" is a state the app can be in without saying so. `null` is
+ * one way to spell it, but a selection that happens to cover the whole index is
+ * the same state reached a different way, and the two must serialize identically
+ * — otherwise the URL carries a `cat=` that reads straight back out, and the
+ * "All" chip disagrees with the address bar about what is pressed.
+ *
+ * `all` is the manifest's own list and is re-checked at runtime for the same
+ * reason `resolveCategories` re-checks it: it arrives through a bare cast. A
+ * list that cannot be trusted answers "no", which keeps the writer emitting the
+ * `cat=` it emitted before rather than dropping a live filter.
+ */
+export function isFullSelection(
+  selected: readonly string[],
+  all?: readonly string[] | null,
+): boolean {
+  if (!Array.isArray(all) || all.length === 0) {
+    return false;
+  }
+  const valid = new Set<string>();
+  for (const entry of all) {
+    if (typeof entry !== "string" || entry === "") {
+      return false;
+    }
+    valid.add(entry);
+  }
+  const chosen = new Set(selected);
+  return (
+    chosen.size === valid.size && all.every((category) => chosen.has(category))
+  );
+}
+
+/**
  * Parses a location hash into the app's URL state, and nothing more. `cat=` is
  * de-duplicated but *not* validated here: the manifest has not been fetched at
  * the point this is called (first render, or the `hashchange` listener), so
@@ -131,11 +166,19 @@ function writeToLocation(hash: string, mode: "push" | "replace"): void {
  * to the real `location.hash` / `history.replaceState` writers. The hash is
  * also returned so callers — and tests — never have to read it back out of the
  * address bar, which is why the serialization needs no `window` of its own.
+ *
+ * `allCategories` is the index's own category list. It is what makes "every
+ * category" recognizable: a selection that covers all of it is not a filter, so
+ * it is written as no `cat=` at all and reads back as the `null` that means the
+ * same thing. An explicitly empty selection is a different request and keeps its
+ * own `cat=`. Omit the list and every non-`null` selection is written as named,
+ * which is what a caller that has no manifest in hand wants.
  */
 export function writeHash(
   state: HashState,
   mode: "push" | "replace",
   write: HashWriter = writeToLocation,
+  allCategories?: readonly string[] | null,
 ): { hash: string } {
   const params = new URLSearchParams();
   if (state.view !== "feed") {
@@ -144,7 +187,10 @@ export function writeHash(
   if (state.query) {
     params.set("q", state.query);
   }
-  if (state.categories !== null) {
+  if (
+    state.categories !== null &&
+    !isFullSelection(state.categories, allCategories)
+  ) {
     params.set("cat", state.categories.join(","));
   }
   if (state.recency !== DEFAULT_RECENCY) {

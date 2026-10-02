@@ -65,14 +65,6 @@ export function App() {
   const [urlState, setUrlState] = useState<HashState>(() => readHash());
   const view = urlState.view;
 
-  const applyState = useCallback(
-    (next: HashState, mode: "push" | "replace") => {
-      writeHash(next, mode);
-      setUrlState(next);
-    },
-    [],
-  );
-
   useEffect(() => {
     const onHashChange = () => setUrlState(readHash());
     window.addEventListener("hashchange", onHashChange);
@@ -93,6 +85,18 @@ export function App() {
   const [manifestAttempts, setManifestAttempts] = useState(0);
   const retriedRef = useRef(false);
   const feedHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  const applyState = useCallback(
+    (next: HashState, mode: "push" | "replace") => {
+      // The manifest is what "every category" means, so the writer needs it: a
+      // selection covering the whole index is no filter at all and must
+      // serialize as no `cat=`. The third argument stays undefined so the
+      // default writer is kept.
+      writeHash(next, mode, undefined, manifest?.categories ?? null);
+      setUrlState(next);
+    },
+    [manifest],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -188,6 +192,11 @@ export function App() {
     categoryResolution.selected ?? manifest?.categories ?? [];
   const unknownCategories = categoryResolution.unknown;
 
+  // `activeCategories` is empty until the manifest arrives, so "no categories
+  // selected" is only a claim the index could already have refuted.
+  const noCategoriesSelected =
+    manifest !== null && activeCategories.length === 0;
+
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [urlState.query, urlState.recency, urlState.categories, urlState.sort]);
@@ -248,6 +257,14 @@ export function App() {
       ? current.filter((item) => item !== category)
       : [...current, category];
     applyState({ ...urlState, categories: next }, "replace");
+  };
+
+  // "Every category" is `null` — no explicit selection — so the state and the
+  // URL agree: `writeHash` omits `cat=` and `readHash` hands the same `null`
+  // back. Writing the manifest's list instead would be a second spelling of a
+  // state that already has one, and it would drift the moment the index does.
+  const selectAllCategories = () => {
+    applyState({ ...urlState, categories: null }, "replace");
   };
 
   // Keeps whatever the index does have and drops only the values it reported as
@@ -415,6 +432,7 @@ export function App() {
                   categories={manifest.categories}
                   selectedCategories={activeCategories}
                   onToggleCategory={toggleCategory}
+                  onSelectAllCategories={selectAllCategories}
                   recency={urlState.recency}
                   onRecencyChange={setRecency}
                   sort={urlState.sort}
@@ -462,6 +480,24 @@ export function App() {
                     {progress.total === 1 ? "" : "s"}… ({progress.loaded}/
                     {progress.total})
                   </p>
+) : noCategoriesSelected ? (
+                  // Deselecting the last chip is the one filter change no chip
+                  // can undo, so this state names its own cause and offers the
+                  // action that reverses it instead of the generic "nothing
+                  // matched" line. Reuses `empty` and `button`, so no
+                  // `styles.css` rule is needed.
+                  <>
+                    <p className="empty">No categories selected</p>
+                    <p>
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={selectAllCategories}
+                      >
+                        Select all categories
+                      </button>
+                    </p>
+                  </>
                 ) : (
                   <PaperList
                     papers={visiblePapers}

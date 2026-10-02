@@ -1,4 +1,5 @@
 import type { RecencyDays, SortMode } from "../lib/types";
+import { isFullSelection } from "../lib/urlState";
 
 interface FeedControlsProps {
   query: string;
@@ -6,6 +7,7 @@ interface FeedControlsProps {
   categories: string[];
   selectedCategories: string[];
   onToggleCategory: (category: string) => void;
+  onSelectAllCategories: () => void;
   recency: RecencyDays;
   onRecencyChange: (recency: RecencyDays) => void;
   sort: SortMode;
@@ -21,6 +23,7 @@ export function FeedControls({
   categories,
   selectedCategories,
   onToggleCategory,
+  onSelectAllCategories,
   recency,
   onRecencyChange,
   sort,
@@ -33,6 +36,11 @@ export function FeedControls({
   const relevanceAvailable = query.trim() !== "";
   const effectiveSort: SortMode =
     sort === "relevance" && !relevanceAvailable ? "newest" : sort;
+
+  // The whole index is filterable with one click only if it can also be named
+  // back in one click, so "All" reports the same fact the writer uses to decide
+  // whether the URL needs a `cat=` at all.
+  const allSelected = isFullSelection(selectedCategories, categories);
 
   return (
     <section className="controls" aria-label="Feed filters">
@@ -54,6 +62,14 @@ export function FeedControls({
         <fieldset className="controls__group">
           <legend>Categories</legend>
           <div className="chips">
+            <button
+              type="button"
+              className={`chip ${allSelected ? "chip--active" : ""}`}
+              aria-pressed={allSelected}
+              onClick={onSelectAllCategories}
+            >
+              All
+            </button>
             {categories.map((category) => {
               const active = selectedCategories.includes(category);
               return (

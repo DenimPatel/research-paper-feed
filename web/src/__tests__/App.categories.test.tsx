@@ -108,11 +108,20 @@ async function renderFeed() {
   return screen.getByRole("group", { name: "Categories" });
 }
 
+/** The per-category chips only: `All` is a separate control with its own tests. */
 function pressedCategoryLabels(group: HTMLElement): string[] {
   return within(group)
     .getAllByRole("button")
-    .filter((chip) => chip.getAttribute("aria-pressed") === "true")
+    .filter(
+      (chip) =>
+        chip.textContent !== "All" &&
+        chip.getAttribute("aria-pressed") === "true",
+    )
     .map((chip) => chip.textContent ?? "");
+}
+
+function allChip(group: HTMLElement): HTMLElement {
+  return within(group).getByRole("button", { name: "All" });
 }
 
 /** The unknown-category banner. `error` never renders here, so it is unique. */
@@ -146,10 +155,15 @@ describe("a deep link naming a category the index does not have", () => {
 
     // Pressing a second chip is what makes the intersection observable: the
     // chips are drawn from the manifest either way, so only the next write
-    // reveals whether the carried list was intersected or raw.
+    // reveals whether the carried list was intersected or raw. Pressing the
+    // last one fills the whole index, which is no filter, so the write drops
+    // `cat=` — never `cs.BI`, which is what seeding from the raw hash would do.
+    // The empty string rather than `#` is what a browser reports for a URL that
+    // ends in a bare fragment, and both mean "no `cat=`".
     fireEvent.click(within(group).getByRole("button", { name: "cs.LG" }));
-    expect(window.location.hash).toBe("#cat=cs.CV%2Ccs.LG");
+    expect(window.location.hash).not.toContain("cat=");
     expect(pressedCategoryLabels(group)).toEqual(["cs.CV", "cs.LG"]);
+    expect(allChip(group).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("names the dropped value rather than leaving an unexplained result", async () => {
@@ -231,7 +245,12 @@ describe("a deep link naming only unknown categories", () => {
     reset.focus();
     expect(document.activeElement).toBe(reset);
 
-    expect(await screen.findByText(/No papers match the current filters/)).toBeTruthy();
+    // Nothing is selected, so the feed says so in as many words instead of
+    // blaming the search or the window.
+    expect(await screen.findByText("No categories selected")).toBeTruthy();
+    expect(
+      screen.queryByText(/No papers match the current filters/),
+    ).toBeNull();
     expect(pressedCategoryLabels(group)).toEqual([]);
   });
 
@@ -239,7 +258,7 @@ describe("a deep link naming only unknown categories", () => {
     installFetch();
     window.location.hash = "#cat=cs.BI";
     const group = await renderFeed();
-    expect(await screen.findByText(/No papers match the current filters/)).toBeTruthy();
+    expect(await screen.findByText("No categories selected")).toBeTruthy();
 
     fireEvent.click(
       within(unknownNotice()).getByRole("button", { name: /reset category filter/i }),
@@ -293,13 +312,91 @@ describe("hashes that name no category", () => {
 
   it("does not claim anything about an explicit empty selection", async () => {
     // `#cat=` asks for no category, which is a request — not a typo — so there
-    // is nothing to report. Its empty feed is a separate item's business.
+    // is nothing to report as unknown. Its empty feed is named and reversible.
     installFetch();
     window.location.hash = "#cat=";
 
     await renderFeed();
 
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(await screen.findByText(/No papers match the current filters/)).toBeTruthy();
+    expect(await screen.findByText("No categories selected")).toBeTruthy();
+  });
+});
+
+describe("choosing between all categories and a subset", () => {
+  it("presses All for a bare feed and drops cat= once it is pressed again", async () => {
+    installFetch();
+    const group = await renderFeed();
+
+    expect(allChip(group).getAttribute("aria-pressed")).toBe("true");
+    expect(window.location.hash).not.toContain("cat=");
+
+    fireEvent.click(within(group).getByRole("button", { name: "cs.CV" }));
+    expect(allChip(group).getAttribute("aria-pressed")).toBe("false");
+    // Removing one category from the full set leaves the other four, so the
+    // write names what is left rather than what was clicked.
+    expect(window.location.hash).toBe("#cat=cs.LG");
+
+    fireEvent.click(allChip(group));
+    expect(allChip(group).getAttribute("aria-pressed")).toBe("true");
+    expect(window.location.hash).not.toContain("cat=");
+    expect(pressedCategoryLabels(group)).toEqual(["cs.CV", "cs.LG"]);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(await screen.findByText(LG_PAPER.title)).toBeTruthy();
+  });
+
+  it("treats a reordered full list from a deep link as no filter", async () => {
+    installFetch();
+    window.location.hash = "#cat=cs.LG,cs.CV";
+
+    const group = await renderFeed();
+
+    expect(allChip(group).getAttribute("aria-pressed")).toBe("true");
+    // The URL still carries the full list because nothing has rewritten it
+    // yet; the next write is what has to drop it.
+    fireEvent.change(screen.getByLabelText("Search papers"), {
+      target: { value: "smoke" },
+    });
+    expect(window.location.hash).toBe("#q=smoke");
+  });
+
+  it("names and reverses an explicitly empty selection", async () => {
+    installFetch();
+    window.location.hash = "#cat=";
+    await renderFeed();
+
+    const restore = await screen.findByRole("button", {
+      name: "Select all categories",
+    });
+    expect(restore.tagName).toBe("BUTTON");
+    expect(restore.getAttribute("type")).toBe("button");
+    expect(restore.hasAttribute("disabled")).toBe(false);
+    restore.focus();
+    expect(document.activeElement).toBe(restore);
+
+    fireEvent.click(restore);
+
+    expect(window.location.hash).not.toContain("cat=");
+    expect(
+      screen.queryByText("No categories selected"),
+    ).toBeNull();
+    expect(await screen.findByText(CV_PAPER.title)).toBeTruthy();
+    expect(screen.getByText(LG_PAPER.title)).toBeTruthy();
+  });
+
+  it("reaches the empty state by deselecting every chip in turn", async () => {
+    installFetch();
+    const group = await renderFeed();
+
+    fireEvent.click(within(group).getByRole("button", { name: "cs.CV" }));
+    fireEvent.click(within(group).getByRole("button", { name: "cs.LG" }));
+
+    expect(await screen.findByText("No categories selected")).toBeTruthy();
+    expect(pressedCategoryLabels(group)).toEqual([]);
+    expect(window.location.hash).toBe("#cat=");
+
+    fireEvent.click(screen.getByRole("button", { name: "All" }));
+    expect(await screen.findByText(CV_PAPER.title)).toBeTruthy();
+    expect(window.location.hash).not.toContain("cat=");
   });
 });

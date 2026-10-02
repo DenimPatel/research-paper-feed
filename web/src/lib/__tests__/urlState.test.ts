@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import {
+  isFullSelection,
   readHash,
   resolveCategories,
   writeHash,
@@ -238,6 +239,61 @@ describe("resolveCategories", () => {
   });
 });
 
+describe("isFullSelection", () => {
+  it("accepts a selection naming every category, in any order", () => {
+    expect(isFullSelection(MANIFEST_CATEGORIES, MANIFEST_CATEGORIES)).toBe(true);
+    expect(
+      isFullSelection([...MANIFEST_CATEGORIES].reverse(), MANIFEST_CATEGORIES),
+    ).toBe(true);
+  });
+
+  it("rejects a partial selection", () => {
+    expect(isFullSelection(["cs.CV"], MANIFEST_CATEGORIES)).toBe(false);
+    expect(
+      isFullSelection(MANIFEST_CATEGORIES.slice(0, 4), MANIFEST_CATEGORIES),
+    ).toBe(false);
+  });
+
+  it("rejects a selection naming more than the index has", () => {
+    expect(
+      isFullSelection([...MANIFEST_CATEGORIES, "cs.BI"], MANIFEST_CATEGORIES),
+    ).toBe(false);
+  });
+
+  it("rejects an explicitly empty selection", () => {
+    expect(isFullSelection([], MANIFEST_CATEGORIES)).toBe(false);
+  });
+
+  it("cannot be fooled by a repeated name on either side", () => {
+    // A repeat must not stand in for a missing category: `["cs.CV","cs.CV"]`
+    // has two entries but names one category.
+    expect(isFullSelection(["cs.CV", "cs.CV"], MANIFEST_CATEGORIES)).toBe(false);
+    // A manifest that repeats a category still declares the same set.
+    expect(
+      isFullSelection(MANIFEST_CATEGORIES, [
+        ...MANIFEST_CATEGORIES,
+        "cs.CV",
+      ]),
+    ).toBe(true);
+  });
+
+  it("answers no while the manifest list is absent or unusable", () => {
+    // Answering "yes" here would make the writer drop a live `cat=`.
+    expect(isFullSelection(MANIFEST_CATEGORIES, null)).toBe(false);
+    expect(isFullSelection(MANIFEST_CATEGORIES, undefined)).toBe(false);
+    expect(isFullSelection(MANIFEST_CATEGORIES, [])).toBe(false);
+    expect(
+      isFullSelection(
+        MANIFEST_CATEGORIES,
+        ["cs.CV", {}] as unknown as string[],
+      ),
+    ).toBe(false);
+    expect(
+      isFullSelection(MANIFEST_CATEGORIES, "cs.CV" as unknown as string[]),
+    ).toBe(false);
+  });
+});
+
 describe("writeHash", () => {
   it("omits every default, leaving a bare #", () => {
     expect(writeHash(DEFAULT_STATE, "replace", IGNORE_LOCATION).hash).toBe("#");
@@ -295,6 +351,58 @@ describe("writeHash", () => {
       IGNORE_LOCATION,
     ).hash;
     expect(hash).toBe("#cat=");
+  });
+
+  it("omits cat for a selection that covers the whole index", () => {
+    const hash = writeHash(
+      { ...DEFAULT_STATE, categories: [...MANIFEST_CATEGORIES] },
+      "replace",
+      IGNORE_LOCATION,
+      MANIFEST_CATEGORIES,
+    ).hash;
+
+    expect(hash).toBe("#");
+    // The `cat=` it drops is the one `readHash` reports as no selection at all,
+    // so the round trip lands on the same state the writer started from.
+    expect(readHash(hash).categories).toBeNull();
+  });
+
+  it("emits cat for a partial selection of the same index", () => {
+    const hash = writeHash(
+      { ...DEFAULT_STATE, categories: ["cs.CV", "cs.LG"] },
+      "replace",
+      IGNORE_LOCATION,
+      MANIFEST_CATEGORIES,
+    ).hash;
+
+    expect(hash).toBe("#cat=cs.CV%2Ccs.LG");
+    expect(readHash(hash).categories).toEqual(["cs.CV", "cs.LG"]);
+  });
+
+  it("keeps an explicitly empty selection its own cat=, not the full one", () => {
+    // "No category" and "every category" are different requests; collapsing
+    // them would silently re-filter the feed the user just emptied.
+    const hash = writeHash(
+      { ...DEFAULT_STATE, categories: [] },
+      "replace",
+      IGNORE_LOCATION,
+      MANIFEST_CATEGORIES,
+    ).hash;
+
+    expect(hash).toBe("#cat=");
+    expect(readHash(hash).categories).toEqual([]);
+  });
+
+  it("still emits cat when the index's category list is not in hand", () => {
+    // No list means no way to recognize a full selection, and dropping the
+    // filter would be the worse failure of the two.
+    const hash = writeHash(
+      { ...DEFAULT_STATE, categories: [...MANIFEST_CATEGORIES] },
+      "replace",
+      IGNORE_LOCATION,
+    ).hash;
+
+    expect(hash).toBe(`#cat=${MANIFEST_CATEGORIES.join("%2C")}`);
   });
 
   it("hands the serialized hash and the mode to the writer", () => {

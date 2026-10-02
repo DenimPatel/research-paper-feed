@@ -17,6 +17,7 @@ function renderControls({
       categories={["cs.CV", "cs.LG"]}
       selectedCategories={["cs.CV", "cs.LG"]}
       onToggleCategory={vi.fn()}
+      onSelectAllCategories={vi.fn()}
       recency={60}
       onRecencyChange={vi.fn()}
       sort={sort}
@@ -107,5 +108,91 @@ describe("FeedControls relevance chip", () => {
     expect(relevance.hasAttribute("disabled")).toBe(false);
     fireEvent.click(relevance);
     expect(onSortChange).toHaveBeenCalledWith("relevance");
+  });
+});
+
+const ALL_CATEGORIES = ["cs.CV", "cs.LG", "cs.RO"];
+
+function renderCategories(selectedCategories: string[]) {
+  const onSelectAllCategories = vi.fn();
+  render(
+    <FeedControls
+      query=""
+      onQueryChange={vi.fn()}
+      categories={ALL_CATEGORIES}
+      selectedCategories={selectedCategories}
+      onToggleCategory={vi.fn()}
+      onSelectAllCategories={onSelectAllCategories}
+      recency={60}
+      onRecencyChange={vi.fn()}
+      sort="newest"
+      onSortChange={vi.fn()}
+      resultCount={0}
+    />,
+  );
+  return { onSelectAllCategories };
+}
+
+function categoryGroup(): HTMLElement {
+  return screen.getByRole("group", { name: "Categories" });
+}
+
+function allChip(): HTMLButtonElement {
+  return within(categoryGroup()).getByRole("button", { name: "All" });
+}
+
+describe("FeedControls All chip", () => {
+  it("puts All ahead of the per-category chips", () => {
+    renderCategories(["cs.CV"]);
+
+    expect(
+      within(categoryGroup())
+        .getAllByRole("button")
+        .map((chip) => chip.textContent),
+    ).toEqual(["All", "cs.CV", "cs.LG", "cs.RO"]);
+  });
+
+  it("presses All when the selection names every category", () => {
+    renderCategories(["cs.RO", "cs.CV", "cs.LG"]);
+
+    expect(allChip().getAttribute("aria-pressed")).toBe("true");
+    expect(allChip().className).toContain("chip--active");
+  });
+
+  it("leaves All un-pressed for a partial selection", () => {
+    renderCategories(["cs.CV"]);
+
+    expect(allChip().getAttribute("aria-pressed")).toBe("false");
+    expect(allChip().className).not.toContain("chip--active");
+  });
+
+  it("leaves All un-pressed for an explicitly empty selection", () => {
+    renderCategories([]);
+
+    expect(allChip().getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("asks the app to select every category when activated", () => {
+    const { onSelectAllCategories } = renderCategories([]);
+
+    fireEvent.click(allChip());
+
+    expect(onSelectAllCategories).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the per-category chips reporting their own state", () => {
+    renderCategories(["cs.CV"]);
+
+    expect(allChip().hasAttribute("disabled")).toBe(false);
+    expect(
+      within(categoryGroup())
+        .getByRole("button", { name: "cs.CV" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      within(categoryGroup())
+        .getByRole("button", { name: "cs.LG" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
   });
 });
