@@ -258,7 +258,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 - **Notes:** commit pending; attempt 2 PASS
 ### IMP-008 — Make relevance sort agree with the Relevance chip
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `web/src/App.tsx:215-218` (empty-query short circuit), `web/src/components/FeedControls.tsx:92-99` (`aria-pressed` and `disabled` on the Relevance chip), `web/src/App.tsx:57` (`readHash` accepting `sort=relevance` with no `q`)
@@ -272,9 +272,9 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** IMP-143
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending; attempt 2 PASS
 ### IMP-009 — Validate `#cat=` values against the manifest
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `web/src/App.tsx:47-55` (`readHash` passing `cat` through), `web/src/App.tsx:198-201` (`activeCategories`), `web/src/components/FeedControls.tsx:50-51` (chips iterate `categories`, not `selectedCategories`)

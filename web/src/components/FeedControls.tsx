@@ -27,6 +27,13 @@ export function FeedControls({
   onSortChange,
   resultCount,
 }: FeedControlsProps) {
+  // Relevance needs a search term to rank against. Without one the feed lists by
+  // date, so the chips must report the sort that is actually in effect rather
+  // than the one the URL happens to carry.
+  const relevanceAvailable = query.trim() !== "";
+  const effectiveSort: SortMode =
+    sort === "relevance" && !relevanceAvailable ? "newest" : sort;
+
   return (
     <section className="controls" aria-label="Feed filters">
       <div className="controls__search">
@@ -84,24 +91,30 @@ export function FeedControls({
         <fieldset className="controls__group">
           <legend>Sort</legend>
           <div className="chips">
-            {(["newest", "relevance"] as SortMode[]).map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={`chip ${sort === option ? "chip--active" : ""}`}
-                aria-pressed={sort === option}
-                onClick={() => onSortChange(option)}
-                disabled={option === "relevance" && query.trim() === ""}
-                title={
-                  option === "relevance" && query.trim() === ""
-                    ? "Type a search term to sort by relevance"
-                    : undefined
-                }
-              >
-                {option === "newest" ? "Newest" : "Relevance"}
-              </button>
-            ))}
+            {(["newest", "relevance"] as SortMode[]).map((option) => {
+              const active = effectiveSort === option;
+              const unavailable = option === "relevance" && !relevanceAvailable;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className={`chip ${active ? "chip--active" : ""}`}
+                  aria-pressed={active}
+                  onClick={() => onSortChange(option)}
+                  disabled={unavailable}
+                >
+                  {option === "newest" ? "Newest" : "Relevance"}
+                </button>
+              );
+            })}
           </div>
+          {!relevanceAvailable && (
+            // Reuses `controls__count`, the block's muted secondary-text style,
+            // so the hint needs no new rule in styles.css.
+            <p className="controls__count">
+              Enter a search term to sort by relevance.
+            </p>
+          )}
         </fieldset>
       </div>
 

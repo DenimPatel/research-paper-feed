@@ -23,16 +23,24 @@ export function readHash(hash: string = window.location.hash): HashState {
     : DEFAULT_RECENCY;
 
   const rawCategories = params.get("cat");
+  const query = params.get("q") ?? "";
 
   return {
     view: params.get("view") === "collections" ? "collections" : "feed",
-    query: params.get("q") ?? "",
+    query,
     categories:
       rawCategories === null
         ? null
         : rawCategories.split(",").filter(Boolean),
     recency,
-    sort: params.get("sort") === "relevance" ? "relevance" : "newest",
+    // Relevance ranks against a search term, so `sort=relevance` without one
+    // asks for an order the feed cannot produce. Normalizing it here keeps a
+    // shared `#sort=relevance` link self-consistent on its very first render
+    // instead of pressing the chip over a date-ordered list.
+    sort:
+      query.trim() !== "" && params.get("sort") === "relevance"
+        ? "relevance"
+        : "newest",
   };
 }
 
@@ -70,7 +78,10 @@ export function writeHash(
   if (state.recency !== DEFAULT_RECENCY) {
     params.set("recency", String(state.recency));
   }
-  if (state.sort !== "newest") {
+  // The mirror of the `readHash` normalization: never write a `sort=relevance`
+  // that the reader would have to strip, or clearing the query would leave the
+  // address bar claiming an order the feed is not using.
+  if (state.sort !== "newest" && state.query.trim() !== "") {
     params.set("sort", state.sort);
   }
 

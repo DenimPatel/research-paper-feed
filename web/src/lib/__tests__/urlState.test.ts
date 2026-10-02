@@ -71,8 +71,21 @@ describe("readHash", () => {
   });
 
   it("falls back to newest for an unknown sort", () => {
-    expect(readHash("#sort=relevance").sort).toBe("relevance");
-    expect(readHash("#sort=oldest").sort).toBe("newest");
+    expect(readHash("#q=diffusion&sort=oldest").sort).toBe("newest");
+    expect(readHash("#q=diffusion&sort=").sort).toBe("newest");
+  });
+
+  it("keeps relevance only when the hash carries a search term", () => {
+    expect(readHash("#q=diffusion&sort=relevance").sort).toBe("relevance");
+  });
+
+  it("falls back to newest when sort=relevance arrives with no query", () => {
+    expect(readHash("#sort=relevance").sort).toBe("newest");
+  });
+
+  it("treats a blank or whitespace-only query as no query for sort", () => {
+    expect(readHash("#q=&sort=relevance").sort).toBe("newest");
+    expect(readHash("#q=%20%20&sort=relevance").sort).toBe("newest");
   });
 
   it("reads a category list and drops empty entries", () => {
@@ -97,6 +110,34 @@ describe("readHash", () => {
 describe("writeHash", () => {
   it("omits every default, leaving a bare #", () => {
     expect(writeHash(DEFAULT_STATE, "replace", IGNORE_LOCATION).hash).toBe("#");
+  });
+
+  it("omits a relevance sort that no query could justify", () => {
+    const hash = writeHash(
+      { ...DEFAULT_STATE, sort: "relevance" },
+      "replace",
+      IGNORE_LOCATION,
+    ).hash;
+    expect(hash).toBe("#");
+  });
+
+  it("omits a relevance sort for a whitespace-only query", () => {
+    const hash = writeHash(
+      { ...DEFAULT_STATE, query: "   ", sort: "relevance" },
+      "replace",
+      IGNORE_LOCATION,
+    ).hash;
+    expect(hash).toBe("#q=+++");
+  });
+
+  it("round-trips a relevance hash whose query was cleared away", () => {
+    const { hash } = writeHash(
+      { ...readHash(FULL_HASH), query: "" },
+      "replace",
+      IGNORE_LOCATION,
+    );
+    expect(hash).toBe("#view=collections&cat=cs.CV%2Ccs.LG&recency=7");
+    expect(readHash(hash).sort).toBe("newest");
   });
 
   it("writes every non-default value in a fixed order", () => {
