@@ -6,15 +6,46 @@ import type {
   ShardManifestEntry,
 } from "./types";
 
+/**
+ * Why the index could not be read. "Not there" and "there but broken" are told
+ * to a reader differently — one clears by itself, the other does not — so the
+ * distinction travels on the error instead of having to be guessed back out of
+ * the message.
+ */
+export type IndexFailureKind = "unavailable" | "malformed";
+
 export class IndexUnavailableError extends Error {
+  readonly kind: IndexFailureKind;
+
   readonly cause?: unknown;
 
-  constructor(message: string, options?: { cause?: unknown }) {
+  constructor(
+    message: string,
+    kind: IndexFailureKind = "unavailable",
+    options?: { cause?: unknown },
+  ) {
     super(message);
     this.name = "IndexUnavailableError";
+    this.kind = kind;
     if (options?.cause !== undefined) {
       this.cause = options.cause;
     }
+  }
+}
+
+/**
+ * A week of papers that could not be loaded. Its own class so a caller can tell
+ * "a shard failed" from "the index itself is gone" by type rather than by
+ * matching on prose, and so the technical detail stays in `message` where a
+ * tooltip and a console line can carry it.
+ */
+export class ShardLoadError extends Error {
+  readonly file: string;
+
+  constructor(message: string, file: string) {
+    super(message);
+    this.name = "ShardLoadError";
+    this.file = file;
   }
 }
 
@@ -134,7 +165,9 @@ export class PaperIndex {
     try {
       response = await fetch(url, { cache: "no-cache" });
     } catch (error) {
-      throw new IndexUnavailableError(INDEX_HELP, { cause: error });
+      throw new IndexUnavailableError(INDEX_HELP, "unavailable", {
+        cause: error,
+      });
     }
     const contentType = response.headers.get("content-type") ?? "";
     // Static hosts (and Vite's dev SPA fallback) answer a missing file with an
@@ -143,6 +176,7 @@ export class PaperIndex {
     if (!response.ok || contentType.includes("text/html")) {
       throw new IndexUnavailableError(
         `${INDEX_HELP} (HTTP ${response.status})`,
+        "unavailable",
       );
     }
     try {
@@ -150,6 +184,7 @@ export class PaperIndex {
     } catch (error) {
       throw new IndexUnavailableError(
         "The paper index is malformed and could not be parsed.",
+        "malformed",
         { cause: error },
       );
     }
@@ -162,8 +197,9 @@ export class PaperIndex {
     }
     const response = await fetch(`${dataBase()}/${shard.file}`);
     if (!response.ok) {
-      throw new Error(
+      throw new ShardLoadError(
         `Failed to load ${shard.file} (HTTP ${response.status}).`,
+        shard.file,
       );
     }
     const data = (await response.json().catch(() => null)) as
@@ -176,8 +212,9 @@ export class PaperIndex {
         ? data.papers
         : null;
     if (!papers) {
-      throw new Error(
+      throw new ShardLoadError(
         `Shard ${shard.file} is missing or malformed. Try regenerating the index.`,
+        shard.file,
       );
     }
     this.shardCache.set(shard.file, papers);

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
 import { PAPERS_KEY } from "../lib/collections";
@@ -341,9 +341,41 @@ describe("App with one unreachable shard", () => {
     // alert, carrying the hard failure — not the hard failure *and* a stale
     // "some weeks are missing" banner describing a load that never resolved.
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("Failed to load papers-2024-W09.json");
+    // Reader-facing copy, not the shard's own `Error.message`: a file name and
+    // an HTTP status belong in the tooltip, which is where IMP-017 kept them.
+    expect(alert.textContent).toMatch(/Papers could not be loaded/);
+    expect(alert.textContent).toMatch(/paper data could not be fetched/i);
+    expect(alert.textContent).not.toMatch(/papers-2024-W09\.json/);
+    expect(alert.textContent).not.toMatch(/HTTP/);
+    expect(within(alert).getByTitle(/Failed to load papers-2024-W09\.json/)).toBeTruthy();
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.queryByText(W09.title)).toBeNull();
+  });
+
+  /**
+   * `role="alert"` takes its accessible name from the author and not from its
+   * contents, so a notice whose only author-supplied string was a `title` had
+   * the raw HTTP failure as its name — reproduced in Chromium's tree as
+   * `alert "papers-2024-W08.json: Failed to load … (HTTP 404)."` The name has to
+   * be a sentence a reader can hear.
+   */
+  it("names the notice for a reader, so the tooltip is not its accessible name", async () => {
+    installFetch(() => "papers-2024-W08.json");
+
+    render(<App />);
+    await screen.findByText(W09.title);
+
+    const notice = partialNotice();
+    expect(notice.getAttribute("aria-label")).toBe(
+      "Some papers could not be loaded",
+    );
+    // Label in name: the accessible name contains the notice's own visible
+    // label, so speech input and the rendered text agree.
+    expect(notice.textContent).toMatch(/Some papers could not be loaded\./);
+    // The tooltip is untouched — the detail is hidden from the announcement,
+    // not deleted.
+    expect(notice.getAttribute("title")).toContain("papers-2024-W08.json");
+    expect(notice.getAttribute("title")).toContain("HTTP 404");
   });
 });
 

@@ -256,11 +256,47 @@ describe("a window where no shard could be loaded", () => {
     const panel = failurePanel();
 
     expect(panel.textContent).toMatch(/not an empty window/i);
-    // The underlying cause stays visible: IMP-017 owns rewording it, and
-    // dropping it here would lose the only specific detail the user gets.
-    expect(panel.textContent).toContain("Failed to load papers-2024-W10.json");
+    // The raw `Error.message` this used to render — IMP-017 replaced it with a
+    // sentence a reader can act on. A file name, an HTTP status and the loader's
+    // own "Failed to load" phrasing are all barred from the visible text.
+    expect(panel.textContent).toMatch(/paper data could not be fetched/i);
+    expect(panel.textContent).not.toMatch(/papers-2024-W10\.json/);
+    expect(panel.textContent).not.toMatch(/HTTP/);
+    expect(panel.textContent).not.toMatch(/Failed to load/);
     // Nothing here may suggest the papers are absent rather than unfetched.
     expect(panel.textContent).not.toMatch(/no papers are available/i);
+  });
+
+  it("keeps the technical cause on the element that carries the sentence", async () => {
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...args) => {
+      logged.push(args.map(String).join(" "));
+    });
+
+    try {
+      installFetch(() => [
+        "papers-2024-W10.json",
+        "papers-2024-W09.json",
+        "papers-2024-W08.json",
+      ]);
+
+      render(<App />);
+      await screen.findByText(/Papers could not be loaded/);
+
+      // The file name and the status are not shown, but they are not lost: the
+      // element carrying the reader-facing sentence says what it was, and the
+      // console keeps the thrown cause for whoever is debugging a deploy with no
+      // mouse to hover with.
+      const titled = within(failurePanel()).getByTitle(
+        "Failed to load papers-2024-W10.json (HTTP 404).",
+      );
+      expect(titled.tagName).toBe("P");
+      expect(titled.textContent).toMatch(/paper data could not be fetched/i);
+      expect(logged.join("\n")).toMatch(/Failed to load papers-2024-W10\.json/);
+      expect(logged.join("\n")).toMatch(/HTTP 404/);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("offers a discoverable Try again, reusing the established panel and button", async () => {
@@ -417,6 +453,147 @@ describe("a window where no shard could be loaded", () => {
     expect(
       within(screen.getByRole("alert")).getByRole("button", { name: /try again/i }),
     ).toBeTruthy();
+  });
+});
+
+/**
+ * IMP-017: every failure the loader can produce reaches the screen as a plain
+ * sentence, with the file name and the HTTP status kept in a `title` and in the
+ * console. This block is the guard for the index-side half — the shard side is
+ * the "no shard could be loaded" block above.
+ */
+describe("the copy for an index that could not be loaded", () => {
+  /** The index file exists but its body is not the manifest. */
+  function installFetchWithUnreadableIndex(): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).endsWith("/index.json")) {
+          return new Response("<html>not json", {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return notFound();
+      }),
+    );
+  }
+
+  function indexPanel(): HTMLElement {
+    return screen.getByRole("alert");
+  }
+
+  it("explains an absent index without showing the request that failed", async () => {
+    installFetchWithoutIndex();
+
+    render(<App />);
+    await screen.findByText("No paper index yet");
+
+    // Scoped to the message paragraph, not the whole panel: IMP-007's panel keeps
+    // its "Build the index locally" block, and those commands are meant to be
+    // read. What must not be in the prose is the loader's own diagnostic.
+    const message = within(indexPanel()).getByTitle(/No paper index was found/);
+    expect(message.tagName).toBe("P");
+    expect(message.textContent).toMatch(/paper index could not be loaded/i);
+    expect(message.textContent).toMatch(/usually temporary/i);
+    expect(message.textContent).not.toMatch(/HTTP/);
+    expect(message.textContent).not.toMatch(/\.json/);
+    expect(message.textContent).not.toMatch(/build_index/);
+    expect(message.textContent).not.toMatch(/GitHub Action/);
+  });
+
+  it("tells an unreadable index apart from an absent one", async () => {
+    installFetchWithUnreadableIndex();
+
+    render(<App />);
+    await screen.findByText("No paper index yet");
+
+    // "Not there yet" and "there but broken" want opposite advice, so they cannot
+    // share a sentence — and this one has to admit that retrying is pointless,
+    // because a body that will not parse will not parse on the second try.
+    const message = within(indexPanel()).getByTitle(/malformed/);
+    expect(message.textContent).toMatch(/could not be read/i);
+    expect(message.textContent).toMatch(/will not help/i);
+    expect(message.textContent).not.toMatch(/usually temporary/i);
+  });
+
+  it("keeps the index detail in the tooltip and the console for both failures", async () => {
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...args) => {
+      logged.push(args.map(String).join(" "));
+    });
+
+    try {
+      installFetchWithoutIndex();
+      const { unmount } = render(<App />);
+      await screen.findByText("No paper index yet");
+      expect(
+        within(indexPanel()).getByTitle(/No paper index was found/),
+      ).toBeTruthy();
+      expect(logged.join("\n")).toMatch(/No paper index was found/);
+      unmount();
+
+      logged.length = 0;
+      installFetchWithUnreadableIndex();
+      render(<App />);
+      await screen.findByText("No paper index yet");
+      expect(
+        within(indexPanel()).getByTitle(
+          "The paper index is malformed and could not be parsed.",
+        ),
+      ).toBeTruthy();
+      expect(logged.join("\n")).toMatch(/malformed and could not be parsed/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+/**
+ * A window that loaded, then a window that could not. The papers from the first
+ * are still on screen, so this is the one failure state that renders as a banner
+ * beside a working feed rather than as a panel — which means it is a separate
+ * piece of copy that can drift on its own.
+ */
+describe("a window that fails while papers are already on screen", () => {
+  it("warns beside the feed in plain words, keeping the cause in the title", async () => {
+    // The only route to this state, and it is a real one. `loadShard` never
+    // re-requests a shard it already holds, so a window can only fail outright
+    // if every shard it needs is uncached — and papers are on screen only if
+    // some *other* shard loaded. Here W10 and W09 never arrive, so the 60-day
+    // window degrades to W08 alone; the 7-day window needs W10 and W09 and
+    // nothing else, so it has no cached shard to fall back on.
+    installFetch(() => ["papers-2024-W10.json", "papers-2024-W09.json"]);
+
+    render(<App />);
+    await screen.findByText(W08_PAPER.title);
+
+    fireEvent.click(screen.getByRole("button", { name: "7 days" }));
+    await screen.findByText(/paper data could not be fetched/i);
+
+    const banner = screen
+      .getAllByRole("alert")
+      .find((node) =>
+        /paper data could not be fetched/i.test(node.textContent ?? ""),
+      );
+    expect(banner).toBeDefined();
+    // Still a feed, not a dead end: the papers that did load are untouched, and
+    // the earlier "two weeks are missing" notice has stood down rather than
+    // leaving a second alert describing a window that no longer exists.
+    expect(screen.getByText(W08_PAPER.title)).toBeTruthy();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.queryByText(/Papers could not be loaded/)).toBeNull();
+    expect(screen.queryByText(/failed to load \(/)).toBeNull();
+    expect(banner?.textContent).not.toMatch(/papers-2024-W10\.json/);
+    expect(banner?.textContent).not.toMatch(/HTTP/);
+    expect(banner?.getAttribute("title")).toContain(
+      "Failed to load papers-2024-W10.json (HTTP 404).",
+    );
+    // `alert` is an author-named role, so with only the tooltip above it the
+    // HTTP status would be announced instead of the sentence.
+    expect(banner?.getAttribute("aria-label")).toBe(
+      banner?.textContent?.trim(),
+    );
   });
 });
 

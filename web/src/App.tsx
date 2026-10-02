@@ -18,6 +18,10 @@ import {
   type ExportPayload,
 } from "./lib/collections";
 import {
+  describeLoadFailure,
+  type LoadFailureNotice,
+} from "./lib/failureCopy";
+import {
   PaperIndex,
   type LoadProgress,
   type ShardLoadFailure,
@@ -131,7 +135,7 @@ export function App() {
   const [manifest, setManifest] = useState<IndexManifest | null>(null);
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailureNotice | null>(null);
   const [progress, setProgress] = useState<LoadProgress>({ loaded: 0, total: 0 });
   // Shards that were asked for and did not arrive. A partial failure no longer
   // rejects the load (IMP-015), so without this the feed would render short and
@@ -179,7 +183,11 @@ export function App() {
       })
       .catch((cause: unknown) => {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : String(cause));
+          // The console keeps the cause — URL, status, stack — for anyone
+          // debugging a deploy with no mouse to hover a tooltip with. The screen
+          // gets the reader-facing sentence alone.
+          console.error("paper feed: the index could not be loaded.", cause);
+          setError(describeLoadFailure(cause));
           setLoading(false);
         }
       });
@@ -246,7 +254,8 @@ export function App() {
           // hard error panel below is the whole story, and leaving an older
           // partial notice up would double-report a state that no longer holds.
           setFailedShards([]);
-          setError(cause instanceof Error ? cause.message : String(cause));
+          console.error("paper feed: the papers could not be loaded.", cause);
+          setError(describeLoadFailure(cause));
           setLoading(false);
         }
       });
@@ -510,7 +519,11 @@ export function App() {
             {!manifest && error && (
               <div className="panel panel--error" role="alert">
                 <h1>No paper index yet</h1>
-                <p>{error}</p>
+                {/* The cause — the request, the status, the build command — is a
+                    tooltip and a console line, never the sentence a reader has to
+                    read. The local build steps stay visible below, so nothing the
+                    old raw message carried is lost to a developer. */}
+                <p title={error.detail}>{error.message}</p>
                 <p>
                   <button
                     type="button"
@@ -566,10 +579,22 @@ export function App() {
                 {error && !loadFailed && (
                   // A failure that left papers on screen — a window that
                   // replaced a loaded one and could not be fetched. The
-                  // warnings below still apply, so the raw cause goes in a
-                  // banner beside them rather than taking over the feed body.
-                  <p className="banner banner--warning" role="alert">
-                    {error}
+                  // warnings below still apply, so the cause goes in a banner
+                  // beside them rather than taking over the feed body.
+                  //
+                  // `aria-label` is load-bearing, not decoration: a
+                  // `role="alert"` node takes its accessible name from the author
+                  // and not from its contents, so without this the `title` below
+                  // would become the name and a screen reader would announce the
+                  // HTTP status before the sentence. Naming it with the same
+                  // reader-facing copy keeps the announcement honest.
+                  <p
+                    className="banner banner--warning"
+                    role="alert"
+                    aria-label={error.message}
+                    title={error.detail}
+                  >
+                    {error.message}
                   </p>
                 )}
 
@@ -591,9 +616,18 @@ export function App() {
                   // The file name and the raw `Error.message` stay in `title`
                   // for the detail, which is also what keeps IMP-017 AC2 — no
                   // file name or HTTP status in the visible text — satisfied.
+                  //
+                  // `aria-label` is what keeps that `title` out of the
+                  // accessible name. `alert` is an author-named role, so Chromium
+                  // was computing this notice's name as
+                  // `papers-2024-W08.json: Failed to load … (HTTP 404).` — the
+                  // technical string, announced ahead of the sentence. Naming the
+                  // notice with its own visible label instead leaves the tooltip
+                  // for pointers and the announcement for readers.
                   <p
                     className="banner banner--error"
                     role="alert"
+                    aria-label="Some papers could not be loaded"
                     title={failedShards
                       .map((failure) => `${failure.file}: ${failure.message}`)
                       .join("\n")}
@@ -660,7 +694,11 @@ export function App() {
                       there is nothing to show. This is a loading failure, not an
                       empty window.
                     </p>
-                    <p>{error}</p>
+                    {/* A plain `<p>`, so the `title` is a tooltip rather than the
+                        panel's accessible name: `alert` is an author-named role
+                        and would otherwise have taken the shard file name and HTTP
+                        status as its name. The cause is in the console too. */}
+                    <p title={error.detail}>{error.message}</p>
                     <p>
                       <button
                         type="button"

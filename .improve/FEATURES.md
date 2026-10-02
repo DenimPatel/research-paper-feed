@@ -403,7 +403,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 - **Notes:** commit pending
 ### IMP-017 — Replace the raw `Error.message` with human-readable copy
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** improvement
 - **Area / files:** `web/src/App.tsx:409-411` (raw `error` rendered), `web/src/lib/paperIndex.ts:107-109` and `:121-123` (messages such as `Failed to load papers-2024-W14.json (HTTP 404).`)
@@ -417,7 +417,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-018 — Add a React error boundary around `<App />`
 - **Status:** TODO
 - **Category:** Error handling & edge cases
