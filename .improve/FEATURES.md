@@ -285,7 +285,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 
 ### IMP-012 — Darken `--text-muted` until it clears 4.5:1 on every surface
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Accessibility
 - **Type:** bug-fix
 - **Area / files:** `web/src/styles.css:9` (`--text-muted: #7a7a73`), used at `web/src/styles.css:285` (`.controls__count`), `web/src/styles.css:350` (`.tag`), `web/src/components/PaperCard.tsx:61-64` (`.paper__meta`), `web/src/styles.css:703` (`.site-footer p`)
@@ -299,7 +299,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-013 — Raise `--border` to 3:1 against `--surface`
 - **Status:** TODO
 - **Category:** Accessibility
