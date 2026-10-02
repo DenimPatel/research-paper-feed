@@ -65,6 +65,54 @@ function formatGeneratedAt(value: string): string {
   });
 }
 
+/**
+ * A shard's `from`/`to` as prose a reader can act on, for the notice that names a
+ * missing week. A shard is a week, so a failure has to be reportable as one
+ * without the reader having to decode `2024-W09` or know what a file is.
+ *
+ * Pinned to `en-US` and `UTC` on purpose, unlike `formatGeneratedAt` above: the
+ * endpoints are bare `YYYY-MM-DD` days, so a local-time zone west of Greenwich
+ * would print the day before, and a reader's locale would change which week the
+ * notice claims is missing. The manifest entry is the fallback when either end
+ * will not parse, which keeps the range truthful rather than blank.
+ */
+function formatWeekRange(from: string, to: string): string {
+  const start = new Date(`${from}T00:00:00Z`);
+  const end = new Date(`${to}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return `${from} to ${to}`;
+  }
+  const day = { month: "short", day: "numeric", timeZone: "UTC" } as const;
+  const dated = { ...day, year: "numeric" } as const;
+  const startText = start.toLocaleDateString("en-US", day);
+  const endText = end.toLocaleDateString("en-US", dated);
+  return start.getUTCFullYear() === end.getUTCFullYear()
+    ? `${startText} – ${endText}`
+    : `${start.toLocaleDateString("en-US", dated)} – ${endText}`;
+}
+
+/**
+ * What the notice claims is missing: how many weeks, and which ones. The count
+ * on its own was the whole claim before this, and it named nothing — so a reader
+ * on a touch device, where `title` renders no tooltip at all, learned the feed
+ * was incomplete without learning what was. With no usable week in the manifest
+ * the count still has to be true, so that case keeps the count and stops there.
+ */
+function describeFailedWeeks(weeks: (string | null)[]): string {
+  const count = weeks.length === 1 ? "One week" : `${weeks.length} weeks`;
+  const named = weeks.filter((week): week is string => week !== null);
+  if (named.length === 0) {
+    return `${count} in this window failed to load`;
+  }
+  const range =
+    named.length === 1
+      ? named[0]
+      : named.length === 2
+        ? `${named[0]} and ${named[1]}`
+        : named.join(", ");
+  return `${count} in this window failed to load (${range})`;
+}
+
 export function App() {
   const [urlState, setUrlState] = useState<HashState>(() => readHash());
   const view = urlState.view;
@@ -92,6 +140,11 @@ export function App() {
   const [failedShards, setFailedShards] = useState<ShardLoadFailure[]>([]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [manifestAttempts, setManifestAttempts] = useState(0);
+  // A failed paper load is recoverable in place — `loadPapers` caches nothing for
+  // a shard that failed, so a retry re-asks the network for exactly the shards
+  // that are missing. The manifest's own attempt counter cannot drive it: a
+  // window that fails after the index is in hand never touches the manifest.
+  const [papersAttempts, setPapersAttempts] = useState(0);
   const retriedRef = useRef(false);
   const feedHeadingRef = useRef<HTMLHeadingElement>(null);
 
@@ -153,6 +206,16 @@ export function App() {
     setManifestAttempts((attempts) => attempts + 1);
   };
 
+  // Same latch reasoning as `handleRetryManifest`, and the same two pieces of
+  // state cleared here rather than left to the effect: the load-failure state is
+  // mounted only while `error` is set, so clearing it unmounts this button in
+  // the same commit and a second activation cannot reach the handler.
+  const handleRetryPapers = () => {
+    setError(null);
+    setLoading(true);
+    setPapersAttempts((attempts) => attempts + 1);
+  };
+
   useEffect(() => {
     if (!manifest) {
       return;
@@ -190,7 +253,22 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [manifest, urlState.recency]);
+  }, [manifest, urlState.recency, papersAttempts]);
+
+  // The manifest is what the weeks are described from, so a failure can only be
+  // named once the index is in hand. The `manifest &&` branch below is the only
+  // place a failure is rendered, which is what makes the non-null check here
+  // redundant rather than merely defensive.
+  const failedWeeks = useMemo(() => {
+    if (!manifest) {
+      return [];
+    }
+    const shardsByFile = new Map(manifest.shards.map((shard) => [shard.file, shard]));
+    return failedShards.map((failure) => {
+      const shard = shardsByFile.get(failure.file);
+      return shard ? formatWeekRange(shard.from, shard.to) : null;
+    });
+  }, [failedShards, manifest]);
 
   // A shared link can name categories this index does not have, and `readHash`
   // cannot tell: it runs before the manifest is fetched and never re-runs.
@@ -214,6 +292,12 @@ export function App() {
   // selected" is only a claim the index could already have refuted.
   const noCategoriesSelected =
     manifest !== null && activeCategories.length === 0;
+
+  // The one distinction the empty state could not make: nothing on screen, and
+  // an error explaining why. An empty `papers` array is otherwise
+  // indistinguishable from a window that genuinely has nothing in it, so this
+  // has to be decided from `error` and not from `papers.length` alone.
+  const loadFailed = error !== null && papers.length === 0;
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -479,7 +563,11 @@ export function App() {
                   resultCount={visiblePapers.length}
                 />
 
-                {error && (
+                {error && !loadFailed && (
+                  // A failure that left papers on screen — a window that
+                  // replaced a loaded one and could not be fetched. The
+                  // warnings below still apply, so the raw cause goes in a
+                  // banner beside them rather than taking over the feed body.
                   <p className="banner banner--warning" role="alert">
                     {error}
                   </p>
@@ -495,10 +583,14 @@ export function App() {
                   // thing and need no new styling. Mounted only while the
                   // failures last and keyed to nothing but its own condition, so
                   // the assertive announcement fires once per degraded load and
-                  // not again on every later render. The shard names go in
-                  // `title`: IMP-015 wants the missing week named, IMP-017 AC2
-                  // bars a file name or an `Error.message` from the visible
-                  // text, and `title` is the one place that satisfies both.
+                  // not again on every later render.
+                  //
+                  // The missing week is in the prose, not only in `title`:
+                  // `title` renders no tooltip on touch, so a 390px reader was
+                  // told the feed was incomplete without being told what was.
+                  // The file name and the raw `Error.message` stay in `title`
+                  // for the detail, which is also what keeps IMP-017 AC2 — no
+                  // file name or HTTP status in the visible text — satisfied.
                   <p
                     className="banner banner--error"
                     role="alert"
@@ -507,10 +599,7 @@ export function App() {
                       .join("\n")}
                   >
                     <strong>Some papers could not be loaded.</strong>{" "}
-                    {failedShards.length === 1
-                      ? "One week"
-                      : `${failedShards.length} weeks`}{" "}
-                    in this window failed to load, so the feed below is
+                    {describeFailedWeeks(failedWeeks)}, so the feed below is
                     incomplete. Everything that did load is shown.
                   </p>
                 )}
@@ -549,6 +638,39 @@ export function App() {
                     {progress.total === 1 ? "" : "s"}… ({progress.loaded}/
                     {progress.total})
                   </p>
+                ) : loadFailed ? (
+                  // The index is here and not one shard answered, so the feed
+                  // has nothing to list. Claiming the window is empty would be
+                  // the lie this state exists to stop, so `PaperList` is not
+                  // rendered at all and the failure says what it is.
+                  //
+                  // Reuses `panel panel--error` — the treatment IMP-007's
+                  // index-unavailable panel already established — plus a plain
+                  // `button` for the retry, so no `styles.css` rule is needed.
+                  // `role="alert"` on the panel is what makes this the single
+                  // announcement for a hard failure; the bare warning banner
+                  // above stands down for it, so nothing is announced twice.
+                  //
+                  // A `<strong>` rather than a heading: the hero above is
+                  // already the page's `<h1>` and a second one would repeat it.
+                  <div className="panel panel--error" role="alert">
+                    <p>
+                      <strong>Papers could not be loaded.</strong> The index is
+                      available, but no week in this window could be fetched, so
+                      there is nothing to show. This is a loading failure, not an
+                      empty window.
+                    </p>
+                    <p>{error}</p>
+                    <p>
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={handleRetryPapers}
+                      >
+                        Try again
+                      </button>
+                    </p>
+                  </div>
                 ) : noCategoriesSelected ? (
                   // Deselecting the last chip is the one filter change no chip
                   // can undo, so this state names its own cause and offers the

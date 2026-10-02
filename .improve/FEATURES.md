@@ -387,7 +387,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 - **Notes:** commit pending; attempt 2 (AC2 completed)
 ### IMP-016 — Distinguish "papers failed to load" from "no papers available"
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** bug-fix
 - **Area / files:** `web/src/App.tsx:408-433` (warning banner vs. `PaperList emptyMessage`), `web/src/App.tsx:429-432` (`emptyMessage` selection)
@@ -401,7 +401,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-017 — Replace the raw `Error.message` with human-readable copy
 - **Status:** TODO
 - **Category:** Error handling & edge cases
