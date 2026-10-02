@@ -31,3 +31,5 @@
 2026-10-02T16:15:03Z | REGRESSION-4 | FOUND    | 166066d (order-dependent flake); 3x PROGRESS.log corruption
 2026-10-02T18:45:40Z | REGRESSION-4   | FIXED     | pending (flake fixes in 3 test files; PROGRESS.log normalized)
 2026-10-02T18:45:41Z | REGRESSION-4   | FIXED     | 2c73ec9
+2026-10-02T19:02:03Z | IMP-026        | DONE      | 2ec06d0
+2026-10-02T19:02:03Z | IMP-033        | DONE      | bbe2d18
