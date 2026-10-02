@@ -26,14 +26,27 @@ def build_client(max_results):
     )
 
 
-def iter_results(query, max_results):
+def new_status():
+    """Return an empty ``iter_results`` status holder."""
+    return {"failed": False, "error": None}
+
+
+def iter_results(query, max_results, status=None):
     """Yield arXiv results for ``query``, newest first, up to ``max_results``.
 
     arXiv errors are logged and terminate iteration, so callers receive
     whatever results arrived before the failure instead of an exception. This
     matches the long-standing behavior of ``paper-collector.py`` and lets the
     index builder fail loudly later when it has zero records.
+
+    A short result list is indistinguishable from an exhausted one, so callers
+    that must not act on a partial answer pass a ``status`` holder (see
+    :func:`new_status`). It is reset on entry and, if arXiv fails mid-query,
+    filled in with ``{"failed": True, "error": "<message>"}`` so the caller can
+    tell "category had no new papers" apart from "the query died".
     """
+    if status is not None:
+        status.update(failed=False, error=None)
     if max_results is not None and max_results <= 0:
         return
 
@@ -56,4 +69,6 @@ def iter_results(query, max_results):
             if max_results is not None and yielded >= max_results:
                 break
     except arxiv.ArxivError as exc:
+        if status is not None:
+            status.update(failed=True, error=str(exc))
         logging.error("ArXiv search failed for %r: %s", query, exc)

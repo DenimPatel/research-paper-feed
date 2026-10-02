@@ -10,7 +10,9 @@ cross-listed papers, truncates abstracts, and writes:
 
 The pure helpers below (truncation, author formatting, dedup, sharding) are
 deliberately free of network access so they can be unit tested with synthetic
-records. Only :func:`collect_papers` touches arXiv.
+records. Only :func:`collect_papers` touches arXiv. A category whose query
+fails aborts the run instead of publishing an index that is missing it, since
+a truncated index is indistinguishable from a complete one once deployed.
 """
 
 import argparse
@@ -201,22 +203,40 @@ def _result_datetime(result):
 
 
 def collect_papers(
-    categories, retention_days, max_per_category, abstract_chars
+    categories, retention_days, max_per_category, abstract_chars, failures=None
 ):
-    """Query each category and return raw (not yet deduplicated) records."""
+    """Query each category and return raw (not yet deduplicated) records.
+
+    ``failures`` is an optional list that collects every category whose query
+    did not complete. ``iter_results`` reports arXiv errors through a status
+    holder, and an ``ArxivError`` raised out of it is caught here too, so a
+    mid-run outage is never mistaken for a category that simply has no new
+    papers.
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
     limit = max_per_category if max_per_category > 0 else UNLIMITED
+    failures = [] if failures is None else failures
     records = []
     for category in categories:
         query = f"cat:{category}"
         logging.info("Querying %s (limit %s) ...", query, limit)
         count = 0
-        for result in arxiv_common.iter_results(query, limit):
-            published = _result_datetime(result)
-            if published is not None and published < cutoff:
-                break
-            records.append(record_from_result(result, abstract_chars))
-            count += 1
+        status = arxiv_common.new_status()
+        try:
+            for result in arxiv_common.iter_results(query, limit, status):
+                published = _result_datetime(result)
+                if published is not None and published < cutoff:
+                    break
+                records.append(record_from_result(result, abstract_chars))
+                count += 1
+        except arxiv_common.arxiv.ArxivError as exc:
+            status.update(failed=True, error=str(exc))
+        if status["failed"]:
+            failures.append(category)
+            logging.error(
+                "  query failed for %s: %s", category, status["error"]
+            )
+            continue
         logging.info("  %d papers within retention window for %s", count, category)
     return records
 
@@ -279,12 +299,20 @@ def main(argv=None):
     args = parse_args(argv)
     categories = args.categories or DEFAULT_CATEGORIES
 
+    failures = []
     records = collect_papers(
         categories,
         args.retention_days,
         args.max_per_category,
         args.abstract_chars,
+        failures,
     )
+    if failures:
+        logging.error(
+            "Refusing to write an index: the arXiv query failed for %s.",
+            ", ".join(failures),
+        )
+        return 1
     records = dedupe_records(records)
     if not records:
         logging.error("No papers fetched; refusing to write an empty index.")

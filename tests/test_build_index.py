@@ -39,6 +39,22 @@ def make_record(paper_id, published, categories=None, **overrides):
     return record
 
 
+def make_result(paper_id, published=None, categories=None):
+    published = published or datetime.now(timezone.utc)
+    categories = categories or ["cs.CV"]
+    return SimpleNamespace(
+        entry_id=f"http://arxiv.org/abs/{paper_id}v1",
+        title=f"Title {paper_id}",
+        authors=[SimpleNamespace(name="A")],
+        summary="abstract",
+        published=published,
+        updated=published,
+        categories=list(categories),
+        primary_category=categories[0],
+        pdf_url=f"https://arxiv.org/pdf/{paper_id}v1",
+    )
+
+
 class TruncateAbstractTests(unittest.TestCase):
     def test_short_abstract_unchanged_and_not_flagged(self):
         text, truncated = build_index.truncate_abstract("  hello   world ", 50)
@@ -211,6 +227,64 @@ class WriteIndexTests(unittest.TestCase):
             )
 
 
+class CollectPapersTests(unittest.TestCase):
+    def setUp(self):
+        self.original = build_index.arxiv_common.iter_results
+
+    def tearDown(self):
+        build_index.arxiv_common.iter_results = self.original
+
+    def _install(self, results_by_category, failing=()):
+        def fake_iter_results(query, max_results, status=None):
+            category = query.split(":", 1)[-1]
+            if category in failing:
+                if status is not None:
+                    status.update(failed=True, error="simulated arXiv failure")
+                return
+            for result in results_by_category.get(category, []):
+                yield result
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+
+    def test_records_failed_categories_separately_from_records(self):
+        self._install(
+            {"cs.CV": [make_result("2401.00001")]},
+            failing=["cs.LG"],
+        )
+        failures = []
+        records = build_index.collect_papers(
+            ["cs.CV", "cs.LG"], 60, 0, 500, failures
+        )
+        self.assertEqual([record["id"] for record in records], ["2401.00001"])
+        self.assertEqual(failures, ["cs.LG"])
+
+    def test_healthy_categories_report_no_failures(self):
+        self._install({"cs.CV": [make_result("2401.00001")]})
+        failures = []
+        records = build_index.collect_papers(["cs.CV"], 60, 0, 500, failures)
+        self.assertEqual(failures, [])
+        self.assertEqual(len(records), 1)
+
+    def test_failures_list_is_optional(self):
+        self._install({}, failing=["cs.CV"])
+        self.assertEqual(build_index.collect_papers(["cs.CV"], 60, 0, 500), [])
+
+    def test_arxiv_error_raised_by_iter_results_is_classified_as_failure(self):
+        arxiv_error = build_index.arxiv_common.arxiv.ArxivError
+
+        def raising_iter_results(query, max_results, status=None):
+            raise arxiv_error(
+                "https://export.arxiv.org/api/query", 0, "simulated outage"
+            )
+            yield  # pragma: no cover - unreachable, makes this a generator
+
+        build_index.arxiv_common.iter_results = raising_iter_results
+        failures = []
+        records = build_index.collect_papers(["cs.CV"], 60, 0, 500, failures)
+        self.assertEqual(records, [])
+        self.assertEqual(failures, ["cs.CV"])
+
+
 class MainTests(unittest.TestCase):
     def test_refuses_to_write_an_empty_index(self):
         import tempfile
@@ -226,6 +300,61 @@ class MainTests(unittest.TestCase):
                 )
         finally:
             build_index.collect_papers = original
+
+    def test_refuses_to_write_index_when_a_category_query_fails(self):
+        import tempfile
+
+        arxiv_error = build_index.arxiv_common.arxiv.ArxivError
+        original = build_index.arxiv_common.iter_results
+
+        def fake_iter_results(query, max_results, status=None):
+            if query == "cat:cs.LG":
+                raise arxiv_error(
+                    "https://export.arxiv.org/api/query", 0, "simulated outage"
+                )
+            yield make_result("2401.00001")
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                with self.assertLogs(level="ERROR") as captured:
+                    exit_code = build_index.main([
+                        "--out-dir", out_dir,
+                        "--category", "cs.CV",
+                        "--category", "cs.LG",
+                    ])
+                self.assertNotEqual(exit_code, 0)
+                self.assertEqual(os.listdir(out_dir), [])
+                self.assertIn("cs.LG", "\n".join(captured.output))
+        finally:
+            build_index.arxiv_common.iter_results = original
+
+    def test_writes_index_when_every_category_query_succeeds(self):
+        import tempfile
+
+        original = build_index.arxiv_common.iter_results
+
+        def fake_iter_results(query, max_results, status=None):
+            yield make_result(
+                "2401.00001" if query == "cat:cs.CV" else "2401.00002"
+            )
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                exit_code = build_index.main([
+                    "--out-dir", out_dir,
+                    "--category", "cs.CV",
+                    "--category", "cs.LG",
+                ])
+                self.assertEqual(exit_code, 0)
+                manifest_path = os.path.join(out_dir, "index.json")
+                with open(manifest_path, encoding="utf-8") as handle:
+                    manifest = json.load(handle)
+                self.assertEqual(manifest["totalPapers"], 2)
+                self.assertEqual(manifest["categories"], ["cs.CV", "cs.LG"])
+        finally:
+            build_index.arxiv_common.iter_results = original
 
     def test_writes_index_when_papers_exist(self):
         import tempfile

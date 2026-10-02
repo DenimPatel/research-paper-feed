@@ -99,6 +99,31 @@ class IterResultsTests(unittest.TestCase):
         results = list(arxiv_common.iter_results("cat:cs.CV", 100))
         self.assertEqual(len(results), 2)
 
+    def test_status_holder_reports_a_failed_query(self):
+        self._install([object()] * 3, error_after=2)
+        status = arxiv_common.new_status()
+        results = list(arxiv_common.iter_results("cat:cs.CV", 100, status))
+        self.assertEqual(len(results), 2)
+        self.assertTrue(status["failed"])
+        self.assertIn("simulated arXiv failure", status["error"])
+
+    def test_status_holder_reports_an_exhausted_query(self):
+        self._install([object()] * 2)
+        status = arxiv_common.new_status()
+        list(arxiv_common.iter_results("cat:cs.CV", 100, status))
+        self.assertFalse(status["failed"])
+        self.assertIsNone(status["error"])
+
+    def test_status_holder_is_reset_for_each_query(self):
+        self._install([object()] * 3, error_after=1)
+        status = arxiv_common.new_status()
+        list(arxiv_common.iter_results("cat:cs.LG", 100, status))
+        self.assertTrue(status["failed"])
+        self._install([object()] * 3)
+        list(arxiv_common.iter_results("cat:cs.CV", 100, status))
+        self.assertFalse(status["failed"])
+        self.assertIsNone(status["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

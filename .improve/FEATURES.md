@@ -135,7 +135,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 - **Notes:** commit pending
 ### IMP-004 — Refuse to write an index after any category's arXiv query failed
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `scripts/arxiv_common.py:52-59` (`iter_results` swallowing `arxiv.ArxivError`), `scripts/build_index.py:203-221` (`collect_papers` per-category loop and count log), `scripts/build_index.py:186-187` (`manifest["categories"]`), `scripts/build_index.py:289-291` (empty-index refusal)
@@ -148,10 +148,10 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** S    **Risk:** med
 - **Depends on:** none
 - **Priority score:** 25.0
-- **Notes:** Risk is `med` because the failure-reporting shape is a real design choice (hard fail vs. degraded index with a visible flag) and hard-failing could turn a partial outage into a red deploy. The choice must be recorded.
+- **Notes:** Risk is `med` because the failure-reporting shape is a real design choice (hard fail vs. degraded index with a visible flag) and hard-failing could turn a partial outage into a red deploy. The choice must be recorded. | verifier PASS 3/3; 39 py tests
 
 ### IMP-005 — Make component and DOM testing possible
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Test coverage & test quality
 - **Type:** tooling
 - **Area / files:** `web/vite.config.ts:7-10` (`test.environment: "node"`, `test.include: ["src/**/*.test.ts"]`), `web/package.json:6-25` (scripts and devDependencies), `web/package-lock.json`
