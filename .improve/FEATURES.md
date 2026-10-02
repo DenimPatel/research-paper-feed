@@ -419,7 +419,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 - **Notes:** commit pending
 ### IMP-018 — Add a React error boundary around `<App />`
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** improvement
 - **Area / files:** `web/src/main.tsx:12-15` (`createRoot(...).render(<StrictMode><App /></StrictMode>)`), `web/src/App.tsx:207-224` (`visiblePapers` render-time path), `web/src/components/PaperCard.tsx:44-49` (`paper.abstract.length`)
@@ -433,7 +433,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** The boundary is a safety net; it does not replace IMP-098 (runtime validation) — a boundary that silently hides a schema violation would be worse than the bug.
+- **Notes:** The boundary is a safety net; it does not replace IMP-098 (runtime validation) — a boundary that silently hides a schema violation would be worse than the bug. | commit pending
 
 ### IMP-019 — Align `web/src/lib/types.ts` nullability with `record_from_result`
 - **Status:** TODO
@@ -468,7 +468,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Risk `med` because dropping non-`datetime` records changes what reaches the index for any upstream shape change; verify a real run still produces ~the same paper count before merging. The baseline index on disk is `totalPapers: 2812` across 2 shards; a smoke run of `--category cs.CV --max-per-category 300` is the comparison to record.
 
 ### IMP-021 — Write the manifest before deleting stale shards
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Correctness
 - **Type:** bug-fix
 - **Area / files:** `scripts/build_index.py:224-232` (`_clean_old_shards`), `scripts/build_index.py:235-245` (`write_index` order)
