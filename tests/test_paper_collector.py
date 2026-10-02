@@ -43,6 +43,89 @@ class SafeFilenameTests(unittest.TestCase):
         title = "A Simple Paper Title"
         self.assertEqual(paper_collector.safe_filename(title), title)
 
+    def test_dot_only_titles_are_never_directory_references(self):
+        for title in (".", "..", "...", " . ", "./.", "\\..\\", ".. ", "  .."):
+            with self.subTest(title=title):
+                slug = paper_collector.safe_filename(title)
+                self.assertNotIn(slug, ("", ".", ".."))
+                self.assertNotIn("/", slug)
+                self.assertNotIn("\\", slug)
+                self.assertNotIn(os.sep, slug)
+
+    def test_no_input_produces_a_path_separator(self):
+        separators = ["/", "\\", os.sep] + ([os.altsep] if os.altsep else [])
+        for title in ("a/b", "a\\b", "/etc/passwd", "\\windows\\system32", "//", "..//.."):
+            with self.subTest(title=title):
+                slug = paper_collector.safe_filename(title)
+                for separator in separators:
+                    self.assertNotIn(separator, slug)
+
+    def test_replaces_control_characters(self):
+        slug = paper_collector.safe_filename("two\nlines\r\x00nul\x7fdel\t here")
+        for control in "\n\r\x00\x7f\t":
+            self.assertNotIn(control, slug)
+        self.assertEqual(
+            slug.encode("utf-8").decode("utf-8"),
+            slug,
+            "the slug must still be valid UTF-8",
+        )
+
+    def test_caps_the_slug_by_utf8_bytes_not_characters(self):
+        ascii_slug = paper_collector.safe_filename("x" * 400)
+        self.assertLessEqual(len(ascii_slug.encode("utf-8")), 200)
+        self.assertEqual(len(ascii_slug.encode("utf-8")), 200)
+
+        # One CJK character is three UTF-8 bytes, so 400 characters is ~1200 bytes.
+        cjk_title = "深" * 400
+        cjk_slug = paper_collector.safe_filename(cjk_title)
+        self.assertLessEqual(len(cjk_slug.encode("utf-8")), 200)
+        self.assertEqual(cjk_slug, "深" * 66)
+
+    def test_truncation_never_splits_a_multibyte_character(self):
+        for character in ("é", "深", "\U0001f600"):
+            with self.subTest(character=character):
+                slug = paper_collector.safe_filename(character * 400)
+                encoded = slug.encode("utf-8")
+                self.assertLessEqual(len(encoded), 200)
+                self.assertEqual(encoded, character.encode("utf-8") * len(slug))
+                self.assertTrue(slug)
+                roundtripped = slug.encode("utf-8").decode("utf-8")
+                self.assertEqual(roundtripped, slug)
+
+    def test_windows_reserved_names_gain_an_underscore_suffix(self):
+        reserved = (
+            ["CON", "PRN", "AUX", "NUL"]
+            + [f"COM{number}" for number in range(1, 10)]
+            + [f"LPT{number}" for number in range(1, 10)]
+        )
+        self.assertEqual(len(reserved), 22)
+        for name in reserved:
+            for variant in (name, name.lower(), name.capitalize()):
+                with self.subTest(name=variant):
+                    slug = paper_collector.safe_filename(variant)
+                    self.assertTrue(slug.endswith("_"), slug)
+                    self.assertEqual(slug[:-1].lower(), variant.lower())
+
+    def test_reserved_name_before_a_long_extension_is_still_suffixed(self):
+        slug = paper_collector.safe_filename("CON." + "x" * 400)
+        self.assertLessEqual(len(slug.encode("utf-8")), 200)
+        self.assertTrue(slug.startswith("CON.x"), slug[:12])
+
+    def test_names_that_only_start_like_a_device_are_untouched(self):
+        for title in ("CONSORTIUM", "com10", "lpt0", "auxiliary losses"):
+            with self.subTest(title=title):
+                self.assertEqual(paper_collector.safe_filename(title), title)
+
+    def test_documented_topics_stay_readable(self):
+        for topic, expected in (
+            ("cat:cs.CV", "cat_cs.CV"),
+            ("diffusion models", "diffusion models"),
+            ("computer-vision", "computer-vision"),
+            ('cat:cs.CV AND "3d reconstruction"', 'cat_cs.CV AND _3d reconstruction_'),
+        ):
+            with self.subTest(topic=topic):
+                self.assertEqual(paper_collector.safe_filename(topic), expected)
+
 
 class BuildHtmlFeedTests(unittest.TestCase):
     def test_escapes_html_in_paper_fields(self):

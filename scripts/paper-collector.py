@@ -26,10 +26,49 @@ TARFILE_HAS_FILTER = (
     and hasattr(tarfile, "data_filter")
 )
 
+# The slug becomes a filename and a directory name, so it is capped well below
+# the 255-byte filename limit of ext4/APFS/NTFS to leave room for the suffixes
+# callers append to it ("...papers.csv", ".pdf", the extraction timestamp).
+MAX_SLUG_BYTES = 200
+# Used when an input leaves nothing usable behind, e.g. ".", ".." or "   ".
+FALLBACK_SLUG = "_"
+# Windows resolves these device names anywhere they appear, with or without an
+# extension, so "CON" and "CON.txt" both name the console device.
+WINDOWS_RESERVED_NAMES = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + [f"COM{number}" for number in range(1, 10)]
+    + [f"LPT{number}" for number in range(1, 10)]
+)
+
+
+def truncate_to_bytes(text, limit):
+    """Cut ``text`` down to at most ``limit`` UTF-8 bytes, never mid-character."""
+    encoded = text.encode("utf-8")
+    if len(encoded) <= limit:
+        return text
+    return encoded[:limit].decode("utf-8", "ignore")
+
 
 def safe_filename(title):
-    """Strip characters that are illegal in filenames on common filesystems."""
-    return re.sub(r'[\\/:"*?<>|]+', "_", title).strip()
+    """Return ``title`` as a single path component that is safe to create.
+
+    The slug is used as a filename *and* as the extraction directory name, so it
+    must never be empty, "." or "..", must never contain a path separator, must
+    stay inside a filesystem's byte budget, and must never name a reserved
+    Windows device.
+    """
+    cleaned = re.sub(r"[\x00-\x1f\x7f]", "_", title)
+    cleaned = re.sub(r'[\\/:"*?<>|]+', "_", cleaned).strip().strip(". ")
+    if not cleaned:
+        return FALLBACK_SLUG
+    # Windows treats everything before the first dot as the device name.
+    if cleaned.split(".")[0].upper() in WINDOWS_RESERVED_NAMES:
+        # Reserve a byte for the suffix so the cap still holds afterwards.
+        cleaned = truncate_to_bytes(cleaned, MAX_SLUG_BYTES - 1) + "_"
+    else:
+        cleaned = truncate_to_bytes(cleaned, MAX_SLUG_BYTES)
+    # Truncating can leave a trailing dot, which Windows trims silently.
+    return cleaned.rstrip(". ")
 
 
 def is_inside(root, path):

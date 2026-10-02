@@ -502,7 +502,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Adding validation ranges changes `--help` output, which profile §4.5 requires to be reconciled with `readme.md` in the same change — that is criterion 5. IMP-114 documents `--category` in the readme and should be sequenced with this item.
 
 ### IMP-023 — Make `safe_filename` a real sanitizer
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** Security
 - **Type:** bug-fix
 - **Area / files:** `scripts/paper-collector.py:21-23` (`safe_filename`), `scripts/paper-collector.py:72,79` (slug used as a **directory** name for `extractall`)
@@ -517,7 +517,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-024 — Pass `filter="data"` to `tarfile.extractall`
 - **Status:** DONE
 - **Category:** Security
