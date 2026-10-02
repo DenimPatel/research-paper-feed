@@ -25,6 +25,12 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install dependencies
+        working-directory: .
+        run: pip install -r requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -36,5 +42,8 @@ jobs:
         run: npm run typecheck
       - name: Run tests
         run: npm test
+      - name: Build the paper index
+        working-directory: .
+        run: python scripts/build_index.py --category cs.CV --max-per-category 5 --out-dir web/public/data
       - name: Build
         run: npm run build
