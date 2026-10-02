@@ -336,6 +336,11 @@ describe("PaperIndex", () => {
             headers: { "Content-Type": "application/json" },
           }),
       ],
+      // Valid JSON documents that are not manifests. They used to resolve as if
+      // they were one, which is how a body of `null` hung the app forever.
+      ["a JSON null body", () => jsonResponse(null)],
+      ["a JSON array body", () => jsonResponse([MANIFEST])],
+      ["a JSON string body", () => jsonResponse("index.json")],
     ];
 
     for (const [label, respond] of failures) {
@@ -353,6 +358,72 @@ describe("PaperIndex", () => {
       await expect(index.refreshManifest(), label).resolves.toEqual(MANIFEST);
       expect(mock, label).toHaveBeenCalledTimes(2);
     }
+  });
+
+  /**
+   * Only a plain object can be a manifest, and `response.json()` resolves for
+   * every valid JSON document — `null`, `[]`, `"text"`, `7` and `true` all
+   * parse. Those used to be cast straight through, so the caller got a resolved
+   * value it could not use and no failure to recover from.
+   */
+  it("rejects every body that is not a plain object, as malformed", async () => {
+    const unusable: Array<[string, unknown]> = [
+      ["null", null],
+      ["an array", [MANIFEST]],
+      ["a bare string", "index.json"],
+      ["a number", 7],
+      ["a boolean", true],
+    ];
+
+    for (const [label, body] of unusable) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL) => {
+          if (String(input).endsWith("/index.json")) {
+            return jsonResponse(body);
+          }
+          return new Response("not found", { status: 404 });
+        }),
+      );
+
+      const cause = await new PaperIndex()
+        .getManifest()
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect(cause, label).toBeInstanceOf(IndexUnavailableError);
+      const failure = cause as IndexUnavailableError;
+      // `malformed`, not `unavailable`: the file was there and could not be
+      // read, which is what tells a reader that retrying will not help. The
+      // message is the one the malformed sentence in `failureCopy.ts` is keyed
+      // to, and the one the tooltip and the console line both carry.
+      expect(failure.kind, label).toBe("malformed");
+      expect(failure.message, label).toBe(
+        "The paper index is malformed and could not be parsed.",
+      );
+    }
+  });
+
+  /**
+   * The boundary this check draws: a plain object is accepted whatever it
+   * contains, because whether those fields are usable is a separate question
+   * (IMP-098) and answering it here would take that item's place.
+   */
+  it("accepts any plain object as a manifest, however few fields it has", async () => {
+    const empty = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).endsWith("/index.json")) {
+          return jsonResponse(empty);
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+
+    expect(await new PaperIndex().getManifest()).toEqual({});
   });
 });
 

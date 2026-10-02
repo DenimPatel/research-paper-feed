@@ -89,6 +89,8 @@ const INDEX_HELP =
   "No paper index was found. Run `python scripts/build_index.py` locally, " +
   "or wait for the scheduled GitHub Action that builds and deploys the index.";
 
+const INDEX_MALFORMED = "The paper index is malformed and could not be parsed.";
+
 function dataBase(): string {
   const base = import.meta.env?.BASE_URL ?? "/";
   return `${base.replace(/\/$/, "")}/data`;
@@ -179,15 +181,25 @@ export class PaperIndex {
         "unavailable",
       );
     }
+    let body: unknown;
     try {
-      return (await response.json()) as IndexManifest;
+      body = await response.json();
     } catch (error) {
-      throw new IndexUnavailableError(
-        "The paper index is malformed and could not be parsed.",
-        "malformed",
-        { cause: error },
-      );
+      throw new IndexUnavailableError(INDEX_MALFORMED, "malformed", {
+        cause: error,
+      });
     }
+    // `response.json()` resolves for every valid JSON document, and `null`, `[]`,
+    // `"text"` and `7` are all valid ones. The cast below used to accept them, so
+    // a manifest of `null` resolved successfully and reached the app as a value
+    // indistinguishable from "still loading": the state never advanced and there
+    // was no failure to recover from. Only a plain object can be a manifest, so
+    // everything else is malformed. Whether that object has the fields the UI
+    // reads is a separate question — IMP-098 owns those checks.
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      throw new IndexUnavailableError(INDEX_MALFORMED, "malformed");
+    }
+    return body as IndexManifest;
   }
 
   private async loadShard(shard: ShardManifestEntry): Promise<Paper[]> {

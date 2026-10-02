@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -180,6 +181,12 @@ export function App() {
       .then((next) => {
         if (!cancelled) {
           setManifest(next);
+          // The papers effect below takes loading back as soon as it starts, so
+          // this is not the state a normal load ends in. It matters for a
+          // manifest that resolved and is still not usable: leaving `loading`
+          // true kept the app on "Loading the paper index…" with no error and no
+          // way back, because every way out of that screen is behind `error`.
+          setLoading(false);
         }
       })
       .catch((cause: unknown) => {
@@ -225,7 +232,16 @@ export function App() {
     setPapersAttempts((attempts) => attempts + 1);
   };
 
-  useEffect(() => {
+  // `useLayoutEffect`, not `useEffect`: the manifest effect clears `loading` the
+  // moment the index arrives (IMP-173 AC2), and this effect is what puts it back
+  // while the papers are fetched. A passive effect runs after the paint, so the
+  // browser would paint that one frame in between — a manifest in hand, `loading`
+  // false and `papers` still empty, which reads as "No papers are available in
+  // this window yet." A claim the IMP-016 panel exists to make impossible, shown
+  // on the one path where everything is working. A layout effect closes the gap
+  // in the same commit, so the reader only ever sees one of the two loading
+  // lines.
+  useLayoutEffect(() => {
     if (!manifest) {
       return;
     }

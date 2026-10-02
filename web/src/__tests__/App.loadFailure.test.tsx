@@ -568,6 +568,112 @@ describe("the copy for an index that could not be loaded", () => {
 });
 
 /**
+ * `index.json` answered with HTTP 200, `content-type: application/json`, and a
+ * body of JSON `null`.
+ *
+ * `response.json()` resolves for that body — it is valid JSON — so before the
+ * fix the manifest promise resolved with `null`, `setManifest(null)` was not a
+ * state change, and nothing else moved either: the app rendered
+ * "Loading the paper index…" on a condition that consults neither `loading` nor
+ * any promise. No error, no `role="alert"`, and no "Try again", because every
+ * way out of that screen hangs off `error`. Only a reload recovered.
+ */
+describe("an index file whose body is JSON null", () => {
+  function installFetchWithNullIndex(): FetchLog {
+    const log: FetchLog = { indexRequests: 0, shardRequests: [] };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/index.json")) {
+          log.indexRequests += 1;
+          // 200 and a JSON content type, so only the body is wrong: this is not
+          // the "not built yet" state IMP-007 already serves.
+          return jsonResponse(null);
+        }
+        log.shardRequests.push(url.split("/").pop() ?? "");
+        return notFound();
+      }),
+    );
+    return log;
+  }
+
+  it("replaces the indefinite loading line with the index-unavailable panel", async () => {
+    installFetchWithNullIndex();
+
+    render(<App />);
+
+    // Waiting for the panel is the wait: while this line is still up the app is
+    // in the state that used to be permanent.
+    expect(await screen.findByText("No paper index yet")).toBeTruthy();
+    expect(screen.queryByText(/Loading the paper index/)).toBeNull();
+    // Settled, not merely momentarily absent — the claim is that no frame ever
+    // goes back to it.
+    await waitFor(() =>
+      expect(screen.queryByText(/Loading the paper index/)).toBeNull(),
+    );
+    // A real paper list is not an option either: there is no index, so there is
+    // nothing to list and nothing to filter.
+    expect(screen.queryByRole("heading", { name: /Recent arXiv papers/ })).toBeNull();
+    expect(screen.queryByLabelText("Search papers")).toBeNull();
+  });
+
+  it("shows IMP-007's panel and a Try again that re-requests index.json", async () => {
+    const log = installFetchWithNullIndex();
+
+    render(<App />);
+    await screen.findByText("No paper index yet");
+
+    // The same panel IMP-007 established for an absent index, reached by the
+    // same route — so this is not a second, quieter failure state.
+    const panel = screen.getByRole("alert");
+    expect(panel.className).toContain("panel");
+    expect(panel.className).toContain("panel--error");
+    expect(within(panel).getByRole("heading", { name: "No paper index yet" })).toBeTruthy();
+    const button = within(panel).getByRole("button", { name: /try again/i });
+    expect(button.tagName).toBe("BUTTON");
+    expect(button.textContent).toBe("Try again");
+    expect(button.hasAttribute("disabled")).toBe(false);
+    expect(log.indexRequests).toBe(1);
+
+    fireEvent.click(button);
+
+    // IMP-003: the rejection was not memoized, so the retry really re-asks the
+    // network. A dead button here would leave the reader with the reload this
+    // whole item exists to remove.
+    await waitFor(() => expect(log.indexRequests).toBe(2));
+    expect(screen.queryByText(/Loading the paper index/)).toBeNull();
+    // Still unreadable, so the panel comes back rather than the app hanging a
+    // second time.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert")).toHaveLength(1),
+    );
+    expect(screen.getByText("No paper index yet")).toBeTruthy();
+    // The shard fetch is never reached: without a manifest there is no window to
+    // ask for.
+    expect(log.shardRequests).toEqual([]);
+  });
+
+  it("keeps the reader-facing malformed sentence, not the raw loader text", async () => {
+    installFetchWithNullIndex();
+
+    render(<App />);
+    await screen.findByText("No paper index yet");
+
+    // `null` is "there but broken", so it must not be dressed as the transient
+    // "usually temporary" case the absent index gets — telling this reader to
+    // wait is the wrong advice for a file that will not parse on a second read.
+    const message = within(screen.getByRole("alert")).getByTitle(
+      "The paper index is malformed and could not be parsed.",
+    );
+    expect(message.tagName).toBe("P");
+    expect(message.textContent).toMatch(/could not be read/i);
+    expect(message.textContent).toMatch(/will not help/i);
+    expect(message.textContent).not.toMatch(/usually temporary/i);
+  });
+});
+
+/**
  * A window that loaded, then a window that could not. The papers from the first
  * are still on screen, so this is the one failure state that renders as a banner
  * beside a working feed rather than as a panel — which means it is a separate

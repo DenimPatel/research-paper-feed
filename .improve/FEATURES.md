@@ -243,7 +243,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 ## Tier 20.0
 
 ### IMP-173 — Stop a JSON `null` manifest from hanging the app on "Loading the paper index…" forever
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** bug-fix
 - **Area / files:** `web/src/App.tsx:179-194` (`fetchManifest(...).then(...)` calls `setManifest(next)` and never `setLoading(false)`), `web/src/App.tsx:583-587` (`{!manifest && !error && (<p className="panel" role="status">Loading the paper index…</p>)}`, which does not consult `loading`), `web/src/lib/paperIndex.ts:183` (`return (await response.json()) as IndexManifest`)
@@ -257,7 +257,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** Pre-existing, not a regression: `git show fc77a40:web/src/App.tsx` has the same `.then` with no `setLoading(false)` and the same `{!manifest && !error && (` guard at `:378`. Found as R4 in `.improve/reports/regression-sweep-3.md` §2 and re-derived independently at `.improve/reports/verify-IMP-018.md` §9.2. **Cross-reference — do not duplicate:** the bare cast at `paperIndex.ts:183` is the same "data validated only by cast" family as profile defect WEB-07 and as IMP-098 (TODO, `10.0`); IMP-098 owns field-level validation, this item owns the deadlock, and criterion 4 forbids this item from taking IMP-098's place. The related silent-data-loss question for a malformed `published`, which `paperIndex.ts:294` filters out rather than rejecting, is a **separate** item because it needs a product decision first.
+- **Notes:** Pre-existing, not a regression: `git show fc77a40:web/src/App.tsx` has the same `.then` with no `setLoading(false)` and the same `{!manifest && !error && (` guard at `:378`. Found as R4 in `.improve/reports/regression-sweep-3.md` §2 and re-derived independently at `.improve/reports/verify-IMP-018.md` §9.2. **Cross-reference — do not duplicate:** the bare cast at `paperIndex.ts:183` is the same "data validated only by cast" family as profile defect WEB-07 and as IMP-098 (TODO, `10.0`); IMP-098 owns field-level validation, this item owns the deadlock, and criterion 4 forbids this item from taking IMP-098's place. The related silent-data-loss question for a malformed `published`, which `paperIndex.ts:294` filters out rather than rejecting, is a **separate** item because it needs a product decision first. | commit pending
 
 ### IMP-007 — Add a "Try again" button to the index-unavailable panel
 - **Status:** DONE
@@ -502,7 +502,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:**
 - **Notes:** commit pending
 ### IMP-022 — Validate every CLI flag in both scripts
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Configuration & defaults
 - **Type:** bug-fix
 - **Area / files:** `scripts/build_index.py:248-275` (`parse_args`), `scripts/build_index.py:48-53` (`truncate_abstract`, `max_chars <= 0` silently disables truncation), `scripts/build_index.py:208` (`max_per_category > 0` else `UNLIMITED`), `scripts/build_index.py:211` (`query = f"cat:{category}"`), `scripts/paper-collector.py:35-38` (`--max-papers`, default 1000), `scripts/arxiv_common.py:37-38` (non-positive short circuit), `readme.md:42-44` and `readme.md:96-103`
