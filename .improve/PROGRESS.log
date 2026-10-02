@@ -20,4 +20,4 @@
 2026-10-02T12:41:07Z | IMP-015      | DONE     | ff3f331 (attempt 2; attempt 1 never implemented AC2)
 2026-10-02T12:58:51Z | IMP-016      | DONE     | 166066d
 2026-10-02T13:25:57Z | IMP-017      | DONE     | 8aceee1
-2026-10-02T14:02:33Z | REGRESSION-3 | FOUND    | duplicate recovery affordance (IMP-010 x IMP-009); spurious save-failure alert on cold boot (IMP-011)
+2026-10-02T14:02:33Z | REGRESSION-3 | FOUND    | duplicate recovery affordance (IMP-010 x IMP-009); spurious save-failure alert on cold boot (IMP-011)2026-10-02T14:25:58Z | REGRESSION-3 | FIXED | 819a6d9
