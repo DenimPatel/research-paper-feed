@@ -549,3 +549,246 @@ describe("loadState / saveState", () => {
     expect(saveState(EMPTY_STATE, THROWING_STORAGE)).toBe(false);
   });
 });
+
+/**
+ * `PaperCard` dereferences `categories`, `primaryCategory` and `published`
+ * without a guard, and nothing sits between `<App />` and the DOM, so a snapshot
+ * missing one of them blanks every view rather than degrading one card.
+ */
+describe("paper fields PaperCard dereferences are validated", () => {
+  const SIBLING = "2401.00001";
+
+  /** Round-trips through JSON so the payload is the bytes a file import reads. */
+  function parseImported(papers: unknown[]): ExportPayload | null {
+    return parseExportPayload(
+      JSON.parse(
+        JSON.stringify({
+          version: 1,
+          exportedAt: "2026-10-02T00:00:00.000Z",
+          collection: {
+            id: "c1",
+            name: "Imported",
+            createdAt: "2026-10-02",
+            paperIds: papers.map((paper) => (paper as { id: string }).id),
+          },
+          papers,
+        }),
+      ),
+    );
+  }
+
+  function merge(raw: unknown): CollectionsState | null {
+    const payload = parseExportPayload(JSON.parse(JSON.stringify(raw)));
+    return payload
+      ? collectionsReducer(EMPTY_STATE, { type: "mergeImport", payload })
+      : null;
+  }
+
+  const MALFORMED: Array<[string, Record<string, unknown>]> = [
+    ["no categories", { id: "2401.00009", title: "No categories", authors: ["A"], abstract: "abc" }],
+    ["no published", { ...makePaper("2401.00010"), published: undefined }],
+    ["categories as a string", { ...makePaper("2401.00011"), categories: "cs.CV" }],
+    ["categories with a non-string", { ...makePaper("2401.00012"), categories: ["cs.CV", 7] }],
+    ["no primaryCategory", { ...makePaper("2401.00013"), primaryCategory: undefined }],
+    ["published as a number", { ...makePaper("2401.00014"), published: 20240101 }],
+  ];
+
+  for (const [label, malformed] of MALFORMED) {
+    it(`drops a payload paper with ${label} and keeps the valid sibling`, () => {
+      const raw = {
+        version: 1,
+        exportedAt: "2026-10-02T00:00:00.000Z",
+        collection: {
+          id: "c1",
+          name: "Imported",
+          createdAt: "2026-10-02",
+          paperIds: [malformed.id as string, SIBLING],
+        },
+        papers: [malformed, makePaper(SIBLING)],
+      };
+      expect(parseImported(raw.papers)?.papers.map((paper) => paper.id)).toEqual([
+        SIBLING,
+      ]);
+      const state = merge(raw);
+      expect(state?.collections[0].paperIds).toEqual([SIBLING]);
+      expect(Object.keys(state?.papers ?? {})).toEqual([SIBLING]);
+    });
+  }
+
+  it("returns an empty papers array, never null, when every paper fails", () => {
+    const raw = {
+      version: 1,
+      exportedAt: "2026-10-02T00:00:00.000Z",
+      collection: {
+        id: "c1",
+        name: "Imported",
+        createdAt: "2026-10-02",
+        paperIds: ["2401.00009", "2401.00010"],
+      },
+      papers: [
+        { id: "2401.00009", title: "No categories", authors: ["A"], abstract: "abc" },
+        { ...makePaper("2401.00010"), published: null },
+      ],
+    };
+    const payload = parseImported(raw.papers);
+    expect(payload).not.toBeNull();
+    expect(payload?.papers).toEqual([]);
+    expect(merge(raw)?.collections[0].paperIds).toEqual([]);
+  });
+
+  it("drops a stored snapshot that is missing categories on reload", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      PAPERS_KEY,
+      JSON.stringify({
+        "2401.00009": { id: "2401.00009", title: "No categories", authors: ["A"], abstract: "abc" },
+        [SIBLING]: makePaper(SIBLING),
+      }),
+    );
+    storage.setItem(
+      COLLECTIONS_KEY,
+      JSON.stringify([
+        {
+          id: "c1",
+          name: "Vision",
+          createdAt: "2024-01-08",
+          paperIds: ["2401.00009", SIBLING],
+        },
+      ]),
+    );
+    const loaded = loadState(storage);
+    expect(Object.keys(loaded.papers)).toEqual([SIBLING]);
+    expect(loaded.collections[0].paperIds).toEqual([SIBLING]);
+  });
+});
+
+/**
+ * Four records copied verbatim out of `web/public/data/papers-2026-W40.json` and
+ * `papers-2026-W39.json` as produced by `scripts/build_index.py`: the multi
+ * category cross-listed paper, an `et al.` capped author list, a single category
+ * paper, and a short untruncated abstract whose primary category is not a `cs.*`
+ * one. `web/public/data/` is gitignored, so the sweep below can only run where a
+ * real index happens to be on disk; this fixture keeps the contract covered in
+ * CI either way.
+ */
+const REAL_RECORDS: Paper[] = [
+  {
+    id: "2610.02207",
+    title: "One Basis to Animate Them All: Gaussian Blendshape Distillation for Real-Time Avatars",
+    authors: ["Ramazan Fazylov", "Stamatis Lefkimmiatis", "Ivan Laptev"],
+    abstract:
+      "3D Gaussian avatars support fast rendering, however, their real-time animation is often challenged by the costly neural inference. We address this bottleneck and show that the animation of pretrained avatar models can be closely approximated by a linear combination of identity-independent blendshapes. Building on this finding, we introduce GALA (Gaussian Animation via Linear Approximation), a distillation method that replaces per-frame heavy neural decoding with a shallow coefficient predictor a\u2026",
+    abstractTruncated: true,
+    published: "2026-10-01",
+    updated: "2026-10-01",
+    categories: ["cs.CV", "cs.AI", "cs.HC", "cs.LG"],
+    primaryCategory: "cs.CV",
+    absUrl: "http://arxiv.org/abs/2610.02207v1",
+    pdfUrl: "https://arxiv.org/pdf/2610.02207v1",
+  },
+  {
+    id: "2610.01004",
+    title:
+      "The Effect of Gait Stability Based on Two Types of Impact Strategies for Two-Link Walking and Brachiating Robots",
+    authors: ["Alan Estrada Flores", "Nelson Rosa"],
+    abstract:
+      "In this paper, we explore the impulsive dynamics common to single-joint, two-link models of walking and brachiating gaits with respect to slope and switching time. In particular, we investigate how the stability of a gait and bifurcations encountered within a family of gaits change under time-based and state-based switching of the impulsive dynamics.",
+    abstractTruncated: false,
+    published: "2026-10-01",
+    updated: "2026-10-01",
+    categories: ["nlin.CD", "cs.RO"],
+    primaryCategory: "nlin.CD",
+    absUrl: "http://arxiv.org/abs/2610.01004v1",
+    pdfUrl: "https://arxiv.org/pdf/2610.01004v1",
+  },
+  {
+    id: "2609.38219",
+    title:
+      "TutlAit v1: a crowdsourced Moroccan Tamazight speech dataset with Arabic transcriptions and regional accent labels",
+    authors: [
+      "Mohamed-Amine Chadi",
+      "Ezzahra Ait El Arbi",
+      "Ismail Khayoub",
+      "Aymane Fadili",
+      "Yassine Ennhili",
+      "Jadjigua Bouali",
+      "Hanane Inhid",
+      "Mohammed Ameksa",
+      "et al.",
+    ],
+    abstract:
+      "Tamazight (Amazigh) is, together with Arabic, one of the two official languages of Morocco, yet it remains severely under-resourced for speech technology: pub licly available labelled audio is scarce, generally lacks information on the regional variety spoken, and is often of uneven transcription quality. This article describes the TutlAit dataset, a corpus of Moroccan Tamazight speech paired with Modern Standard Arabic text and explicit regional accent labels. The data were collected with TutlA\u2026",
+    abstractTruncated: true,
+    published: "2026-09-27",
+    updated: "2026-09-27",
+    categories: ["cs.CL", "cs.LG"],
+    primaryCategory: "cs.CL",
+    absUrl: "http://arxiv.org/abs/2609.38219v1",
+    pdfUrl: "https://arxiv.org/pdf/2609.38219v1",
+  },
+  {
+    id: "2609.38216",
+    title:
+      "Fiatlux: A Long-Horizon Benchmark for Humanoid Ladder Climbing and Light-Bulb Replacement",
+    authors: [
+      "Pavel Bushuyeu",
+      "Yujin Chen",
+      "Anton Nikolaev",
+      "Brian Shu",
+      "Igor Molybog",
+    ],
+    abstract:
+      "Existing benchmarks evaluate tabletop manipulation, flat-floor household activity, or humanoid locomotion and manipulation as separate task groups; none scores vertical mobility and dexterous work on a fragile payload in one long-horizon episode. We present Fiatlux, a light-bulb replacement benchmark built on NVIDIA Isaac Lab. In one episode, a Unitree G1 humanoid positions a step ladder under a ceiling or wall fixture, climbs it, exchanges a spent bulb in a socket for a fresh one, and leaves th\u2026",
+    abstractTruncated: true,
+    published: "2026-09-27",
+    updated: "2026-09-27",
+    categories: ["cs.RO"],
+    primaryCategory: "cs.RO",
+    absUrl: "http://arxiv.org/abs/2609.38216v1",
+    pdfUrl: "https://arxiv.org/pdf/2609.38216v1",
+  },
+];
+
+describe("real producer records are never rejected", () => {
+  it("keeps every real record fixture", () => {
+    const payload = parseExportPayload({
+      version: 1,
+      exportedAt: "2026-10-02T02:44:04Z",
+      collection: {
+        id: "c1",
+        name: "Imported",
+        createdAt: "2026-10-02",
+        paperIds: REAL_RECORDS.map((paper) => paper.id),
+      },
+      papers: REAL_RECORDS,
+    });
+    expect(payload?.papers).toHaveLength(REAL_RECORDS.length);
+    expect(payload?.papers).toEqual(REAL_RECORDS);
+  });
+
+  it("keeps a real record through a localStorage round trip", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      PAPERS_KEY,
+      JSON.stringify(
+        Object.fromEntries(REAL_RECORDS.map((paper) => [paper.id, paper])),
+      ),
+    );
+    storage.setItem(
+      COLLECTIONS_KEY,
+      JSON.stringify([
+        {
+          id: "c1",
+          name: "Vision",
+          createdAt: "2026-10-02",
+          paperIds: REAL_RECORDS.map((paper) => paper.id),
+        },
+      ]),
+    );
+    const loaded = loadState(storage);
+    expect(loaded.collections[0].paperIds).toHaveLength(REAL_RECORDS.length);
+    expect(loaded.collections[0].paperIds).toEqual(
+      REAL_RECORDS.map((paper) => paper.id),
+    );
+  });
+});

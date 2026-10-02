@@ -65,6 +65,15 @@ export function createCollection(
   return { id, name, createdAt: now, paperIds: [] };
 }
 
+/**
+ * The import gate. `PaperCard` dereferences every one of these fields without a
+ * guard and there is no error boundary above `<App />`, so a snapshot missing
+ * one blanks the whole app rather than degrading a single card. `build_index.py`
+ * emits all eleven keys on every record (measured over the 2,812 papers of
+ * `papers-2026-W39/W40.json`), so the strict checks below reject malformed files
+ * only. `absUrl`/`pdfUrl` stay out of it on purpose: the producer emits `null`
+ * for those, and `hasSafeUrls` is the guard for them.
+ */
 function isPaper(value: unknown): value is Paper {
   if (!value || typeof value !== "object") {
     return false;
@@ -75,7 +84,11 @@ function isPaper(value: unknown): value is Paper {
     !PROTOTYPE_KEYS.has(paper.id) &&
     typeof paper.title === "string" &&
     Array.isArray(paper.authors) &&
-    typeof paper.abstract === "string"
+    typeof paper.abstract === "string" &&
+    Array.isArray(paper.categories) &&
+    paper.categories.every((category) => typeof category === "string") &&
+    typeof paper.primaryCategory === "string" &&
+    typeof paper.published === "string"
   );
 }
 
