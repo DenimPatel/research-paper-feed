@@ -134,12 +134,17 @@ def main():
     )
     print("Number of papers extracted : ", df.shape[0])
 
+    topic_slug = safe_filename(topic)
+    os.makedirs(args.output_dir, exist_ok=True)
+
     if args.save_csv:
-        df.to_csv(topic + "_papers.csv", index=False)
+        df.to_csv(os.path.join(args.output_dir, f"{topic_slug}_papers.csv"), index=False)
 
     prefix = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
-    os.makedirs(args.output_dir, exist_ok=True)
-    filename = f"{args.output_dir}/{topic}-{len(df)}_papers_extracted_on_{prefix}.html"
+    filename = os.path.join(
+        args.output_dir,
+        f"{topic_slug}-{len(df)}_papers_extracted_on_{prefix}.html",
+    )
     with open(filename, "w") as file:
         file.write(build_html_feed(df))
     print(filename, "file saved!")
