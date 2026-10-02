@@ -58,14 +58,28 @@ Every command below was executed. Dir is noted. **All four baseline checks are g
 
 ### 3.1 Python environment
 
-The repo has **no venv, no `pyproject.toml`, no `setup.cfg`, no lockfile**. `CONTRIBUTING.md:2-4`
-documents `pip install -r requirements.txt` and `python -m unittest discover -s tests -v`, and
-**that documented command fails on this machine**: there is no `python` on `PATH`, and
-`/opt/homebrew/bin/python3` (3.14.3) has neither `arxiv` nor `pandas`. This is a real docs bug
-(`DOC-1` in §9), and it is CONTRIBUTING's fault, not the repo's.
+The repo has **no committed venv, no `pyproject.toml`, no `setup.cfg`, no lockfile**. As of
+**IMP-031 / IMP-032 (`299d753`, 2026-10-02)** both `CONTRIBUTING.md` and `readme.md` document a
+**venv-first, root-based workflow**: `python3 --version` (a `3.10 or newer` gate stated as the first
+line of the block) → `python3 -m venv .venv` → `source .venv/bin/activate` → `python -m pip install
+-r requirements.txt`, with every block naming its working directory and the only `cd web` coming
+*after* the Python test step. That guidance was executed verbatim on a clean copy: **every documented
+step exits 0**, and the suite ran from the repository root as the document says.
 
-**The correct working command on this machine** (uses `/usr/local/bin/python3.11`, the only
-interpreter with the deps: `arxiv 2.1.3`, `pandas 2.2.1`, `numpy 1.26.4`):
+**The floor is documented but still unenforced.** Both docs say "**Python 3.10 and newer** can
+install the dependencies. This project is *verified on Python 3.11 and 3.14*… Python 3.9 and older
+cannot install the dependencies at all." That wording is honest and was measured (3.11.8 and 3.14.3
+both green; 3.10 resolves `pandas` 2.3.x by backtracking, which is why it is stated as installable
+rather than verified). But **no workflow pins any of it**: `ci.yml:15`, `ci.yml:34` and
+`deploy.yml:32` are all `python-version: "3.x"`, and `"3.x"` floats *upward*, so CI will drift to
+3.15/3.16 and will never once exercise the 3.11 floor the docs name. Do not read the docs' floor as
+a tested one. Backlog: **IMP-097** (add a matrix) and **IMP-209** (the matrix must include the
+documented floor, and the two floating sites outside IMP-097's area).
+
+**On this machine** the interpreter with the dependencies is still `/usr/local/bin/python3.11` (the
+only one: `arxiv 2.1.3`, `pandas 2.2.1`, `numpy 1.26.4`); `/opt/homebrew/bin/python3` (3.14.3) has
+neither `arxiv` nor `pandas` outside a venv, so the documented venv block is required here, not
+optional:
 
 ```shell
 # from repo root
@@ -93,15 +107,21 @@ which is exactly how PY-1 existed — 4.x removed `Result.download_pdf` / `downl
 
 ```shell
 # from repo root
-/usr/local/bin/python3.11 -m unittest discover -s tests -v     # 78 tests, OK, ~0.05s
+/usr/local/bin/python3.11 -m unittest discover -s tests -v     # 89 tests, OK, ~1.1s
 ```
 
-Baseline: **`Ran 78 tests` / `OK`, exit 0.** *(Re-measured 2026-10-02; this row previously read 44,
-which was accurate when written and is now stale — re-measure rather than trusting either number.)*
-Fully offline and hermetic — every test injects a fake arXiv client; no network, no real clock, no
-filesystem beyond `tempfile`. Confirmed hermetic by re-running with `socket.connect` /
-`create_connection` / `getaddrinfo` blocked: 78 run, 0 failures. Breakdown:
-`test_arxiv_common.py` (8), `test_build_index.py` (42), `test_paper_collector.py` (28).
+Baseline: **`Ran 89 tests` / `OK`, exit 0.** *(Re-measured 2026-10-02: `Ran 89 tests in 1.104s` /
+`OK`, exit 0, from the command above. This row has read 44, then 78, then 89 as agents landed tests,
+and **each of those numbers was accurate when written** — re-measure, do not trust any of them.)*
+Almost entirely offline and hermetic — every test injects a fake arXiv client; no network, no real
+clock, no filesystem beyond `tempfile`. Under a socket block (`socket.connect` /
+`create_connection` / `getaddrinfo` replaced by a raiser) the suite reports **89 run, 1 failure** —
+the single failure is the pre-existing `BlackHoleRequestTests`, which deliberately binds
+`127.0.0.1:0` to measure a real read timeout and so trips any blanket socket block. Breakdown:
+`test_arxiv_common.py` (18), `test_build_index.py` (43), `test_paper_collector.py` (28) — 18 + 43 +
+28 = 89. **This sentence previously read "78 run, 0 failures" and was false**; it was also the exact
+sentence a future verifier reads to decide hermeticity, so do not restore it without re-running the
+block.
 
 Note the suite is hermetic in the strong sense: it passes identically on `arxiv` 2.1.3, 3.0.0 **and
 4.0.1**, because every arXiv touch point is a fake and no test constructs a real `arxiv.Result`. A
@@ -109,7 +129,7 @@ green suite therefore proves nothing about the installed `arxiv` version — do 
 for a dependency pin (IMP-033's verifier drew exactly this conclusion).
 
 ```shell
-python -m pytest tests -q        # WORKS — 78 passed, but ONLY after `pip install pytest`
+python -m pytest tests -q        # WORKS — 89 passed, but ONLY after `pip install pytest`
 ```
 
 `pytest` is **not installed** in the provisioned 3.11 (`No module named pytest`) and is **not a
@@ -130,7 +150,7 @@ All from **`web/`**. `node_modules` is present and complete (62 packages, lockfi
 ```shell
 cd web
 npm run typecheck    # tsc --noEmit          -> exit 0, no output
-npm test             # vitest run            -> 16 files, 253 tests passed, ~4.5s
+npm test             # vitest run            -> 16 files, 253 tests passed, ~4.2s
 npm run build        # tsc --noEmit && vite build -> 41 modules, ~0.4s
 ```
 
@@ -158,8 +178,10 @@ across the same range). **Data presence does not affect the bundle at all**: the
 files, never inlined, so the JS and CSS content hashes are identical whether `web/public/data` is
 present, absent, or empty.
 
-Test files, **253 tests across 16** — re-measured 2026-10-02 (this table previously read 69 tests
-across 5 and was accurate only at the commit that created it):
+Test files, **253 tests across 16** — re-measured 2026-10-02, and **re-confirmed 2026-10-02 after
+IMP-031/IMP-032 and IMP-198 landed**: `Test Files  16 passed (16)` / `Tests  253 passed (253)`,
+duration 4.19 s. Unchanged by those three commits (this table previously read 69 tests across 5 and
+was accurate only at the commit that created it):
 
 | File | Tests | Environment |
 | --- | --- | --- |
@@ -840,12 +862,12 @@ supposed to fix that row, in which case the row must be updated in this file.**
 | PY-9 | No error handling around `write_index`; an unwritable `--out-dir` propagates a raw `OSError` traceback instead of `logging.error` + `return 1` | `build_index.py:298` |
 | PY-10 | Zero CLI argument validation: `--retention-days -1/0`, `--abstract-chars -3` (silently disables truncation), `--max-per-category -9` (means unlimited), any `--out-dir` | `build_index.py:248-275` |
 | PY-11 | `DEFAULT_OUT_DIR` is CWD-relative, so running outside the repo root writes a stray `web/public/data` nothing deploys | `build_index.py:34` |
-| PY-12 | No HTTP timeout anywhere — `arxiv` 4.x issues `session.get()` with no `timeout=`; a hung connection stalls the deploy to the 6h Actions cap | `arxiv_common.py:20-26` |
+| PY-12 | **FIXED — IMP-198, commit `b7e23a8`.** The request timeout now exists: `DEFAULT_REQUEST_TIMEOUT_SECONDS = 60` at `arxiv_common.py:19`, installed by `install_request_timeout` (`:48-77`) as `TimeoutSession`, a `requests.Session` subclass whose `request()` does `kwargs.setdefault("timeout", …)`. It is a **floor, not a guarantee** — it reaches into the library's private `Client._session` and raises `TimeoutNotInstalled` rather than running unbounded if that attribute ever changes shape. `requests` applies the value per socket operation, so a slow-drip server can still outlast it; the workflow-level `timeout-minutes` on the index step is what bounds that case. **Residual:** the deploy step's cap is 1.009× the compound worst case (38 pages × 70 s + 5 × 360 s = 4460 s vs a 4500 s cap — 40 s of slack, breaking at 39 pages). Backlog **IMP-205**, **IMP-206**. | `arxiv_common.py:16-19, 26-45, 48-77, 80-88`; `deploy.yml:23-26, 37-55` |
 | PY-13 | `DEFAULT_DELAY_SECONDS = 10` is 3× arXiv's stated ToU minimum of 3s, unconfigurable, with no per-category backoff | `arxiv_common.py:16` |
 | PY-14 | `logging.basicConfig` at **import** time in three modules, with three different formats; a library module reconfigures the root logger process-wide | `arxiv_common.py:13`; `paper-collector.py:18`; `build_index.py:40` |
 | PY-15 | `iso_date` docstring claims "normalized to UTC" but the naive-datetime branch does not convert | `build_index.py:77-87` |
 | PY-16 | Dead `yielded` counter that duplicates `arxiv`'s own `islice` limit — untestable by design | `arxiv_common.py:51, 55-57` |
-| PY-17 | `UNLIMITED = 100000` exceeds arXiv's 30,000-result `start` ceiling; if the retention break ever stopped working, `iter_results` would silently truncate | `build_index.py:38`; `arxiv_common.py` |
+| PY-17 | `UNLIMITED = 100000` exceeds arXiv's 30,000-result ceiling. **The line cite was stale (`build_index.py:38` → now `:45`; `limit` is resolved at `:236`) and the row understates the problem.** arXiv's own API manual (§3.1.1.2) states "A request with max_results >30,000 will result in an HTTP 400 error code" and recommends OAI-PMH for bulk harvesting. `--max-per-category 0` is the **default**, and `.github/workflows/deploy.yml:55` runs the bare uncapped command every week. When a deep-offset 5xx fires, `collect_papers` records the failure and `main()` **discards all five categories** and exits 1 with nothing written — reproduced deterministically against a stubbed upstream (6 attempts at `start=10000`, then exit 1, no out-dir). So this is a live production-deploy defect, not a latent one. **Backlog: IMP-095 (the constant) and IMP-204 (the bound + per-category degradation + the deploy default).** | `build_index.py:43-45, 236, 261-273`; `deploy.yml:55` |
 | PY-18 | `--category` is unvalidated — a malformed category produces a query arXiv answers with an empty feed, indistinguishable from "no new papers" | `build_index.py:248-275` |
 | PY-19 | `collect_papers` has a hard-coded, un-injectable clock (`datetime.now(timezone.utc)`, no parameter) while `build_shards` accepts `generated_at` — and therefore has zero test coverage | `build_index.py:203-221` |
 | PY-20 | `sys.path.insert(0, ...)` at import time in every script mutates global import state; no `scripts/__init__.py`; three duplicated `load_module()` helpers in tests | `build_index.py:26`; `paper-collector.py:11`; `tests/*.py` |
@@ -906,12 +928,14 @@ supposed to fix that row, in which case the row must be updated in this file.**
 | INF-20 | `readme.md` is lowercase; no `docs/`, no changelog, no issue/PR templates, no CODEOWNERS, no release process | repo root |
 
 ### Baseline (do not "fix" without being asked)
-Zero failing checks at HEAD: **Python 78/78 OK**, `tsc --noEmit` clean, **vitest 253/253 across 16
+Zero failing checks at HEAD: **Python 89/89 OK**, `tsc --noEmit` clean, **vitest 253/253 across 16
 files**, `npm run build` clean (**41 modules, JS 171.45 kB, CSS 10.93 kB**). Re-measured
 2026-10-02; this paragraph previously read "Python 44/44 … vitest 69/69 across 5 files … 39 modules,
 JS 163.72 kB", which was accurate when written and is now stale — re-measure rather than trusting
-either number. The only genuine command-level failures are the notebook (PE-7) and the missing
-`npm run lint` script (PE-4/INF-04), both absences by design rather than regressions.
+either number. The Python figure is the one that moves every time an agent lands tests (44 → 78 →
+89 across this loop), so **treat 89 as of 2026-10-02, not as a permanent fact**. The only genuine
+command-level failures are the notebook (PE-7) and the missing `npm run lint` script (PE-4/INF-04),
+both absences by design rather than regressions.
 
 **Two non-flaky "green" results are weaker than they look — do not treat them as coverage.**
 (1) The Python suite passes identically on `arxiv` 2.1.3, 3.0.0 and 4.0.1, so it cannot detect the
@@ -924,12 +948,12 @@ fixed order passes, not that the suite is order-independent.
 
 ## 10. Recently fixed — do not re-report
 
-**Twenty-nine items are committed** (`git log --oneline fc77a40..HEAD` is 59 commits; one third are
-`chore(improve)` bookkeeping). Each was implemented, then independently verified; the verifier's
-acceptance criteria all passed. **A verifier who re-raises any of these as a new defect is reporting
-a fixed bug.** Re-verify against the current source before believing either the row or this list —
-several rows in §9 were stale for a full loop after their fix landed, so the drift runs in both
-directions.
+**Thirty-four items are committed** (`git log --oneline fc77a40..HEAD` is 64 commits; roughly a
+third are `chore(improve)` bookkeeping). Each was implemented, then independently verified; the
+verifier's acceptance criteria all passed. **A verifier who re-raises any of these as a new defect is
+reporting a fixed bug.** Re-verify against the current source before believing either the row or this
+list — several rows in §9 were stale for a full loop after their fix landed, so the drift runs in
+both directions.
 
 | Item | Commit | What landed | Profile rows closed |
 | --- | --- | --- | --- |
@@ -955,26 +979,45 @@ directions.
 | IMP-023 | `297ed71` | `safe_filename` made a real sanitizer: `MAX_SLUG_BYTES = 200`, `truncate_to_bytes`, `FALLBACK_SLUG`, `WINDOWS_RESERVED_NAMES` | PY-27 |
 | IMP-024 | `19f8dbb` | `filter="data"` on `tarfile.extractall` with a hand-rolled, tested fallback for pre-3.8.17 interpreters; members pre-screened so one rejection cannot abort the archive | PY-30 |
 | IMP-026 | `2ec06d0` | `npm run build` added to CI's `web-tests` job — a missing asset now fails there first, not only on `main` in `deploy.yml` | INF-01 |
+| IMP-031 / IMP-032 | `299d753` | `CONTRIBUTING.md` and `readme.md` rewritten as a **venv-first, root-based** workflow — every documented step exits 0 when executed verbatim in one continuous session, the only `cd web` now comes *after* the Python test step, the non-existent `npm run lint` removed, and no test count hardcoded in prose. Before this, `CONTRIBUTING.md`'s numbered list left the shell inside `web/` when it reached the Python test command, which failed outright | (no §9 row — the defect lived in this profile's own §3.1 prose, corrected there) |
 | IMP-033 | `bbe2d18` | `arxiv>=2.1.0,<4` — 4.0.0 removed `Result.download_pdf`/`download_source` and swapped `feedparser` for `lxml`; the bound is a **floor, not the fix** (IMP-093) | INF-06 (half), PY-1 (half) |
 | IMP-143 | `5320db6` | `readHash`/`writeHash` moved to `web/src/lib/urlState.ts` with tests (now 50); no behavior change | WEB-37 |
 | IMP-151 | `34ea96c` | Prototype-key membership checks replaced with `PROTOTYPE_KEYS` + `hasOwnKey` throughout `collections.ts` | (was WEB-20's sibling route) |
 | IMP-154 | `2367a80` | `isPaper` validates `categories` and `published`, not just URLs | WEB-21 (half) |
 | IMP-173 | `64bd3f1` | A JSON `null` manifest no longer hangs the app forever | WEB-02 |
 | IMP-192 | `2c73ec9` | Order-dependent alert-count flakes fixed: `findByRole("alert")` + `getAllByRole("alert")).toHaveLength(2)` replaced with a settling `waitFor` | (test-quality; see §3.3 caveat) |
-| IMP-193 | `5684b1b` | CI generates the paper index (`--category cs.CV --max-per-category 5 --out-dir web/public/data`) before `Build`, so the build gate is no longer green on an empty checkout. **Adds a live network call to `web-tests`** — see INF-198 (filed in the backlog) for the timeout this now needs | INF-16 (half) |
+| IMP-193 | `5684b1b` | CI generates the paper index (`--category cs.CV --max-per-category 5 --out-dir web/public/data`) before `Build`, so the build gate is no longer green on an empty checkout. **Adds a live network call to `web-tests`** — the timeout this needed is IMP-198, below | INF-16 (half) |
+| IMP-198 | `b7e23a8` | **The arXiv client now bounds its own requests.** `DEFAULT_REQUEST_TIMEOUT_SECONDS = 60` at `scripts/arxiv_common.py:19`, installed by `install_request_timeout` (`:48-77`) by swapping `TimeoutSession` in as the class of the library's own `Client._session` — private and version-fragile by construction, and it raises rather than degrades. **Both workflows are capped**: `ci.yml` `web-tests` job 25 min / index step 15 min; `deploy.yml` `build` job 90 min / index step 75 min / `deploy` job 15 min. Measured worst case for one page fetch: **360.06 s** (6 attempts × 60 s). **Read the caveat below before quoting that margin.** | (no §9 row — the stale bullet claiming otherwise is superseded in the notes under this table) |
 | IMP-025 | `058acc0` | Non-vacuous test that `--save-csv` writes inside `--output-dir` and never the CWD; `readme.md` note added below the flag table | PY-29 (locked in) |
 | REGRESSION-1 | `7a2ed82` | Null-URL papers are no longer dropped on collection import | WEB-20 (half) |
 | REGRESSION-3 | `819a6d9` | Duplicate recovery control removed; no save-failure alert on a cold boot with nothing stored | (found by sweep 3) |
 
-**Four things in this table are still worth knowing, and none of them are defects:**
+**Five things in this table are still worth knowing, and none of them are defects:**
 - **`arxiv`'s upper bound (IMP-033) is a floor, not a fix.** `--download-pdfs` / `--download-sources`
   are still written against helpers a future major can remove, and the Python suite cannot detect it
   (it passes on 4.0.1 too). IMP-093 owns the port.
-- **`web-tests` now performs a live network call** (IMP-193). The arXiv client sets **no HTTP
-  timeout** on any resolvable `arxiv` version — verified against both 2.1.3 and 3.0.0: `Client.
-  __init__` takes only `page_size`/`delay_seconds`/`num_retries`, and the request goes out as
-  `self._session.get(url, headers=…)` with no `timeout=`. A hung endpoint blocks until GitHub's
-  360-minute job limit. Tracked as **IMP-198** (backlog, `FEATURES.md`).
+- **`web-tests` performs a live network call** (IMP-193), and it is now bounded — but **read the
+  margin honestly.** IMP-198 (`b7e23a8`) added `DEFAULT_REQUEST_TIMEOUT_SECONDS = 60` plus
+  `timeout-minutes` on both workflows, and both are real. Two caveats a verifier must not skip:
+  **(a) the client caps are 2.5× the measured worst case, and only of the *simple* case.** Both step
+  caps are `2.5 × 6 × 60 s` (900 s and 4500 s) — correct for a *total partition*, measured at 360.06 s
+  per page fetch with zero inter-retry spacing. **(b) The deploy step's slack is thin.** A deploy
+  fetches **38 pages** across the 5 categories at today's volumes (measured from
+  `opensearch:totalResults`), the per-page bound is `timeout + delay_seconds = 70 s`, so the compound
+  worst case is `38 × 70 + 5 × 360 = 4460 s` against the `4500 s` cap — **40 s of slack**, and
+  `70 × P + 1800 ≤ 4500` breaks at **P = 39**, about 9 % arXiv growth in a single window. So do not
+  quote "2.5× headroom" for the deploy step; quote 1.009× for the compound case. Backlog:
+  **IMP-205** (raise or derive the cap), **IMP-206** (the job-level caps are unpinned by any test).
+- **arXiv does not space its retries, and that gap is deliberately left open.** `arxiv` records
+  `_last_request_dt` only *after* a successful `get`, so a raising request never engages the
+  `delay_seconds` branch: measured attempt offsets were `0/60/120/180/240/300` s with
+  `delay_seconds = 10` configured. Patching it with client-side `time.sleep` would change request
+  pacing toward arXiv, which is arXiv's terms-of-use decision, so it was left alone — **and that
+  judgement is recorded only in a `ci.yml` comment, not at the call site in `scripts/arxiv_common.py`.**
+  Do not "fix" it. Backlog: **IMP-208** (document it at the call site and here).
+- **The documented Python floor is unenforced.** Both docs say "verified on Python 3.11 and 3.14", but
+  `ci.yml:15`, `ci.yml:34` and `deploy.yml:32` all float `python-version: "3.x"`, and `"3.x"` floats
+  upward — CI will never exercise the floor. See §3.1. Backlog: **IMP-097**, **IMP-209**.
 - **The Python suite's green is version-agnostic.** Every arXiv touch point is a fake, so it cannot
   observe a library API removal.
 - **`npm test` runs in fixed order.** A green plain run says nothing about order-independence; use
