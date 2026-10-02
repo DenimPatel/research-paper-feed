@@ -307,7 +307,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Depends on IMP-143 because criterion 4 needs the extracted, testable `writeHash`. IMP-106 (a broader "Clear filters" action) and IMP-009 (validating hash categories against the manifest) touch adjacent UI; keep the copy unambiguous about which control resets what. | commit pending
 
 ### IMP-011 — Surface `saveState` failure to the user
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** bug-fix
 - **Area / files:** `web/src/App.tsx:231-235` (save effect discarding the boolean), `web/src/lib/collections.ts:279-292` (`saveState` returning `false`)
@@ -321,7 +321,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-012 — Darken `--text-muted` until it clears 4.5:1 on every surface
 - **Status:** DONE
 - **Category:** Accessibility
@@ -371,7 +371,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 
 ### IMP-015 — Make a single failed shard non-fatal
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Error handling & edge cases
 - **Type:** bug-fix
 - **Area / files:** `web/src/lib/paperIndex.ts:150-157` (`Promise.all` over needed shards), `web/src/lib/paperIndex.ts:100-127` (`loadShard` throws)

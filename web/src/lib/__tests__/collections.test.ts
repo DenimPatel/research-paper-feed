@@ -80,6 +80,44 @@ const THROWING_STORAGE = {
   },
 } as unknown as Storage;
 
+/**
+ * A quota that is exhausted by the time `saveState` reaches `PAPERS_KEY`. Reads
+ * succeed and the first write lands, so this is the fill-up-the-quota shape of
+ * `DOMException("…", "QuotaExceededError")` rather than `THROWING_STORAGE`'s
+ * storage-disabled one. `writes` records the keys in order and `succeed()` makes
+ * the store writable again, which is how the caller recovers.
+ */
+function quotaStorage(): { storage: Storage; writes: string[]; succeed(): void } {
+  const writes: string[] = [];
+  let full = true;
+  const store = new Map<string, string>();
+  const storage = {
+    get length(): number {
+      return store.size;
+    },
+    clear(): void {
+      store.clear();
+    },
+    getItem(key: string): string | null {
+      return store.get(key) ?? null;
+    },
+    key(index: number): string | null {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    removeItem(key: string): void {
+      store.delete(key);
+    },
+    setItem(key: string, value: string): void {
+      writes.push(key);
+      if (full && key === PAPERS_KEY) {
+        throw new DOMException("quota", "QuotaExceededError");
+      }
+      store.set(key, value);
+    },
+  } satisfies Storage;
+  return { storage, writes, succeed: () => (full = false) };
+}
+
 describe("createCollection", () => {
   it("builds an empty named collection", () => {
     const collection = createCollection("Vision", "2024-01-08T00:00:00Z", "id-1");
@@ -547,6 +585,37 @@ describe("loadState / saveState", () => {
   it("degrades to an empty state and false when storage throws", () => {
     expect(loadState(THROWING_STORAGE)).toEqual(EMPTY_STATE);
     expect(saveState(EMPTY_STATE, THROWING_STORAGE)).toBe(false);
+  });
+
+  it("returns false when the quota fills on the second key it writes", () => {
+    // A real quota is not `THROWING_STORAGE`: the collections key still fits and
+    // only the papers key — the larger of the two, and the second one written —
+    // overflows. That is the failure the App's save effect turns into a banner,
+    // and it is reachable on an ordinary 5 MB localStorage rather than only
+    // under a storage-blocking policy.
+    const { storage, writes } = quotaStorage();
+    const state = collectionsReducer(EMPTY_STATE, {
+      type: "addCollection",
+      collection: createCollection("Vision", "2024-01-08", "c1"),
+    });
+
+    expect(saveState(state, storage)).toBe(false);
+    expect(writes).toEqual([COLLECTIONS_KEY, PAPERS_KEY]);
+  });
+
+  it("reports the next save as successful once the quota is gone", () => {
+    // `false` is a per-attempt result, not a sticky flag, so the caller has a
+    // successful return to clear its warning on. A `saveState` that latched the
+    // first failure would leave the user permanently warned.
+    const { storage, succeed } = quotaStorage();
+    const state = collectionsReducer(EMPTY_STATE, {
+      type: "addCollection",
+      collection: createCollection("Vision", "2024-01-08", "c1"),
+    });
+
+    expect(saveState(state, storage)).toBe(false);
+    succeed();
+    expect(saveState(state, storage)).toBe(true);
   });
 });
 

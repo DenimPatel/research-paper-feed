@@ -224,10 +224,18 @@ export function App() {
   const [collections, dispatch] = useReducer(collectionsReducer, undefined, () =>
     loadState(),
   );
+  const [saveFailed, setSaveFailed] = useState(false);
 
+  // `saveState` reports a blocked or exhausted quota by returning false rather
+  // than throwing, so this effect is the only place the failure can be
+  // noticed. Without it the reducer state stays optimistic, the card shows the
+  // paper as saved, and everything is gone on the next reload. Setting the
+  // flag unconditionally is safe: `useState` bails out on an unchanged value,
+  // and this effect does not depend on it, so a steady stream of saves cannot
+  // loop.
   useEffect(() => {
     if (storageAvailable) {
-      saveState(collections);
+      setSaveFailed(!saveState(collections));
     }
   }, [collections, storageAvailable]);
 
@@ -367,6 +375,19 @@ export function App() {
       </header>
 
       <main className="app__main" id="main">
+        {saveFailed && (
+          // Outside the view branch because a save can fail from either tab,
+          // and `role="alert"` on a node that mounts only while the failure
+          // lasts means the announcement fires once per failure rather than on
+          // every render or every later failed save. Reuses `banner` /
+          // `banner--error`, the same pair the import error already uses.
+          <p className="banner banner--error" role="alert">
+            <strong>Collections could not be saved.</strong> This browser’s
+            storage may be full or blocked, so anything you just changed will be
+            lost when you reload this page.
+          </p>
+        )}
+
         {view === "collections" ? (
           <CollectionsView
             state={collections}
