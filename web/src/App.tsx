@@ -480,7 +480,7 @@ export function App() {
                     {progress.total === 1 ? "" : "s"}… ({progress.loaded}/
                     {progress.total})
                   </p>
-) : noCategoriesSelected ? (
+                ) : noCategoriesSelected ? (
                   // Deselecting the last chip is the one filter change no chip
                   // can undo, so this state names its own cause and offers the
                   // action that reverses it instead of the generic "nothing

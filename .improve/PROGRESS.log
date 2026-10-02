@@ -1,16 +1,18 @@
-2026-10-02T04:20:00Z | IMP-001 | DONE    | 0beec1b
-2026-10-02T04:34:18Z | IMP-002 | DONE    | d3b4a1e
-2026-10-02T04:34:18Z | IMP-003 | DONE    | 768a5ae
-2026-10-02T04:49:38Z | IMP-004 | DONE    | 468b80d
-2026-10-02T04:52:10Z | IMP-005 | DONE    | 894fb9b
-2026-10-02T05:19:11Z | IMP-143 | DONE    | 5320db6
-2026-10-02T05:31:44Z | IMP-024 | DONE    | 19f8dbb (attempt 2; attempt 1 FAILed on fallback traversal)
-2026-10-02T05:36:20Z | IMP-151 | DONE    | 34ea96c
-2026-10-02T05:44:02Z | IMP-012 | DONE    | 0ad375c
-2026-10-02T06:03:29Z | REGRESSION-1 | FOUND | data loss in IMP-001 (null URL drops papers on import)
-2026-10-02T06:03:29Z | REGRESSION-1 | FIXED | 7a2ed822026-10-02T07:17:28Z | IMP-154 | DONE | 2367a80
-ac1fae2 | IMP-007 | DONE |  (attempt 2)
-2026-10-02T08:44:46Z | IMP-008 | DONE | 67ee0a4 (attempt 2)
-2026-10-02T09:54:23Z | IMP-009 | DONE | 228d48d
-2026-10-02T10:37:33Z | IMP-010 | DONE | 42e0edb
-297ed71 | IMP-023 | DONE | 
+2026-10-02T04:20:00Z | IMP-001      | DONE     | 0beec1b
+2026-10-02T04:34:18Z | IMP-002      | DONE     | d3b4a1e
+2026-10-02T04:34:18Z | IMP-003      | DONE     | 768a5ae
+2026-10-02T04:49:38Z | IMP-004      | DONE     | 468b80d
+2026-10-02T04:52:10Z | IMP-005      | DONE     | 894fb9b
+2026-10-02T05:19:11Z | IMP-143      | DONE     | 5320db6
+2026-10-02T05:31:44Z | IMP-024      | DONE     | 19f8dbb (attempt 2; attempt 1 FAILed on fallback traversal)
+2026-10-02T05:36:20Z | IMP-151      | DONE     | 34ea96c
+2026-10-02T05:44:02Z | IMP-012      | DONE     | 0ad375c
+2026-10-02T06:03:29Z | REGRESSION-1 | FOUND    | data loss in IMP-001 (null URL drops papers on import)
+2026-10-02T06:03:29Z | REGRESSION-1 | FIXED    | 7a2ed82
+2026-10-02T07:17:28Z | IMP-154      | DONE     | 2367a80
+2026-10-02T07:40:12Z | IMP-007      | DONE     | ac1fae2 (attempt 2; attempt 1 FAILed on dead retry button)
+2026-10-02T08:44:46Z | IMP-008      | DONE     | 67ee0a4 (attempt 2; attempt 1 FAILed on flaky test race)
+2026-10-02T09:54:23Z | IMP-009      | DONE     | 228d48d (attempt 2; attempt 1 never wired App.tsx)
+2026-10-02T10:37:33Z | IMP-010      | DONE     | 42e0edb
+2026-10-02T10:52:04Z | IMP-023      | DONE     | 297ed71
+2026-10-02T11:10:19Z | REGRESSION-2 | CLEAN    | 34 browser states, 160 web tests x9 runs, 53 python tests
