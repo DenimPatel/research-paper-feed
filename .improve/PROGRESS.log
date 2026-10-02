@@ -10,3 +10,4 @@
 2026-10-02T06:03:29Z | REGRESSION-1 | FOUND | data loss in IMP-001 (null URL drops papers on import)
 2026-10-02T06:03:29Z | REGRESSION-1 | FIXED | 7a2ed822026-10-02T07:17:28Z | IMP-154 | DONE | 2367a80
 ac1fae2 | IMP-007 | DONE |  (attempt 2)
+2026-10-02T08:44:46Z | IMP-008 | DONE | 67ee0a4 (attempt 2)
