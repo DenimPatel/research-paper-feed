@@ -167,7 +167,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:** Dependency cost, as required by the profile: three dev-only packages, none shipped in the Pages bundle (`react` + `react-dom` remain the only runtime dependencies). `web/package-lock.json` is on the do-not-touch list, so this item — together with IMP-137 — is one of only two places that may change it, and only via `npm install`. Effort is `S` because the change is three devDependencies plus two config lines; the lockfile regeneration is one command. If `@testing-library/user-event` proves unnecessary for the first smoke test, drop it rather than carrying an unused dep. | commit 894fb9b
 
 ### IMP-143 — Export and test `readHash` / `writeHash`
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Test coverage & test quality
 - **Type:** refactor
 - **Area / files:** `web/src/App.tsx:38-59` (`readHash`, module-private), `web/src/App.tsx:61-85` (`writeHash`, module-private, calling `history.replaceState` at `:83`), new `web/src/lib/urlState.ts`, new `web/src/lib/__tests__/urlState.test.ts`
@@ -480,7 +480,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Notes:**
 
 ### IMP-024 — Pass `filter="data"` to `tarfile.extractall`
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** Security
 - **Type:** bug-fix
 - **Area / files:** `scripts/paper-collector.py:78-79` (`file.extractall(f"./extracted/{title_slug}")`), `.github/workflows/ci.yml:15` (`python-version: "3.x"`)

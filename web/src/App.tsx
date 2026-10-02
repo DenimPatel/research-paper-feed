@@ -20,69 +20,14 @@ import {
 import { PaperIndex, type LoadProgress } from "./lib/paperIndex";
 import { rankPapers, scorePaper, tokenize } from "./lib/search";
 import type { IndexManifest, Paper, RecencyDays, SortMode } from "./lib/types";
+import {
+  readHash,
+  writeHash,
+  type HashState,
+  type View,
+} from "./lib/urlState";
 
 const PAGE_SIZE = 50;
-const DEFAULT_RECENCY: RecencyDays = 60;
-const RECENCY_VALUES: RecencyDays[] = [7, 30, 60];
-
-type View = "feed" | "collections";
-
-interface HashState {
-  view: View;
-  query: string;
-  categories: string[] | null;
-  recency: RecencyDays;
-  sort: SortMode;
-}
-
-function readHash(): HashState {
-  const raw = window.location.hash.replace(/^#/, "");
-  const params = new URLSearchParams(raw);
-
-  const rawRecency = Number(params.get("recency"));
-  const recency = RECENCY_VALUES.includes(rawRecency as RecencyDays)
-    ? (rawRecency as RecencyDays)
-    : DEFAULT_RECENCY;
-
-  const rawCategories = params.get("cat");
-
-  return {
-    view: params.get("view") === "collections" ? "collections" : "feed",
-    query: params.get("q") ?? "",
-    categories:
-      rawCategories === null
-        ? null
-        : rawCategories.split(",").filter(Boolean),
-    recency,
-    sort: params.get("sort") === "relevance" ? "relevance" : "newest",
-  };
-}
-
-function writeHash(state: HashState, mode: "push" | "replace"): void {
-  const params = new URLSearchParams();
-  if (state.view !== "feed") {
-    params.set("view", state.view);
-  }
-  if (state.query) {
-    params.set("q", state.query);
-  }
-  if (state.categories !== null) {
-    params.set("cat", state.categories.join(","));
-  }
-  if (state.recency !== DEFAULT_RECENCY) {
-    params.set("recency", String(state.recency));
-  }
-  if (state.sort !== "newest") {
-    params.set("sort", state.sort);
-  }
-
-  const hash = `#${params.toString()}`;
-  if (mode === "push") {
-    window.location.hash = hash;
-  } else {
-    window.history.replaceState(null, "", hash);
-  }
-}
 
 function detectStorage(): boolean {
   try {
