@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeLoadFailure } from "../failureCopy";
+import { describeIncompleteIndex, describeLoadFailure } from "../failureCopy";
 import { IndexUnavailableError, ShardLoadError } from "../paperIndex";
 
 /** Every technical token IMP-017 AC2 bars from a rendered user-facing string. */
@@ -115,5 +115,71 @@ describe("describeLoadFailure", () => {
       expect(message.length, `${detail} produced copy`).toBeGreaterThan(0);
       expectNoTechnicalDetail(message);
     }
+  });
+});
+
+describe("describeIncompleteIndex", () => {
+  it("says nothing at all about a complete index", () => {
+    // The gate the banner is mounted on. If this were not null for a healthy
+    // manifest, every reader of a complete index would be told it was short.
+    expect(describeIncompleteIndex()).toBeNull();
+    expect(describeIncompleteIndex([], [])).toBeNull();
+    expect(describeIncompleteIndex(undefined, undefined)).toBeNull();
+  });
+
+  it("names a category that could not be fetched, and says why there is no filter for it", () => {
+    const notice = describeIncompleteIndex(["cs.RO"]);
+    expect(notice).not.toBeNull();
+    expect(notice?.headline).toMatch(/incomplete/i);
+    expect(notice?.prose).toContain("cs.RO");
+    expect(notice?.prose).toMatch(/could not be fetched/i);
+    // The whole point of dropping the category from `categories`: the reader is
+    // told why there is nothing to click, instead of clicking and being told
+    // their own filter is wrong.
+    expect(notice?.prose).toMatch(/no filter to browse/);
+    expectNoTechnicalDetail(notice?.prose ?? "");
+  });
+
+  it("reads correctly for more than one missing category", () => {
+    const notice = describeIncompleteIndex(["cs.RO", "cs.AI"]);
+    expect(notice?.prose).toContain("cs.RO, cs.AI");
+    expect(notice?.prose).toMatch(/they have no papers here/);
+    expect(notice?.prose).toMatch(/no filters to browse/);
+  });
+
+  it("distinguishes a category that is short from one that is gone", () => {
+    // Different problems: missing papers versus papers that may be missing.
+    // Conflating them would either alarm a reader over a partial category or
+    // understate a category that is entirely absent.
+    const notice = describeIncompleteIndex([], ["cs.AI"]);
+    expect(notice?.prose).toContain("cs.AI");
+    expect(notice?.prose).toMatch(/cut off at this index's per-category limit/i);
+    expect(notice?.prose).toMatch(/may be missing/i);
+    expect(notice?.prose).not.toMatch(/could not be fetched/i);
+  });
+
+  it("reports both in one notice when both happened", () => {
+    const notice = describeIncompleteIndex(["cs.RO"], ["cs.AI"]);
+    expect(notice?.prose).toContain("cs.RO");
+    expect(notice?.prose).toContain("cs.AI");
+    expect(notice?.detail).toContain("failed: cs.RO");
+    expect(notice?.detail).toContain("truncated: cs.AI");
+    expectNoTechnicalDetail(notice?.prose ?? "");
+  });
+
+  it("never reports a category twice when it is both failed and short", () => {
+    const notice = describeIncompleteIndex(["cs.RO"], ["cs.RO"]);
+    expect(notice?.prose.match(/cs\.RO/g)).toHaveLength(1);
+    expect(notice?.detail).not.toContain("truncated");
+  });
+
+  it("treats a malformed manifest value as nothing to report", () => {
+    // IMP-098 owns manifest validation; this must not be the thing that throws
+    // on its way to the screen.
+    expect(describeIncompleteIndex("cs.RO" as unknown as string[])).toBeNull();
+    expect(
+      describeIncompleteIndex([42 as unknown as string, ""]),
+    ).toBeNull();
+    expect(describeIncompleteIndex(undefined, "nope" as unknown as string[])).toBeNull();
   });
 });

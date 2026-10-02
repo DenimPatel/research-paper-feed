@@ -37,6 +37,20 @@ export interface IndexManifest {
   categories: string[];
   shards: ShardManifestEntry[];
   totalPapers: number;
+  /**
+   * Categories whose query did not complete, so the index has no papers for
+   * them at all. They are deliberately *not* in `categories`: that list drives
+   * the filter chips, and a chip for an absent category leads the reader to an
+   * empty feed that reads as their own filter being wrong. Named here so the
+   * site can say what is missing instead.
+   */
+  failedCategories?: string[];
+  /**
+   * Categories that used up their per-category result allowance, so older
+   * papers inside the retention window may be missing. They *are* in
+   * `categories` — they have papers — but they are not complete.
+   */
+  truncatedCategories?: string[];
 }
 
 export interface ShardFile {

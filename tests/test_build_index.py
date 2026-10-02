@@ -14,8 +14,36 @@ MODULE_PATH = os.path.join(
 DEPLOY_PATH = os.path.join(
     os.path.dirname(__file__), "..", ".github", "workflows", "deploy.yml"
 )
-DEPLOY_INDEX_RUN = re.compile(r"^\s*run:\s*python scripts/build_index\.py\s*$")
+# Flags on the deploy step's own command are allowed: the explicit
+# ``--max-per-category`` is the deliverable of IMP-204, and a matcher that only
+# accepted a bare command would stop finding the step whose cap has to be
+# checked (which is what the assertion in DeployStepTimeoutTests is for).
+DEPLOY_INDEX_RUN = re.compile(r"^\s*run:\s*python scripts/build_index\.py(?:\s|$)")
+MAX_PER_CATEGORY_FLAG = re.compile(r"--max-per-category\s+(\d+)")
 TIMEOUT_LINE = re.compile(r"^\s*timeout-minutes:\s*(\d+)\s*(?:#.*)?$")
+
+# arXiv's API user manual (§3.1.1.2): a query is limited to 30,000 results,
+# returned "in slices of at most 2000 at a time", and a request asking for more
+# than 30,000 is answered with HTTP 400. Pinned here as literals rather than
+# read off the module, so a bound raised above either one fails.
+ARXIV_RESULTS_PER_QUERY = 30000
+ARXIV_RESULTS_PER_SLICE = 2000
+
+
+def requested_pages(limit, page_size):
+    """The ``(start, max_results)`` pairs ``arxiv.Client`` would request.
+
+    ``Client._results`` asks for ``page_size`` results at ``start``, then
+    advances ``start`` by the size of the page it received, and ``_format_url``
+    writes that pair straight into the query URL. A feed that keeps returning
+    full pages therefore produces exactly this sequence, and it is the largest
+    one a run can produce for ``limit``. Mirrored here so the ceiling can be
+    asserted without opening a socket.
+    """
+    start = 0
+    while start < limit:
+        yield start, page_size
+        start += page_size
 
 
 def load_module():
@@ -455,6 +483,62 @@ class CollectPapersRetentionTests(unittest.TestCase):
         self.assertEqual(failures, [])
 
 
+class QueryCeilingTests(unittest.TestCase):
+    """The bound handed to arXiv must be one the API will actually serve.
+
+    ``--max-per-category 0`` is the default and the value the index build used
+    to run the deploy with, so it has to resolve to a reachable bound: arXiv
+    caps one query at 30,000 results, refuses to serve the offsets past it, and
+    answers a larger request with HTTP 400. A constant above that is not a
+    limit, it is a promise the API declines to keep.
+    """
+
+    def setUp(self):
+        self.original = build_index.arxiv_common.iter_results
+
+    def tearDown(self):
+        build_index.arxiv_common.iter_results = self.original
+
+    def _limit_handed_to_iter_results(self, max_per_category):
+        captured = []
+
+        def fake_iter_results(query, max_results, status=None):
+            captured.append(max_results)
+            return iter(())
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        build_index.collect_papers(["cs.CV"], 60, max_per_category, 500, [])
+        return captured
+
+    def test_the_uncapped_default_is_the_documented_ceiling(self):
+        self.assertEqual(self._limit_handed_to_iter_results(0), [30000])
+        self.assertEqual(build_index.UNLIMITED, 30000)
+
+    def test_a_cap_above_the_ceiling_is_clamped_instead_of_paging_past_it(self):
+        # Otherwise --max-per-category 100000 rebuilds the unreachable bound as
+        # a flag value, on the same query, with the same HTTP 400 waiting.
+        self.assertEqual(
+            self._limit_handed_to_iter_results(100000), [ARXIV_RESULTS_PER_QUERY]
+        )
+
+    def test_a_cap_below_the_ceiling_is_passed_through(self):
+        self.assertEqual(self._limit_handed_to_iter_results(300), [300])
+
+    def test_no_single_request_exceeds_the_slice_or_the_window(self):
+        page_size = build_index.arxiv_common.build_client(
+            build_index.UNLIMITED
+        ).page_size
+        self.assertLessEqual(page_size, ARXIV_RESULTS_PER_SLICE)
+        pages = list(requested_pages(build_index.UNLIMITED, page_size))
+        self.assertEqual(len(pages), 30)
+        for start, max_results in pages:
+            with self.subTest(start=start):
+                self.assertLessEqual(max_results, ARXIV_RESULTS_PER_SLICE)
+                self.assertLessEqual(
+                    start + max_results, ARXIV_RESULTS_PER_QUERY
+                )
+
+
 class MainTests(unittest.TestCase):
     def test_refuses_to_write_an_empty_index(self):
         import tempfile
@@ -471,18 +555,99 @@ class MainTests(unittest.TestCase):
         finally:
             build_index.collect_papers = original
 
-    def test_refuses_to_write_index_when_a_category_query_fails(self):
+    def test_a_failed_category_no_longer_discards_the_others(self):
+        """The deliberate rewrite of IMP-004's guarantee (IMP-204 criterion 2).
+
+        IMP-004 made *any* failed category fatal, because a truncated index is
+        indistinguishable from a complete one once deployed. That is still
+        fatal when every category fails -- the next test pins that. But one
+        category dying mid-paging used to throw away the four that succeeded,
+        which is how a single deep-offset 500 emptied the weekly deploy: exit 1,
+        no out-dir, and a live site left on the previous week's index.
+
+        The shortfall is now published *and* labelled: the manifest names the
+        category that failed, and the failure is logged at ERROR. The exit code
+        stays 0 on purpose -- a non-zero exit fails the deploy step, which
+        throws away the index it just wrote and reproduces the stale live site
+        this item exists to remove.
+        """
+        import tempfile
+
+        arxiv_error = build_index.arxiv_common.arxiv.ArxivError
+        original = build_index.arxiv_common.iter_results
+        failed = build_index.DEFAULT_CATEGORIES[-1]
+
+        def fake_iter_results(query, max_results, status=None):
+            category = query.split(":", 1)[-1]
+            if category == failed:
+                # Pages answered, then a deep offset came back 500: the records
+                # already yielded survive and the category is marked failed.
+                yield make_result("2401.00009")
+                raise arxiv_error(
+                    "https://export.arxiv.org/api/query", 0, "simulated outage"
+                )
+            yield make_result(
+                "2401.0000%d" % (build_index.DEFAULT_CATEGORIES.index(category) + 1)
+            )
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                with self.assertLogs(level="ERROR") as captured:
+                    exit_code = build_index.main(["--out-dir", out_dir])
+                self.assertEqual(exit_code, 0)
+                manifest_path = os.path.join(out_dir, "index.json")
+                self.assertTrue(os.path.exists(manifest_path))
+                with open(manifest_path, encoding="utf-8") as handle:
+                    manifest = json.load(handle)
+                self.assertEqual(manifest["failedCategories"], [failed])
+                self.assertIn(failed, "\n".join(captured.output))
+                # Only the categories that answered are advertised. Keeping the
+                # failed one would put a chip in the site's filter that leads to
+                # "No papers match the current filters" -- a false statement
+                # about the reader's own filter, made because of an outage they
+                # never caused. The notice names it instead.
+                self.assertNotIn(failed, manifest["categories"])
+                self.assertEqual(
+                    manifest["categories"],
+                    [
+                        c for c in build_index.DEFAULT_CATEGORIES
+                        if c != failed
+                    ],
+                )
+                self.assertGreater(manifest["totalPapers"], 0)
+                ids = set()
+                for name in os.listdir(out_dir):
+                    if not name.startswith("papers-"):
+                        continue
+                    with open(os.path.join(out_dir, name), encoding="utf-8") as handle:
+                        ids.update(p["id"] for p in json.load(handle)["papers"])
+                self.assertLessEqual(
+                    {
+                        "2401.00001", "2401.00002", "2401.00003", "2401.00004",
+                    },
+                    ids,
+                )
+        finally:
+            build_index.arxiv_common.iter_results = original
+
+    def test_refuses_to_write_index_when_every_category_query_fails(self):
+        """IMP-004's guarantee, in the shape it was written for.
+
+        This is the case the hard-fail exists for: a total outage produces no
+        papers at all, and an empty index must never replace a deployed one.
+        Degrading per category must not reach this far.
+        """
         import tempfile
 
         arxiv_error = build_index.arxiv_common.arxiv.ArxivError
         original = build_index.arxiv_common.iter_results
 
         def fake_iter_results(query, max_results, status=None):
-            if query == "cat:cs.LG":
-                raise arxiv_error(
-                    "https://export.arxiv.org/api/query", 0, "simulated outage"
-                )
-            yield make_result("2401.00001")
+            raise arxiv_error(
+                "https://export.arxiv.org/api/query", 0, "simulated outage"
+            )
+            yield  # pragma: no cover - unreachable, makes this a generator
 
         build_index.arxiv_common.iter_results = fake_iter_results
         try:
@@ -493,9 +658,146 @@ class MainTests(unittest.TestCase):
                         "--category", "cs.CV",
                         "--category", "cs.LG",
                     ])
-                self.assertNotEqual(exit_code, 0)
+                self.assertEqual(exit_code, 1)
                 self.assertEqual(os.listdir(out_dir), [])
-                self.assertIn("cs.LG", "\n".join(captured.output))
+                log = "\n".join(captured.output)
+                self.assertIn("cs.CV", log)
+                self.assertIn("cs.LG", log)
+        finally:
+            build_index.arxiv_common.iter_results = original
+
+    def test_a_failed_category_is_still_fatal_when_nothing_else_has_papers(self):
+        # Degrading writes a short index, never an empty one: the category that
+        # answered produced nothing inside the retention window, so there is
+        # nothing to publish and the reader is better served by the previous
+        # deployment.
+        import tempfile
+
+        arxiv_error = build_index.arxiv_common.arxiv.ArxivError
+        original = build_index.arxiv_common.iter_results
+        stale = datetime.now(timezone.utc) - timedelta(days=365)
+
+        def fake_iter_results(query, max_results, status=None):
+            if query == "cat:cs.RO":
+                raise arxiv_error(
+                    "https://export.arxiv.org/api/query", 0, "simulated outage"
+                )
+            yield make_result("2001.00001", stale)
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                with self.assertLogs(level="ERROR") as captured:
+                    exit_code = build_index.main([
+                        "--out-dir", out_dir,
+                        "--category", "cs.CV",
+                        "--category", "cs.RO",
+                    ])
+                self.assertEqual(exit_code, 1)
+                self.assertEqual(os.listdir(out_dir), [])
+                self.assertIn("cs.RO", "\n".join(captured.output))
+        finally:
+            build_index.arxiv_common.iter_results = original
+
+    def test_a_complete_index_records_no_failed_categories(self):
+        # Absence is the signal, so the healthy manifest stays byte-for-byte
+        # what a deployed index.json has always been: adding an always-present
+        # empty list would have every existing reader treat a healthy index as
+        # degraded.
+        import tempfile
+
+        original = build_index.arxiv_common.iter_results
+
+        def fake_iter_results(query, max_results, status=None):
+            yield make_result("2401.00001")
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                exit_code = build_index.main(["--out-dir", out_dir])
+                self.assertEqual(exit_code, 0)
+                manifest_path = os.path.join(out_dir, "index.json")
+                with open(manifest_path, encoding="utf-8") as handle:
+                    manifest = json.load(handle)
+                self.assertNotIn("failedCategories", manifest)
+                self.assertNotIn("truncatedCategories", manifest)
+                self.assertEqual(
+                    sorted(manifest),
+                    [
+                        "categories",
+                        "generatedAt",
+                        "retentionDays",
+                        "shards",
+                        "totalPapers",
+                    ],
+                )
+        finally:
+            build_index.arxiv_common.iter_results = original
+
+    def test_a_category_that_spends_the_whole_allowance_is_recorded(self):
+        """A cap-bound truncation must not be a silent one.
+
+        A category that returns exactly ``limit`` results has no results left to
+        prove there were not more, so the index says so. Without this the cap
+        could start cutting papers off with nothing but a log line to show for
+        it -- and unlike a failed query, a truncation never marks a category
+        failed, so nothing else in the manifest would record it.
+        """
+        import tempfile
+
+        original = build_index.arxiv_common.iter_results
+
+        def fake_iter_results(query, max_results, status=None):
+            for index in range(max_results):
+                yield make_result("2401.%05d" % index)
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                with self.assertLogs(level="WARNING") as captured:
+                    exit_code = build_index.main([
+                        "--out-dir", out_dir,
+                        "--category", "cs.AI",
+                        "--max-per-category", "3",
+                    ])
+                self.assertEqual(exit_code, 0)
+                manifest_path = os.path.join(out_dir, "index.json")
+                with open(manifest_path, encoding="utf-8") as handle:
+                    manifest = json.load(handle)
+                self.assertEqual(manifest["truncatedCategories"], ["cs.AI"])
+                # A truncated category still has papers behind it, so it stays
+                # filterable; only a category with nothing is dropped.
+                self.assertEqual(manifest["categories"], ["cs.AI"])
+                self.assertNotIn("failedCategories", manifest)
+                self.assertIn("cs.AI", "\n".join(captured.output))
+                self.assertEqual(manifest["totalPapers"], 3)
+        finally:
+            build_index.arxiv_common.iter_results = original
+
+    def test_a_category_short_of_the_allowance_is_not_recorded_as_truncated(self):
+        # The control: spending the allowance is the only evidence there is, so
+        # anything less than that must stay off the manifest or every run that
+        # ends on a full page would claim to be incomplete.
+        import tempfile
+
+        original = build_index.arxiv_common.iter_results
+
+        def fake_iter_results(query, max_results, status=None):
+            yield make_result("2401.00001")
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                exit_code = build_index.main([
+                    "--out-dir", out_dir,
+                    "--category", "cs.AI",
+                    "--max-per-category", "30000",
+                ])
+                self.assertEqual(exit_code, 0)
+                manifest_path = os.path.join(out_dir, "index.json")
+                with open(manifest_path, encoding="utf-8") as handle:
+                    manifest = json.load(handle)
+                self.assertNotIn("truncatedCategories", manifest)
         finally:
             build_index.arxiv_common.iter_results = original
 
@@ -678,6 +980,87 @@ class CategoryArgumentTests(unittest.TestCase):
             self.assertEqual(raised.exception.code, 2)
         finally:
             build_index.collect_papers = original
+
+
+class DeployStepCommandTests(unittest.TestCase):
+    """The deploy's index build must name its cap instead of leaning on 0.
+
+    ``0`` means "no cap beyond arXiv's ceiling", which is safe but is the
+    number that made the weekly build reach for offsets the API refuses. The
+    shipped command therefore carries the cap explicitly, and the number in the
+    comment above it is the number on the command line -- a comment that
+    explains a different value than the one that runs is worse than none.
+    """
+
+    def _index_step(self):
+        with open(DEPLOY_PATH, encoding="utf-8") as handle:
+            lines = handle.readlines()
+        for index, line in enumerate(lines):
+            if DEPLOY_INDEX_RUN.match(line):
+                return index, lines
+        self.fail("deploy.yml no longer runs 'python scripts/build_index.py'")
+
+    def _cap_on_the_command_line(self, index, lines):
+        match = MAX_PER_CATEGORY_FLAG.search(lines[index])
+        self.assertIsNotNone(
+            match,
+            "deploy.yml:%d: %r must pass --max-per-category explicitly rather "
+            "than rely on the default" % (index + 1, lines[index].strip()),
+        )
+        return int(match.group(1))
+
+    def _comment_above_the_run_line(self, index, lines):
+        # The step's comment sits above its sibling keys (``timeout-minutes``),
+        # so the block is everything between the step's ``- name:`` and the run.
+        start = index
+        while start > 0 and not lines[start].lstrip().startswith("- name:"):
+            start -= 1
+        return "\n".join(
+            line.strip().lstrip("#").strip()
+            for line in lines[start:index]
+            if line.strip().startswith("#")
+        )
+
+    def test_the_index_step_caps_what_it_fetches_within_the_ceiling(self):
+        index, lines = self._index_step()
+        cap = self._cap_on_the_command_line(index, lines)
+        self.assertGreater(cap, 0, "0 is the 'no cap' default, not a cap")
+        self.assertLessEqual(
+            cap, ARXIV_RESULTS_PER_QUERY,
+            "deploy.yml:%d asks for %d results per category, above arXiv's "
+            "%d-result ceiling" % (index + 1, cap, ARXIV_RESULTS_PER_QUERY),
+        )
+
+    def test_the_cap_stays_clear_of_the_real_window_sizes(self):
+        """The cap is a safety bound, so it must not sit just above a window.
+
+        cs.AI held 10,785 papers in its 60-day window on 2026-10-02 (measured
+        from ``opensearch`` totalResults by IMP-198's verifier) and arXiv grows
+        ~9% per window. A cap at 12,000 was +11% over that -- one growth step
+        from binding, and binding was silent, since a cap-bound truncation is
+        not a failed query. Two times the largest measured window is the floor
+        that keeps this a safety bound instead of a content budget; the ceiling
+        itself is the cap's other bound and is enforced by
+        ``QueryCeilingTests``.
+        """
+        largest_measured_window = 10785  # cs.AI, 60-day window, 2026-10-02
+        index, lines = self._index_step()
+        cap = self._cap_on_the_command_line(index, lines)
+        self.assertGreaterEqual(
+            cap,
+            2 * largest_measured_window,
+            "deploy.yml:%d caps at %d, under 2x the largest measured 60-day "
+            "window (%d); a cap that close to a real window size truncates on "
+            "ordinary arXiv growth"
+            % (index + 1, cap, largest_measured_window),
+        )
+
+    def test_the_comment_documents_the_number_the_command_uses(self):
+        index, lines = self._index_step()
+        cap = self._cap_on_the_command_line(index, lines)
+        comment = self._comment_above_the_run_line(index, lines)
+        self.assertTrue(comment, "deploy.yml:%d has no comment" % (index + 1))
+        self.assertIn(str(cap), comment)
 
 
 class DeployStepTimeoutTests(unittest.TestCase):

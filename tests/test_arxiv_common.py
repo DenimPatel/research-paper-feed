@@ -114,6 +114,44 @@ class IterResultsTests(unittest.TestCase):
         list(arxiv_common.iter_results("cat:cs.CV", 5000))
         self.assertEqual(self.search_kwargs["max_results"], 5000)
 
+    def test_a_limit_above_the_api_ceiling_is_capped_and_said_so(self):
+        # The bound belongs here, not in a caller: this is the only point every
+        # limit reaches arxiv.Search through, and paper-collector.py gets here
+        # from --max-papers without ever touching build_index. arXiv answers a
+        # request above the ceiling with HTTP 400 part-way through paging, so
+        # passing the number on would turn a too-large fetch into a failed
+        # category rather than a capped one.
+        sizes = []
+        self._install([object()], client_sizes=sizes)
+        with self.assertLogs(level="WARNING") as captured:
+            list(arxiv_common.iter_results("cat:cs.CV", 100000))
+        self.assertEqual(
+            self.search_kwargs["max_results"], arxiv_common.RESULTS_CEILING
+        )
+        self.assertEqual(arxiv_common.RESULTS_CEILING, 30000)
+        # The client is sized from the capped value too, or it would page with a
+        # slice derived from the number arXiv refused.
+        self.assertEqual(sizes, [arxiv_common.RESULTS_CEILING])
+        self.assertIn("100000", "\n".join(captured.output))
+
+    def test_a_limit_at_the_ceiling_is_left_alone(self):
+        with self.assertNoLogs(level="WARNING"):
+            self._install([object()])
+            list(
+                arxiv_common.iter_results(
+                    "cat:cs.CV", arxiv_common.RESULTS_CEILING
+                )
+            )
+        self.assertEqual(
+            self.search_kwargs["max_results"], arxiv_common.RESULTS_CEILING
+        )
+
+    def test_a_limit_below_the_ceiling_is_untouched(self):
+        with self.assertNoLogs(level="WARNING"):
+            self._install([object()])
+            list(arxiv_common.iter_results("cat:cs.CV", 5000))
+        self.assertEqual(self.search_kwargs["max_results"], 5000)
+
     def test_unlimited_queries_pass_none_and_use_default_page_size(self):
         sizes = []
         self._install([object()] * 5, client_sizes=sizes)

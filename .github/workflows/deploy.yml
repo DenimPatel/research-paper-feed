@@ -40,19 +40,39 @@ jobs:
         # of build_index.py's own "Refusing to write an index: the arXiv query
         # failed for ..." (IMP-004).
         #
-        # A deploy run is the FULL pipeline -- all 5 default categories with
-        # --max-per-category unset, so page_size is 1000. collect_papers records
-        # a failed category and moves to the next one, so a total network
-        # partition costs one worst-case page fetch per category:
-        #     5 categories x (num_retries 5 + 1) x 60 s = 1800 s
-        # Measured at 1/30 scale (60.17 s at a 2 s timeout) and projected:
-        # 1805.1 s = 30.1 min, after which main() logs the category list and
-        # returns 1 without writing an index.
+        # --max-per-category 30000 is arXiv's own ceiling for one query (see
+        # RESULTS_CEILING in scripts/arxiv_common.py: the manual caps a query at
+        # 30,000 results and answers anything above it with HTTP 400), and it is
+        # deliberately equal to it rather than a smaller round number. This cap is
+        # a safety bound against the API ceiling, not a way to say how many papers
+        # we want, so it has to sit clear of real window sizes instead of just
+        # above them: the largest 60-day window among the 5 categories was cs.AI
+        # at 10,785 papers on 2026-10-02, and arXiv grows ~9% per window, so
+        # anything near 12,000 would have started truncating within a year and
+        # said nothing. 30,000 is 2.8x that measurement, and a category that
+        # reaches it is not truncated by us -- arXiv refuses the offset first,
+        # and the category degrades on its own.
         #
-        # 75 min = 4500 s is 2.5x that 1800 s worst case, the same 2.5x margin
-        # ci.yml uses. A healthy deploy is ~2-5 min, so ~15x headroom.
+        # What it costs: nothing on a healthy run. The 60-day retention window is
+        # what stops a healthy run -- 38 pages across the 5 categories today, the
+        # same 38 this command paged before the flag existed, because the cap only
+        # bites once a category outgrows it. If a cap ever does bite,
+        # build_index.py records it in index.json under "truncatedCategories" and
+        # the site says the index is incomplete, so it is no longer a silent cut.
+        #
+        # collect_papers records a failed category and moves to the next one, so
+        # a total network partition costs one worst-case page fetch per category:
+        #     5 categories x (num_retries 5 + 1) x 60 s = 1800 s
+        # and main() logs the category list and returns 1 without writing an
+        # index. That 1800 s is what the step cap is sized against:
+        #     75 min = 4500 s is 2.5x it
+        # which is what DeployStepTimeoutTests asserts. The compound case IMP-198
+        # modelled beyond it -- every page burning its full 60 s bound and still
+        # succeeding, 70 x 38 pages + 1800 s = 4460 s -- leaves 40 s, which is
+        # IMP-205's finding F-1 and not this step's to absorb; raising the cap
+        # there is IMP-205's change. A healthy deploy is ~2-5 min.
         timeout-minutes: 75
-        run: python scripts/build_index.py
+        run: python scripts/build_index.py --max-per-category 30000
 
       - uses: actions/setup-node@v4
         with:

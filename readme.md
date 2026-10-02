@@ -62,18 +62,32 @@ and everything after it run from `web/`.
 
    This writes `web/public/data/index.json` plus `data/papers-<YYYY>-W<NN>.json`.
    Useful flags, with the values they accept: `--retention-days` (1 or greater,
-   default `60`), `--max-per-category` (0 or greater, default `0` = no cap — pass
-   a small number for fast dev runs), `--abstract-chars` (1 or greater, default
-   `500`), `--category` (repeatable; each value must look like `cs.AI`,
-   `stat.ML` or `astro-ph.HE`, defaulting to `cs.CV`, `cs.LG`, `cs.CL`, `cs.AI`,
-   `cs.RO`), and `--out-dir` (any writable directory, default
-   `web/public/data`). An out-of-range or malformed value is rejected before
-   anything is fetched or written.
+   default `60`), `--max-per-category` (0 or greater, default `0` = as many
+   results as arXiv will serve for one query — pass a small number for fast dev
+   runs), `--abstract-chars` (1 or greater, default `500`), `--category`
+   (repeatable; each value must look like `cs.AI`, `stat.ML` or `astro-ph.HE`,
+   defaulting to `cs.CV`, `cs.LG`, `cs.CL`, `cs.AI`, `cs.RO`), and `--out-dir`
+   (any writable directory, default `web/public/data`). An out-of-range or
+   malformed value is rejected before anything is fetched or written.
 
-   `--max-per-category` is not only a speed knob here: a full uncapped run pages
-   `cs.AI` past `start=9000`, and arXiv's API answers deep offsets with HTTP 500,
-   which aborts the whole run before anything is written. Capping keeps a local
-   build on the first page.
+   `--max-per-category 0` is a bound, not the absence of one. arXiv's API user
+   manual limits a single query to 30,000 results, returned in slices of at most
+   2,000 at a time, and answers a request above that with HTTP 400 — so 0 means
+   "up to that ceiling" (30,000), and a larger explicit value is clamped to it.
+   The 60-day retention window is what actually stops a healthy run, which is why
+   a normal build only ever asks for the first page or two.
+
+   If one category's query dies part-way through, the index the other categories
+   produced is still written instead of nothing. `index.json` names what is
+   missing under `failedCategories`, the site shows a notice saying the index is
+   incomplete, and the missing category is dropped from the filter entirely — so
+   a short index cannot be mistaken for a complete one, and no filter chip can
+   send a reader to a feed that is empty for reasons of someone else's. A
+   category that used up its `--max-per-category` allowance is reported the same
+   way, under `truncatedCategories`: it keeps its papers and its chip, and the
+   notice says older papers from it may be missing. Only a run where *every*
+   category failed, or one that fetched no papers at all, exits 1 and writes
+   nothing, leaving the previously deployed index in place.
 
 2. Start the dev server. From the repository root:
 
@@ -161,9 +175,15 @@ from the command line.
 
 `.github/workflows/deploy.yml` builds the index and deploys the site to GitHub
 Pages on a weekly schedule (Sunday at 06:00 UTC), on pushes to `main`, and on
-manual dispatch. CI (`.github/workflows/ci.yml`) runs the Python `unittest`
-suite and, for the web app, `npm ci`, `npm run typecheck`, `npm test`, a small
-paper-index build and then `npm run build`.
+manual dispatch. Its index step caps each category at
+`--max-per-category 30000`, which is arXiv's own ceiling for a single query and
+so a safety bound rather than a content budget: at the shipped 60-day retention
+the largest of the five categories held 10,785 papers when it was measured, so
+the cap sits well clear of any real window and costs nothing on a healthy run.
+The comment above the step records the measurement, the growth rate it has to
+outlast, and the timeout arithmetic. CI (`.github/workflows/ci.yml`) runs the
+Python `unittest` suite and, for the web app, `npm ci`, `npm run typecheck`,
+`npm test`, a small paper-index build and then `npm run build`.
 
 > One-time setup: in the repository's **Settings → Pages**, set **Source =
 > GitHub Actions**. The workflow cannot set this itself, and the first deploy

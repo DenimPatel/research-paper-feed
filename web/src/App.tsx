@@ -20,7 +20,9 @@ import {
   type ExportPayload,
 } from "./lib/collections";
 import {
+  describeIncompleteIndex,
   describeLoadFailure,
+  type IncompleteIndexNotice,
   type LoadFailureNotice,
 } from "./lib/failureCopy";
 import {
@@ -313,6 +315,22 @@ export function App() {
   const activeCategories =
     categoryResolution.selected ?? manifest?.categories ?? [];
   const unknownCategories = categoryResolution.unknown;
+
+  // What the build could not cover, told to the reader rather than left in
+  // `index.json`: a category whose query died is absent from `categories` (no
+  // dead chip), and one the per-category cap cut short is present but
+  // incomplete. Without this the site advertises a category list, offers it as
+  // a filter, and then answers a click with "No papers match the current
+  // filters" — blaming the reader's filter for an outage they never caused.
+  // `null` on a complete index, so nothing is rendered for the normal case.
+  const incompleteIndex: IncompleteIndexNotice | null = useMemo(
+    () =>
+      describeIncompleteIndex(
+        manifest?.failedCategories,
+        manifest?.truncatedCategories,
+      ),
+    [manifest],
+  );
 
   // `activeCategories` is empty until the manifest arrives, so "no categories
   // selected" is only a claim the index could already have refuted.
@@ -693,6 +711,25 @@ export function App() {
                     <strong>Some papers could not be loaded.</strong>{" "}
                     {describeFailedWeeks(failedWeeks)}, so the feed below is
                     incomplete. Everything that did load is shown.
+                  </p>
+                )}
+
+                {incompleteIndex !== null && (
+                  // The index is on screen but short, and the short parts are
+                  // named in the prose rather than only in `title`: a 390px
+                  // reader gets no tooltip. Same `banner banner--warning` and
+                  // `role="alert"` treatment as the unknown-category notice
+                  // below, so the two read as one kind of thing. `aria-label`
+                  // keeps the category lists in the tooltip out of the
+                  // announcement, which is what `alert` would otherwise name.
+                  <p
+                    className="banner banner--warning"
+                    role="alert"
+                    aria-label={incompleteIndex.headline}
+                    title={incompleteIndex.detail}
+                  >
+                    <strong>{incompleteIndex.headline}.</strong>{" "}
+                    {incompleteIndex.prose}
                   </p>
                 )}
 

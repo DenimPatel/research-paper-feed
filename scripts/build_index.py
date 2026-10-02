@@ -10,9 +10,11 @@ cross-listed papers, truncates abstracts, and writes:
 
 The pure helpers below (truncation, author formatting, dedup, sharding) are
 deliberately free of network access so they can be unit tested with synthetic
-records. Only :func:`collect_papers` touches arXiv. A category whose query
-fails aborts the run instead of publishing an index that is missing it, since
-a truncated index is indistinguishable from a complete one once deployed.
+records. Only :func:`collect_papers` touches arXiv. A truncated index is
+indistinguishable from a complete one once deployed, so a run that could not
+produce one refuses to write anything (exit 1); a run that produced an index
+which is merely *missing* a category writes it, but records which categories
+failed in ``index.json`` so the reader of a deployed index can tell.
 """
 
 import argparse
@@ -40,9 +42,24 @@ DEFAULT_OUT_DIR = os.path.join("web", "public", "data")
 # back as an empty result indistinguishable from "no new papers".
 CATEGORY_PATTERN = re.compile(r"^[a-zA-Z-]+(\.[a-zA-Z-]+)?$")
 
-# Used when ``--max-per-category`` is left at 0 ("no per-category cap").
-# The retention window is the real bound; this only prevents an unbounded run.
-UNLIMITED = 100000
+# Used when ``--max-per-category`` is left at 0 ("no per-category cap"), and
+# the ceiling an explicit cap is clamped to. It is ``RESULTS_CEILING`` rather
+# than a second number: arXiv's API user manual (§3.1.1.2, quoted at
+# ``arxiv_common.RESULTS_CEILING``) caps one query at 30,000 results and answers a
+# request above it with HTTP 400, so that is the most a category query can return
+# and the highest number of requests that can earn an answer.
+#
+# ``arxiv.Client`` pages with ``page_size`` -- ``DEFAULT_PAGE_SIZE`` (1000, under
+# the manual's 2,000-per-slice limit) -- and asks for ``page_size`` results at
+# each ``start``, so a full page never carries a request past 30,000. A *short*
+# page can: the library advances ``offset`` by the number of entries it actually
+# got, so ``start`` need not stay a multiple of ``page_size``. That request is
+# then refused, which terminates the category rather than the run.
+#
+# The retention window is what actually stops a healthy run; this keeps an
+# unhealthy one inside a bound arXiv will serve. The manual also recommends
+# refining queries over 1,000 results and points bulk harvesting at OAI-PMH.
+UNLIMITED = arxiv_common.RESULTS_CEILING
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
@@ -214,6 +231,7 @@ def collect_papers(
     abstract_chars,
     failures=None,
     assume_newest_first=False,
+    truncated=None,
 ):
     """Query each category and return raw (not yet deduplicated) records.
 
@@ -222,6 +240,11 @@ def collect_papers(
     holder, and an ``ArxivError`` raised out of it is caught here too, so a
     mid-run outage is never mistaken for a category that simply has no new
     papers.
+
+    ``truncated`` is an optional list that collects every category for which the
+    result allowance was fully spent. Consuming it in full is the only evidence
+    there is that more results existed, so it is reported rather than left to be
+    inferred: a category listed here has papers, but not all of them.
 
     Retention is enforced one record at a time: a result with no usable
     ``published`` datetime and a result older than the cutoff are each dropped
@@ -233,17 +256,24 @@ def collect_papers(
     unexpected order; callers that can vouch for the sort opt in.
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
-    limit = max_per_category if max_per_category > 0 else UNLIMITED
+    # A cap above ``UNLIMITED`` cannot buy more papers than arXiv will serve for
+    # one query, so it is clamped rather than passed through into paging the
+    # offsets arXiv refuses. ``iter_results`` clamps the same value again at the
+    # point it reaches ``arxiv.Search``.
+    limit = min(max_per_category, UNLIMITED) if max_per_category > 0 else UNLIMITED
     failures = [] if failures is None else failures
+    truncated = [] if truncated is None else truncated
     records = []
     for category in categories:
         query = f"cat:{category}"
         logging.info("Querying %s (limit %s) ...", query, limit)
         count = 0
+        yielded = 0
         undated = 0
         status = arxiv_common.new_status()
         try:
             for result in arxiv_common.iter_results(query, limit, status):
+                yielded += 1
                 published = _result_datetime(result)
                 if published is None:
                     # Without a datetime there is no age to compare against the
@@ -271,6 +301,17 @@ def collect_papers(
                 "  query failed for %s: %s", category, status["error"]
             )
             continue
+        if yielded >= limit:
+            # Every result the allowance could hold arrived, so the category may
+            # have more inside the retention window than were fetched. Reported
+            # rather than guessed at: nothing distinguishes "the cap cut it off"
+            # from "the category had exactly this many", and both mean the same
+            # thing to a reader.
+            truncated.append(category)
+            logging.warning(
+                "  %s hit the %d-result cap; older papers in the window may be "
+                "missing", category, limit,
+            )
         logging.info("  %d papers within retention window for %s", count, category)
     return records
 
@@ -290,7 +331,10 @@ def _clean_old_shards(out_dir, keep=()):
                 logging.warning("Could not remove stale shard %s: %s", name, exc)
 
 
-def write_index(out_dir, manifest, shard_files):
+def write_index(
+    out_dir, manifest, shard_files, failed_categories=None,
+    truncated_categories=None,
+):
     """Write the manifest and shard files to ``out_dir``.
 
     Shards land first, then the manifest, and stale shards are swept last. The
@@ -298,11 +342,27 @@ def write_index(out_dir, manifest, shard_files):
     are still on disk for the whole window in which this run can fail; deleting
     first would leave it pointing at files that no longer exist, which the app
     cannot recover from.
+
+    ``failed_categories`` names the categories whose query did not complete and
+    ``truncated_categories`` those whose result allowance was fully spent. Both
+    are recorded in the manifest -- under ``failedCategories`` and
+    ``truncatedCategories`` -- so a reader of the *deployed site* can tell a
+    short index from a complete one, which is the guarantee IMP-004's hard fail
+    used to provide by refusing to write at all. A field nothing renders would
+    not: the shortfall has to be on screen, not only in a file.
+    ``build_index.main`` also drops the failed categories from ``categories``, so
+    the site's category filter never offers a chip that leads to an empty feed.
+    Both keys are absent when nothing failed, so a complete index is exactly the
+    file it was before.
     """
     os.makedirs(out_dir, exist_ok=True)
     for filename, shard in shard_files.items():
         with open(os.path.join(out_dir, filename), "w", encoding="utf-8") as handle:
             json.dump(shard, handle, ensure_ascii=False, separators=(",", ":"))
+    if failed_categories:
+        manifest["failedCategories"] = list(failed_categories)
+    if truncated_categories:
+        manifest["truncatedCategories"] = list(truncated_categories)
     manifest_path = os.path.join(out_dir, "index.json")
     with open(manifest_path, "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, ensure_ascii=False, indent=2)
@@ -369,8 +429,9 @@ def parse_args(argv=None):
     parser.add_argument(
         "--max-per-category", type=int_at_least("--max-per-category", 0),
         default=0,
-        help="Dev escape hatch: cap results fetched per category "
-             "(default: 0; 0 or greater, 0 = no cap).",
+        help="Cap results fetched per category "
+             "(default: 0; 0 or greater, 0 = no cap beyond arXiv's own "
+             f"{UNLIMITED}-result-per-query limit).",
     )
     parser.add_argument(
         "--abstract-chars", type=int_at_least("--abstract-chars", 1),
@@ -392,6 +453,7 @@ def main(argv=None):
     categories = args.categories or DEFAULT_CATEGORIES
 
     failures = []
+    truncated = []
     records = collect_papers(
         categories,
         args.retention_days,
@@ -401,8 +463,15 @@ def main(argv=None):
         # This caller knows the query is the one arxiv_common sorts by
         # submission date, newest first, so it can stop paging early.
         assume_newest_first=True,
+        truncated=truncated,
     )
-    if failures:
+    # Every category failing is the total outage IMP-004 refuses to publish
+    # over, and it stays fatal. One category dying mid-paging is not: the four
+    # that succeeded are real papers, and throwing them away is what let a
+    # single deep-offset 500 empty the whole weekly deploy. The shortfall is
+    # recorded in the manifest and logged instead, so the index is written
+    # short and says so rather than being written whole and silently.
+    if failures and len(failures) == len(categories):
         logging.error(
             "Refusing to write an index: the arXiv query failed for %s.",
             ", ".join(failures),
@@ -410,15 +479,43 @@ def main(argv=None):
         return 1
     records = dedupe_records(records)
     if not records:
+        if failures:
+            logging.error(
+                "Refusing to write an index: the arXiv query failed for %s and "
+                "no remaining category produced a paper in the retention "
+                "window.", ", ".join(failures)
+            )
         logging.error("No papers fetched; refusing to write an empty index.")
         return 1
 
+    # Only the categories that answered are advertised. A chip for a category
+    # with no papers behind it is a promise the index cannot keep: the site would
+    # say "papers from cs.RO" in the header, offer cs.RO as a filter, and then
+    # tell the reader "No papers match the current filters" -- blaming their
+    # filter for an outage they never caused. The notice rendered from
+    # ``failedCategories`` names what is missing instead, which is answerable.
+    contributing = [c for c in categories if c not in set(failures)]
     manifest, shard_files = build_shards(
         records,
         retention_days=args.retention_days,
-        categories=categories,
+        categories=contributing,
     )
-    write_index(args.out_dir, manifest, shard_files)
+    write_index(
+        args.out_dir,
+        manifest,
+        shard_files,
+        failed_categories=failures,
+        truncated_categories=truncated,
+    )
+    if failures:
+        logging.error(
+            "Wrote an index missing %d of %d categor%s; index.json records "
+            "them under 'failedCategories': %s",
+            len(failures),
+            len(categories),
+            "y" if len(categories) == 1 else "ies",
+            ", ".join(failures),
+        )
     logging.info(
         "Wrote %d papers across %d shards to %s",
         manifest["totalPapers"],

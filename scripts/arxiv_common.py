@@ -18,6 +18,21 @@ DEFAULT_DELAY_SECONDS = 10
 DEFAULT_NUM_RETRIES = 5
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 60
 
+# The most results arXiv will return for one query, and therefore the most any
+# caller can usefully ask ``arxiv.Search`` for. This is the ceiling rather than a
+# preference: the API user manual (§3.1.1.2) states that "the maximum number of
+# results returned from a single call (max_results) is limited to 30000 in
+# slices of at most 2000 at a time" and that "a request with max_results >30,000
+# will result in an HTTP 400 error code". A larger limit is not a bigger fetch,
+# it is a request the API declines.
+#
+# It lives here, beside ``DEFAULT_PAGE_SIZE`` and the clamp below, because this
+# module is where every caller passes a limit into ``arxiv.Search``:
+# ``paper-collector.py`` reaches ``iter_results`` through ``--max-papers`` and
+# never touches ``build_index``, so a bound enforced only in the index builder
+# would leave that path unbounded.
+RESULTS_CEILING = 30000
+
 
 class TimeoutNotInstalled(RuntimeError):
     """Raised when the request timeout could not be attached to a client."""
@@ -106,11 +121,24 @@ def iter_results(query, max_results, status=None):
     :func:`new_status`). It is reset on entry and, if arXiv fails mid-query,
     filled in with ``{"failed": True, "error": "<message>"}`` so the caller can
     tell "category had no new papers" apart from "the query died".
+
+    ``max_results`` is clamped to :data:`RESULTS_CEILING` here rather than in a
+    caller, because this is the only point every limit passes through on its way
+    to ``arxiv.Search``; a bigger number buys nothing and is answered with an
+    HTTP 400 part-way through paging. ``None`` still means "no limit", which the
+    library resolves as "until the query is exhausted" -- that path ends on the
+    same API ceiling, failing the category rather than hanging.
     """
     if status is not None:
         status.update(failed=False, error=None)
     if max_results is not None and max_results <= 0:
         return
+    if max_results is not None and max_results > RESULTS_CEILING:
+        logging.warning(
+            "Capping %r results per query at %d: arXiv answers a request above "
+            "that with HTTP 400.", max_results, RESULTS_CEILING,
+        )
+        max_results = RESULTS_CEILING
 
     client = build_client(max_results if max_results is not None else DEFAULT_PAGE_SIZE)
     search = arxiv.Search(
