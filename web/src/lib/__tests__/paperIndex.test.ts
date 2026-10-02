@@ -101,6 +101,14 @@ function installFetch(shards: Record<string, unknown> = SHARDS) {
   return mock;
 }
 
+function defer<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -213,5 +221,136 @@ describe("PaperIndex", () => {
           : new Response("not found", { status: 404 }),
     );
     expect(await new PaperIndex().loadPapers(7)).toEqual([]);
+  });
+
+  it("refetches the manifest on refresh, even after it resolved", async () => {
+    const mock = vi.fn(async () => jsonResponse(MANIFEST));
+    vi.stubGlobal("fetch", mock);
+
+    const index = new PaperIndex();
+    await expect(index.getManifest()).resolves.toEqual(MANIFEST);
+    expect(mock).toHaveBeenCalledTimes(1);
+    await expect(index.refreshManifest()).resolves.toEqual(MANIFEST);
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares an in-flight manifest request with a retry instead of duplicating it", async () => {
+    const gate = defer<Response>();
+    const mock = vi.fn(() => gate.promise);
+    vi.stubGlobal("fetch", mock);
+
+    const index = new PaperIndex();
+    const first = index.getManifest();
+    const retried = index.refreshManifest();
+    expect(mock).toHaveBeenCalledTimes(1);
+
+    gate.resolve(jsonResponse(MANIFEST));
+    await expect(first).resolves.toEqual(MANIFEST);
+    await expect(retried).resolves.toEqual(MANIFEST);
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches the manifest on refresh after a rejection", async () => {
+    const mock = vi.fn(async () => jsonResponse(MANIFEST));
+    mock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", mock);
+
+    const index = new PaperIndex();
+    await expect(index.getManifest()).rejects.toBeInstanceOf(
+      IndexUnavailableError,
+    );
+    await expect(index.refreshManifest()).resolves.toEqual(MANIFEST);
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves the memo holding the refreshed manifest for later callers", async () => {
+    const fresh: IndexManifest = {
+      generatedAt: "2024-03-08T00:00:00Z",
+      retentionDays: 60,
+      categories: ["cs.CV"],
+      shards: [
+        {
+          week: "2024-W10",
+          from: "2024-03-04",
+          to: "2024-03-09",
+          count: 1,
+          file: "papers-2024-W10.json",
+        },
+      ],
+      totalPapers: 1,
+    };
+    let manifestRequests = 0;
+    const mock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/index.json")) {
+        manifestRequests += 1;
+        return jsonResponse(manifestRequests === 1 ? MANIFEST : fresh);
+      }
+      if (url.endsWith("papers-2024-W10.json")) {
+        return jsonResponse({
+          papers: [makePaper("w10a", "2024-03-08")],
+        });
+      }
+      const file = url.split("/").pop() ?? "";
+      if (file in SHARDS) {
+        return jsonResponse(SHARDS[file]);
+      }
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", mock);
+
+    const index = new PaperIndex();
+    expect(await index.getManifest()).toEqual(MANIFEST);
+    expect(await index.refreshManifest()).toEqual(fresh);
+
+    // loadPapers must consume the refreshed memo, not the original manifest,
+    // and must not trigger a third index.json request.
+    const papers = await index.loadPapers(30);
+    expect(papers.map((paper) => paper.id)).toEqual(["w10a"]);
+    expect(manifestRequests).toBe(2);
+  });
+
+  it("recovers via refreshManifest after every manifest failure mode", async () => {
+    const failures: Array<[string, () => Response]> = [
+      [
+        "a network error",
+        () => {
+          throw new TypeError("Failed to fetch");
+        },
+      ],
+      [
+        "an HTML SPA fallback",
+        () =>
+          new Response("<!doctype html><title>fallback</title>", {
+            status: 200,
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+          }),
+      ],
+      ["a 404", () => new Response("not found", { status: 404 })],
+      [
+        "a malformed body",
+        () =>
+          new Response("<html>", {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ],
+    ];
+
+    for (const [label, respond] of failures) {
+      let requests = 0;
+      const mock = vi.fn(async () => {
+        requests += 1;
+        return requests === 1 ? respond() : jsonResponse(MANIFEST);
+      });
+      vi.stubGlobal("fetch", mock);
+
+      const index = new PaperIndex();
+      await expect(index.getManifest(), label).rejects.toBeInstanceOf(
+        IndexUnavailableError,
+      );
+      await expect(index.refreshManifest(), label).resolves.toEqual(MANIFEST);
+      expect(mock, label).toHaveBeenCalledTimes(2);
+    }
   });
 });

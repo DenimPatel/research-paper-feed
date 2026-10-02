@@ -242,7 +242,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 ## Tier 20.0
 
 ### IMP-007 — Add a "Try again" button to the index-unavailable panel
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** UX flows & interactivity
 - **Type:** improvement
 - **Area / files:** `web/src/App.tsx:364-376` (`.panel--error` block), `web/src/App.tsx:148-166` (manifest effect), `web/src/lib/paperIndex.ts:66-71`
@@ -256,7 +256,7 @@ policy), IMP-125 (date locale), IMP-141 (intermediate breakpoint), IMP-142 (prin
 - **Depends on:** IMP-003
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending; attempt 2 PASS
 ### IMP-008 — Make relevance sort agree with the Relevance chip
 - **Status:** TODO
 - **Category:** Correctness

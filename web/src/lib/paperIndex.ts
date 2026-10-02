@@ -61,18 +61,40 @@ export function selectShards(
 export class PaperIndex {
   private manifestPromise: Promise<IndexManifest> | null = null;
 
+  private manifestSettled = false;
+
   private shardCache = new Map<string, Paper[]>();
 
   async getManifest(): Promise<IndexManifest> {
     if (!this.manifestPromise) {
-      // Clear the memoized promise on failure so a retry refetches instead of
-      // replaying the same rejection forever.
-      this.manifestPromise = this.fetchManifest().catch((error: unknown) => {
-        this.manifestPromise = null;
-        throw error;
-      });
+      this.manifestSettled = false;
+      this.manifestPromise = this.fetchManifest().then(
+        (manifest) => {
+          this.manifestSettled = true;
+          return manifest;
+        },
+        // Clear the memoized promise on failure so a retry refetches instead of
+        // replaying the same rejection forever.
+        (error: unknown) => {
+          this.manifestPromise = null;
+          throw error;
+        },
+      );
     }
     return this.manifestPromise;
+  }
+
+  /**
+   * Fetch the manifest again for an explicit retry. A memo that already
+   * resolved is dropped so the retry really re-asks the network; a request that
+   * is still in flight is shared with the caller instead of duplicated.
+   */
+  refreshManifest(): Promise<IndexManifest> {
+    if (this.manifestSettled) {
+      this.manifestPromise = null;
+      this.manifestSettled = false;
+    }
+    return this.getManifest();
   }
 
   private async fetchManifest(): Promise<IndexManifest> {

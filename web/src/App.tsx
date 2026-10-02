@@ -89,11 +89,22 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<LoadProgress>({ loaded: 0, total: 0 });
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [manifestAttempts, setManifestAttempts] = useState(0);
+  const retriedRef = useRef(false);
+  const feedHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    indexRef.current
-      ?.getManifest()
+    const index = indexRef.current;
+    if (!index) {
+      return;
+    }
+    // A cold start has nothing memoized, so getManifest() is the right call. A
+    // repeat attempt must re-ask the network: getManifest already un-memoes a
+    // rejection, and refreshManifest also drops a manifest that resolved.
+    const attempt =
+      manifestAttempts > 0 ? index.refreshManifest() : index.getManifest();
+    attempt
       .then((next) => {
         if (!cancelled) {
           setManifest(next);
@@ -108,7 +119,25 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [manifestAttempts]);
+
+  useEffect(() => {
+    if (manifest && retriedRef.current) {
+      retriedRef.current = false;
+      feedHeadingRef.current?.focus();
+    }
+  }, [manifest]);
+
+  // No "already retrying" latch: clearing `error` unmounts this button in the
+  // same commit, so a second activation cannot reach the handler until the
+  // attempt has settled and the panel is on screen again. Simultaneous
+  // activations batch into one `manifestAttempts` change, hence one request.
+  const handleRetryManifest = () => {
+    retriedRef.current = true;
+    setError(null);
+    setLoading(true);
+    setManifestAttempts((attempts) => attempts + 1);
+  };
 
   useEffect(() => {
     if (!manifest) {
@@ -310,6 +339,15 @@ export function App() {
               <div className="panel panel--error" role="alert">
                 <h1>No paper index yet</h1>
                 <p>{error}</p>
+                <p>
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={handleRetryManifest}
+                  >
+                    Try again
+                  </button>
+                </p>
                 <p>Build the index locally:</p>
                 <pre>
                   <code>python scripts/build_index.py</code>
@@ -329,7 +367,9 @@ export function App() {
             {manifest && (
               <>
                 <section className="hero">
-                  <h1>Recent arXiv papers in CS &amp; AI</h1>
+                  <h1 ref={feedHeadingRef} tabIndex={-1}>
+                    Recent arXiv papers in CS &amp; AI
+                  </h1>
                   <p>
                     {manifest.totalPapers.toLocaleString()} papers from{" "}
                     {manifest.categories.join(", ")} · index generated{" "}
