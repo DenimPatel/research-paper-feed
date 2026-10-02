@@ -5,7 +5,8 @@ export default defineConfig({
   base: "/research-paper-feed/",
   plugins: [react()],
   test: {
-    environment: "node",
-    include: ["src/**/*.test.ts"],
+    environment: "jsdom",
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    setupFiles: ["src/test-setup.ts"],
   },
 });
