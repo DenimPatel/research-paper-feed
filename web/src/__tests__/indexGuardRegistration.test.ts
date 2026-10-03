@@ -1,6 +1,5 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import viteConfig from "../../vite.config";
 import { guardSuiteCases, guardSuiteListing } from "./collectWithVitest.mjs";
 
 /**
@@ -19,7 +18,7 @@ import { guardSuiteCases, guardSuiteListing } from "./collectWithVitest.mjs";
  * collect it. A pin placed in `scripts/__tests__/` would be dropped by exactly
  * the narrowing it exists to catch, and would prove nothing.
  *
- * Four witnesses, none of which the others can stand in for:
+ * Three witnesses, none of which the others can stand in for:
  *
  *   1. `vitest list --filesOnly`, spawned: the real runner, loading the real
  *      config, resolving the real globs against the real tree, with nothing
@@ -30,8 +29,20 @@ import { guardSuiteCases, guardSuiteListing } from "./collectWithVitest.mjs";
  *      able to catch a narrowing it is not subject to.
  *   3. A `list --json` for which cases the guard suite actually contributes,
  *      so a bare count cannot stand in for the named ones below.
- *   4. The imported config's `test.include`: a cheap, direct statement of
- *      intent, whose failure message names the glob rather than a file list.
+ *
+ * There was a fourth witness, an assertion over the *imported* `test.include`
+ * that a pattern remained anchored at `scripts/`. It was removed in IMP-028d
+ * after mutation testing showed it earned nothing and cost something. It caught
+ * no real hole that witnesses 1 and 3 do not already catch -- including the two
+ * holes a config-reading witness is structurally blind to, `exclude: ["scripts/**"]`
+ * and the guard file being renamed, both of which leave `include` untouched and
+ * still scripts-anchored. Meanwhile it produced a false positive: widening the
+ * glob to `**\/*.test.mjs` still collects all 23 guard cases correctly, yet only
+ * that assertion went red, reporting that the suite "stops being collected" --
+ * untrue, and a spurious failure on a working configuration. Its cost was not
+ * only the false positive but its staleness: it asserted a shape of the `include`
+ * expression rather than a fact about collection, so it would have outlived its
+ * own reason. The evidence is reproduced in `.improve/reports/impl-IMP-028d.md`.
  */
 
 const GUARD_SUITE = "scripts/__tests__/indexGuards.test.mjs";
@@ -54,28 +65,6 @@ const GUARD_SUITE_MINIMUM_CASES = 23;
 
 /** This file's own path as posix, the way the listing reports paths. */
 const SELF = import.meta.url.replace(/\\/g, "/");
-
-/**
- * Whether the configured `include` can reach anything under `scripts/`.
- *
- * An absent or empty `include` counts as reaching it, deliberately: vitest's
- * default pattern is `**\/*.{test,spec}.?(c|m)[jt]s?(x)`, which already collects
- * the guard suite, so dropping the array entirely is a legitimate refactor here
- * rather than a hole. Witness 1 is what catches a narrowing that actually loses
- * the suite; this one exists to say plainly, when it does, that the glob is gone.
- */
-function includeReachesScripts(): boolean {
-  const include = viteConfig.test?.include;
-  if (include === undefined || include.length === 0) {
-    return true;
-  }
-  return include.some((entry) => {
-    // Drop the glob metacharacters and look at the literal directory the
-    // pattern is anchored at: `scripts/**\/*.test.mjs` -> `scripts//.test.mjs`.
-    const anchor = entry.replace(/[*?[\]{}!]/g, "");
-    return /(^|\/)scripts(\/|$)/.test(anchor);
-  });
-}
 
 describe("the index-guard suite is registered with the test runner", () => {
   it("collects the guard suite, so the tests guarding every deploy actually run", () => {
@@ -120,19 +109,4 @@ describe("the index-guard suite is registered with the test runner", () => {
       expect(names, `${GUARD_SUITE} should still contain "${name}"`).toContain(name);
     }
   }, 120_000);
-
-  it("keeps an include pattern anchored at scripts/ in vite.config.ts", () => {
-    // The config is *imported*, not read and parsed, and that is the whole reason
-    // this witness is shaped this way. `vite.config.ts` documents the
-    // `scripts/**\/*.test.mjs` glob in a comment a few lines above the `include`
-    // array it lives in, so a test that grepped the file's text would still find
-    // `scripts/**\/*.test.mjs` after the real glob is deleted -- and would pass
-    // green over a suite that is no longer running. Only the evaluated module
-    // knows which strings are patterns and which are prose.
-    expect(
-      includeReachesScripts(),
-      "vite.config.ts's test.include no longer reaches scripts/, so " +
-        `${GUARD_SUITE} stops being collected`,
-    ).toBe(true);
-  });
 });

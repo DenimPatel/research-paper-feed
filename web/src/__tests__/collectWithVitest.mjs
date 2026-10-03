@@ -56,6 +56,36 @@ function repoRelative(absolute) {
   return relative(WEB_ROOT, absolute).split(sep).join("/");
 }
 
+/**
+ * Wall-clock ceiling on one `vitest list` child, in milliseconds.
+ *
+ * `spawnSync` blocks the event loop while the child runs, so vitest's own
+ * per-test `it` timeout (120 s, set at the call sites) cannot fire to rescue a
+ * hung child: the timer that would fire it is never serviced. Without a bound
+ * here, a wedged child stalls the whole worker and the only backstop left is the
+ * CI job's `timeout-minutes`, which fails every other test in the file along
+ * with this one.
+ *
+ * 30 s is chosen against two measured numbers, not picked round:
+ *
+ *   - The healthy cost of a listing is 918-1330 ms on this tree, and the `--json`
+ *     listing is the expensive one. 30 s is ~23x the worst observed cost, so a
+ *     loaded or cold CI filesystem has to slow the child by more than an order of
+ *     magnitude before this can fire on a healthy tree. A tighter value trades
+ *     that margin for nothing: the child either answers quickly or is wedged.
+ *   - vitest's 120 s test timeout. Staying at or above it would let the blocking
+ *     window reach the `it` deadline, and the pin would fail with vitest's generic
+ *     "test timed out" instead of the ETIMEDOUT diagnosis that names the cause.
+ *     30 s is 4x under it, so the block closes early and the failure says what
+ *     actually happened.
+ *
+ * `killSignal: "SIGKILL"` is what makes the bound a bound. `spawnSync` sends
+ * SIGTERM on expiry, and a child that catches or ignores SIGTERM keeps the parent
+ * blocked indefinitely -- which is the precise failure this timeout exists to
+ * prevent. SIGKILL cannot be handled, so the loop always comes back.
+ */
+const LIST_TIMEOUT_MS = 30_000;
+
 /** Runs `vitest list ...` and returns its status, stdout and stderr together. */
 function runList(args) {
   const result = spawnSync(process.execPath, [vitestBin(), "list", ...args], {
@@ -63,18 +93,29 @@ function runList(args) {
     encoding: "utf8",
     env: childEnv(),
     maxBuffer: 32 * 1024 * 1024,
+    timeout: LIST_TIMEOUT_MS,
+    killSignal: "SIGKILL",
   });
   return {
     status: result.status,
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
     spawnError: result.error ? result.error.message : null,
+    spawnErrorCode: result.error && result.error.code ? result.error.code : null,
   };
 }
 
 function diagnose(args, result) {
+  // A timed-out child exits with `status === null` and `error.code === "ETIMEDOUT"`,
+  // which is otherwise indistinguishable from any other crash in the raw status.
+  // Naming it here means the failure says "the child hung" rather than leaving a
+  // reader to work out why the exit code is null.
+  const timedOut = result.spawnErrorCode === "ETIMEDOUT";
   return (
     `vitest list ${args.join(" ")} failed\n` +
+    (timedOut
+      ? `the child did not finish within ${LIST_TIMEOUT_MS} ms and was killed (SIGKILL)\n`
+      : "") +
     `spawn error: ${result.spawnError ?? "none"}\n` +
     `exit: ${result.status}\n` +
     `stdout:\n${result.stdout}\n` +
