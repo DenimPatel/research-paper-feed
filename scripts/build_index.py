@@ -14,7 +14,11 @@ records. Only :func:`collect_papers` touches arXiv. A truncated index is
 indistinguishable from a complete one once deployed, so a run that could not
 produce one refuses to write anything (exit 1); a run that produced an index
 which is merely *missing* a category writes it, but records which categories
-failed in ``index.json`` so the reader of a deployed index can tell.
+failed in ``index.json`` so the reader of a deployed index can tell. A category
+that answered and then hit an error is neither of those two: it has papers, and
+``truncatedCategories`` is what says how short it is. The manifest never
+describes a category as absent while the shards hold papers carrying it
+(:func:`reconcile_failed_categories`).
 """
 
 import argparse
@@ -60,6 +64,41 @@ CATEGORY_PATTERN = re.compile(r"^[a-zA-Z-]+(\.[a-zA-Z-]+)?$")
 # unhealthy one inside a bound arXiv will serve. The manual also recommends
 # refining queries over 1,000 results and points bulk harvesting at OAI-PMH.
 UNLIMITED = arxiv_common.RESULTS_CEILING
+
+# The largest ``start`` offset the deploy may ever request, and the bound
+# ``tests/test_build_index.py`` pins the deploy's ``--max-per-category``
+# against. It is a budget on *depth*, not a statement about how many papers a
+# category should hold, and it is what the cap in ``deploy.yml`` is sized from.
+#
+# arXiv answers a deep offset with a 5xx rather than a page. On 2026-10-02
+# ``cat:cs.AI`` returned HTTP 500 at ``start=10000`` on two consecutive full
+# production builds -- the same offset both times, while ``cs.LG`` reached
+# ``start=9000`` and ``cs.CV`` stopped at ``start=6000`` -- and the client's
+# ``DEFAULT_NUM_RETRIES`` attempts over ~60 s all came back 500, because arXiv
+# does not space its retries. Retrying cannot fix it: the fault is persistent
+# at a given offset and the offset *moves*, being a function of how many
+# in-window papers a category holds, so any number pinned to today's category
+# sizes is invalidated as they grow. What does not move is the relationship
+# between the cap and the offset, because ``Client`` asks for ``page_size``
+# results at ``start`` and advances by ``page_size``: a cap of exactly this
+# value with ``DEFAULT_PAGE_SIZE`` (1000) puts the deepest request the deploy
+# can make at ``start=9000``, whatever any category has grown to. 9,000 is the
+# deepest offset arXiv is known to have *answered*; 10,000 is the first one
+# known to be refused, and the test requires the deepest request to stay below
+# it.
+#
+# What it costs, stated plainly: this is a content trade for a robustness one.
+# cs.AI held 10,785 papers inside the 60-day window on 2026-10-02, so a cap
+# here truncates it by at least 785 papers (~7%) on a healthy run, announced in
+# ``index.json`` under ``truncatedCategories`` rather than silent. That is a
+# permanent, visible shortfall traded against a category that used to be
+# deleted outright on every build that reached the fault -- the ~10,000 cs.AI
+# papers collected before the 500 were fetched, written to the shards and then
+# denied on screen. The cap and the "no papers here" claim were the same bug.
+# It is a product call about how much of a category to keep; this constant is
+# where a maintainer changes it, and the comment above the deploy step cites
+# the number so the two cannot drift apart silently.
+DEPLOY_OFFSET_BUDGET = 10000
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
@@ -236,15 +275,27 @@ def collect_papers(
     """Query each category and return raw (not yet deduplicated) records.
 
     ``failures`` is an optional list that collects every category whose query
-    did not complete. ``iter_results`` reports arXiv errors through a status
-    holder, and an ``ArxivError`` raised out of it is caught here too, so a
-    mid-run outage is never mistaken for a category that simply has no new
-    papers.
+    did not complete *and left nothing behind*. ``iter_results`` reports arXiv
+    errors through a status holder, and an ``ArxivError`` raised out of it is
+    caught here too, so a mid-run outage is never mistaken for a category that
+    simply has no new papers.
+
+    A query that dies mid-paging is not the same thing as a query that
+    delivered nothing, and the two are classified apart (IMP-216). The fault
+    that motivates this is a deep-offset 5xx: pages answer fine, then one offset
+    comes back 500 after every retry, which leaves a category holding the
+    thousands of papers collected before the failure. Calling that a *failed*
+    category made the manifest lie -- ``failedCategories`` is rendered as "no
+    papers here and no filters to browse", about a category whose papers were
+    sitting in the very shards the manifest described. So a category that
+    yielded at least one in-window record before dying is reported as
+    ``truncated`` instead: it has papers, and not all of them.
 
     ``truncated`` is an optional list that collects every category for which the
-    result allowance was fully spent. Consuming it in full is the only evidence
-    there is that more results existed, so it is reported rather than left to be
-    inferred: a category listed here has papers, but not all of them.
+    result allowance was fully spent, plus every category whose query died after
+    yielding papers. Both mean the same thing to a reader, so both land here.
+    Spending the allowance is the only evidence there is that more results
+    existed, so it is reported rather than left to be inferred.
 
     Retention is enforced one record at a time: a result with no usable
     ``published`` datetime and a result older than the cutoff are each dropped
@@ -296,10 +347,27 @@ def collect_papers(
                 category,
             )
         if status["failed"]:
-            failures.append(category)
-            logging.error(
-                "  query failed for %s: %s", category, status["error"]
-            )
+            # A category is only *failed* if the index ends up holding nothing
+            # for it. A query that answered pages and then hit a refused offset
+            # leaves papers behind, and recording that as a failure produced the
+            # one statement this whole item exists to make impossible: a
+            # manifest saying "cs.AI has no papers here" about shards holding
+            # thousands of them. Those records are real, so the category stays
+            # advertised and filterable and the shortfall is reported instead.
+            if count:
+                truncated.append(category)
+                logging.error(
+                    "  query for %s failed after %d paper(s) in the retention "
+                    "window (%s); keeping the category with those papers and "
+                    "recording it as truncated rather than absent",
+                    category, count, status["error"],
+                )
+            else:
+                failures.append(category)
+                logging.error(
+                    "  query failed for %s with nothing collected: %s",
+                    category, status["error"],
+                )
             continue
         if yielded >= limit:
             # Every result the allowance could hold arrived, so the category may
@@ -314,6 +382,60 @@ def collect_papers(
             )
         logging.info("  %d papers within retention window for %s", count, category)
     return records
+
+
+def categories_in_records(records):
+    """Return every category name ``records`` actually carry.
+
+    Both fields a record carries count: ``primaryCategory`` because that is what
+    a chip filters on, and ``categories`` because arXiv cross-lists, so a paper
+    found through ``cat:cs.LG`` can belong to ``cs.AI`` as well.
+    """
+    held = set()
+    for record in records:
+        for name in record.get("categories") or ():
+            held.add(name)
+        primary = record.get("primaryCategory")
+        if primary:
+            held.add(primary)
+    return held
+
+
+def reconcile_failed_categories(categories, failures, truncated, records):
+    """Return ``(failed, truncated)`` that agree with ``records``.
+
+    ``collect_papers`` classifies by what one query did, but a manifest is a
+    statement about the whole index, and a shard can hold papers for a category
+    whose own query failed: arXiv cross-lists, so a paper answered by
+    ``cat:cs.LG`` can carry ``cs.AI``. Reporting such a category as failed would
+    take away a chip and put a "has no papers here" notice over a category the
+    index had just filled. So this is the backstop that makes the two impossible
+    to disagree -- a category moves from ``failed`` to ``truncated`` exactly when
+    the records prove it is present.
+
+    Ordering follows ``categories`` rather than the order the lists were built
+    in, so a manifest lists its categories the same way whichever path put them
+    there.
+    """
+    held = categories_in_records(records)
+    still_failed = []
+    degraded = []
+    for category in categories:
+        if category in failures:
+            if category in held:
+                degraded.append(category)
+            else:
+                still_failed.append(category)
+        elif category in truncated:
+            degraded.append(category)
+    for category in degraded:
+        if category in failures:
+            logging.warning(
+                "  %s is recorded as truncated, not failed: papers in this "
+                "index carry it, so describing it as absent would be false",
+                category,
+            )
+    return still_failed, degraded
 
 
 def _clean_old_shards(out_dir, keep=()):
@@ -488,12 +610,22 @@ def main(argv=None):
         logging.error("No papers fetched; refusing to write an empty index.")
         return 1
 
+    # The last word on the classification belongs to the records, not to the
+    # queries: a manifest that denies a category the shards hold is worse than
+    # the outage that caused it, because it is published as fact.
+    failures, truncated = reconcile_failed_categories(
+        categories, failures, truncated, records
+    )
+
     # Only the categories that answered are advertised. A chip for a category
     # with no papers behind it is a promise the index cannot keep: the site would
     # say "papers from cs.RO" in the header, offer cs.RO as a filter, and then
     # tell the reader "No papers match the current filters" -- blaming their
     # filter for an outage they never caused. The notice rendered from
     # ``failedCategories`` names what is missing instead, which is answerable.
+    # A category whose query died mid-paging is not in ``failures`` any more, so
+    # it keeps its chip: the papers behind it are real, and the notice built
+    # from ``truncatedCategories`` tells the reader some of them are missing.
     contributing = [c for c in categories if c not in set(failures)]
     manifest, shard_files = build_shards(
         records,
@@ -515,6 +647,16 @@ def main(argv=None):
             len(categories),
             "y" if len(categories) == 1 else "ies",
             ", ".join(failures),
+        )
+    if truncated:
+        logging.warning(
+            "Wrote an index with %d of %d categor%s shorter than the full "
+            "retention window; index.json records them under "
+            "'truncatedCategories': %s",
+            len(truncated),
+            len(categories),
+            "y" if len(categories) == 1 else "ies",
+            ", ".join(truncated),
         )
     logging.info(
         "Wrote %d papers across %d shards to %s",

@@ -483,6 +483,190 @@ class CollectPapersRetentionTests(unittest.TestCase):
         self.assertEqual(failures, [])
 
 
+class PartialCategoryFailureTests(unittest.TestCase):
+    """A query that died mid-paging is short, not absent (IMP-216).
+
+    The deep-offset 5xx this covers is not a total outage: pages answer, then
+    one offset is refused after every retry, and the papers collected up to that
+    point are real. Classifying that the same way as a query that returned
+    nothing made the manifest assert that a category had no papers while the
+    shards it had just written were full of them.
+    """
+
+    ARXIV_ERROR = None
+
+    def setUp(self):
+        self.ARXIV_ERROR = build_index.arxiv_common.arxiv.ArxivError
+        self.original = build_index.arxiv_common.iter_results
+
+    def tearDown(self):
+        build_index.arxiv_common.iter_results = self.original
+
+    def _install_mid_paging_failure(self, category, results):
+        def fake_iter_results(query, max_results, status=None):
+            asked = query.split(":", 1)[-1]
+            if asked != category:
+                return
+            for result in results:
+                yield result
+            raise self.ARXIV_ERROR(
+                "https://export.arxiv.org/api/query", 0, "simulated deep-offset 500"
+            )
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+
+    def _install_dead_query(self, category):
+        def fake_iter_results(query, max_results, status=None):
+            if query.split(":", 1)[-1] != category:
+                return
+            raise self.ARXIV_ERROR(
+                "https://export.arxiv.org/api/query", 0, "simulated deep-offset 500"
+            )
+            yield  # pragma: no cover - unreachable, makes this a generator
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+
+    def test_a_query_that_died_after_yielding_is_truncated_not_failed(self):
+        self._install_mid_paging_failure(
+            "cs.AI", [make_result("2401.00001", categories=["cs.AI"])]
+        )
+        failures = []
+        truncated = []
+        records = build_index.collect_papers(
+            ["cs.AI"], 60, 0, 500, failures, truncated=truncated
+        )
+        self.assertEqual(failures, [])
+        self.assertEqual(truncated, ["cs.AI"])
+        # The records before the fault are kept: they are the reason the
+        # category can be kept at all.
+        self.assertEqual([r["id"] for r in records], ["2401.00001"])
+
+    def test_a_query_that_died_before_yielding_anything_is_failed(self):
+        self._install_dead_query("cs.AI")
+        failures = []
+        truncated = []
+        records = build_index.collect_papers(
+            ["cs.AI"], 60, 0, 500, failures, truncated=truncated
+        )
+        self.assertEqual(records, [])
+        self.assertEqual(failures, ["cs.AI"])
+        self.assertEqual(truncated, [])
+
+    def test_a_dead_query_is_not_rescued_by_out_of_window_papers(self):
+        # The count that decides the classification is the in-window one, so a
+        # query that only ever saw stale results really did deliver nothing.
+        self._install_mid_paging_failure(
+            "cs.AI",
+            [
+                make_result(
+                    "2001.00001",
+                    datetime.now(timezone.utc) - timedelta(days=365),
+                    categories=["cs.AI"],
+                )
+            ],
+        )
+        failures = []
+        truncated = []
+        records = build_index.collect_papers(
+            ["cs.AI"], 60, 0, 500, failures, truncated=truncated
+        )
+        self.assertEqual(records, [])
+        self.assertEqual(failures, ["cs.AI"])
+        self.assertEqual(truncated, [])
+
+    def test_both_answers_can_be_reported_in_one_run(self):
+        def fake_iter_results(query, max_results, status=None):
+            asked = query.split(":", 1)[-1]
+            if asked == "cs.AI":
+                yield make_result("2401.00001", categories=["cs.AI"])
+                raise self.ARXIV_ERROR("u", 0, "simulated deep-offset 500")
+            if asked == "cs.RO":
+                raise self.ARXIV_ERROR("u", 0, "simulated deep-offset 500")
+                yield  # pragma: no cover
+            yield make_result("2401.00002", categories=[asked])
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+        failures = []
+        truncated = []
+        build_index.collect_papers(
+            ["cs.CV", "cs.AI", "cs.RO"], 60, 0, 500, failures, truncated=truncated
+        )
+        # One category short, one category absent, one healthy -- the manifest
+        # has to be able to say all three at once.
+        self.assertEqual(failures, ["cs.RO"])
+        self.assertEqual(truncated, ["cs.AI"])
+
+
+class ReconcileFailedCategoriesTests(unittest.TestCase):
+    """The manifest must never deny a category the shards hold.
+
+    ``collect_papers`` classifies by what one query did, but a shard can hold
+    papers for a category whose own query failed, because arXiv cross-lists: a
+    paper found through ``cat:cs.LG`` carries ``cs.AI`` too. Without this
+    backstop the "no papers here" claim would depend on the shape of the data.
+    """
+
+    def test_a_failed_category_carried_by_a_record_is_not_reported_failed(self):
+        records = [
+            make_record("2401.00001", "2024-01-08", ["cs.LG", "cs.AI"]),
+        ]
+        failed, truncated = build_index.reconcile_failed_categories(
+            ["cs.CV", "cs.AI"], ["cs.AI"], [], records
+        )
+        self.assertEqual(failed, [])
+        self.assertEqual(truncated, ["cs.AI"])
+
+    def test_the_primary_category_counts_as_carrying_it_too(self):
+        records = [
+            make_record("2401.00001", "2024-01-08", ["stat.ML"],
+                        primaryCategory="cs.AI"),
+        ]
+        failed, truncated = build_index.reconcile_failed_categories(
+            ["cs.AI"], ["cs.AI"], [], records
+        )
+        self.assertEqual(failed, [])
+        self.assertEqual(truncated, ["cs.AI"])
+
+    def test_a_category_nothing_carries_stays_failed(self):
+        records = [make_record("2401.00001", "2024-01-08", ["cs.LG"])]
+        failed, truncated = build_index.reconcile_failed_categories(
+            ["cs.LG", "cs.AI"], ["cs.AI"], [], records
+        )
+        self.assertEqual(failed, ["cs.AI"])
+        self.assertEqual(truncated, [])
+
+    def test_a_cap_truncated_category_passes_through_in_requested_order(self):
+        # Nothing moves a category the records disagree with; the returned lists
+        # are rebuilt in the order the categories were asked for, so a manifest
+        # reads the same whichever path put a name in it.
+        failed, truncated = build_index.reconcile_failed_categories(
+            ["cs.CV", "cs.AI", "cs.LG"],
+            [],
+            ["cs.LG", "cs.AI"],
+            [make_record("2401.00001", "2024-01-08", ["cs.AI"])],
+        )
+        self.assertEqual(failed, [])
+        self.assertEqual(truncated, ["cs.AI", "cs.LG"])
+
+    def test_the_move_is_logged_so_it_is_visible_in_a_deploy_log(self):
+        records = [make_record("2401.00001", "2024-01-08", ["cs.LG", "cs.AI"])]
+        with self.assertLogs(level="WARNING") as captured:
+            build_index.reconcile_failed_categories(
+                ["cs.AI"], ["cs.AI"], [], records
+            )
+        self.assertIn("cs.AI", "\n".join(captured.output))
+
+    def test_categories_in_records_covers_cross_listings_and_primaries(self):
+        self.assertEqual(
+            build_index.categories_in_records([
+                make_record("1", "2024-01-08", ["cs.LG", "cs.AI"]),
+                make_record("2", "2024-01-08", ["stat.ML"],
+                            primaryCategory="cs.AI"),
+            ]),
+            {"cs.LG", "cs.AI", "stat.ML"},
+        )
+
+
 class QueryCeilingTests(unittest.TestCase):
     """The bound handed to arXiv must be one the API will actually serve.
 
@@ -570,6 +754,15 @@ class MainTests(unittest.TestCase):
         stays 0 on purpose -- a non-zero exit fails the deploy step, which
         throws away the index it just wrote and reproduces the stale live site
         this item exists to remove.
+
+        IMP-216 amended which list the category lands in, and the two
+        assertions below are the moved ones. It used to be recorded as
+        *failed*, which asserted two falsehoods at once: that the category had
+        no papers (its own records were in the shards this manifest described)
+        and that it could not be browsed (the chip was dropped on the strength
+        of a query error rather than of what was fetched). It is now recorded as
+        *truncated* -- it has papers, not all of them -- which is what the site
+        renders as "cut off ... may be missing".
         """
         import tempfile
 
@@ -582,7 +775,7 @@ class MainTests(unittest.TestCase):
             if category == failed:
                 # Pages answered, then a deep offset came back 500: the records
                 # already yielded survive and the category is marked failed.
-                yield make_result("2401.00009")
+                yield make_result("2401.00009", categories=[failed])
                 raise arxiv_error(
                     "https://export.arxiv.org/api/query", 0, "simulated outage"
                 )
@@ -600,20 +793,18 @@ class MainTests(unittest.TestCase):
                 self.assertTrue(os.path.exists(manifest_path))
                 with open(manifest_path, encoding="utf-8") as handle:
                     manifest = json.load(handle)
-                self.assertEqual(manifest["failedCategories"], [failed])
+                self.assertNotIn("failedCategories", manifest)
+                self.assertEqual(manifest["truncatedCategories"], [failed])
                 self.assertIn(failed, "\n".join(captured.output))
-                # Only the categories that answered are advertised. Keeping the
-                # failed one would put a chip in the site's filter that leads to
-                # "No papers match the current filters" -- a false statement
-                # about the reader's own filter, made because of an outage they
-                # never caused. The notice names it instead.
-                self.assertNotIn(failed, manifest["categories"])
+                # The category is still advertised: it kept its papers, so the
+                # chip still leads to papers. Claiming otherwise is what told a
+                # reader "cs.AI has no papers here" over ~10,000 cs.AI papers
+                # sitting in the shards. Only a category with nothing behind it
+                # is dropped -- and then the notice names it instead.
+                self.assertIn(failed, manifest["categories"])
                 self.assertEqual(
                     manifest["categories"],
-                    [
-                        c for c in build_index.DEFAULT_CATEGORIES
-                        if c != failed
-                    ],
+                    list(build_index.DEFAULT_CATEGORIES),
                 )
                 self.assertGreater(manifest["totalPapers"], 0)
                 ids = set()
@@ -625,6 +816,7 @@ class MainTests(unittest.TestCase):
                 self.assertLessEqual(
                     {
                         "2401.00001", "2401.00002", "2401.00003", "2401.00004",
+                        "2401.00009",
                     },
                     ids,
                 )
@@ -850,6 +1042,130 @@ class MainTests(unittest.TestCase):
             build_index.collect_papers = original
 
 
+class ManifestShardAgreementTests(unittest.TestCase):
+    """A written manifest may not deny a category the written shards hold.
+
+    This is the cross-stack half of IMP-216 criterion 2 and it is the
+    invariant the whole item is for: whatever else happens, no paper in
+    ``papers-*.json`` may carry a category named in ``failedCategories``. The
+    site renders ``failedCategories`` as "so it has no papers here and no
+    filters to browse", so a violation here is a published falsehood about
+    data the same deployment just wrote.
+    """
+
+    def setUp(self):
+        self.original = build_index.arxiv_common.iter_results
+
+    def tearDown(self):
+        build_index.arxiv_common.iter_results = self.original
+
+    def _install(self, results_by_category, failing=()):
+        arxiv_error = build_index.arxiv_common.arxiv.ArxivError
+
+        def fake_iter_results(query, max_results, status=None):
+            category = query.split(":", 1)[-1]
+            if category in failing:
+                results = results_by_category.get(category)
+                if results is None:
+                    if status is not None:
+                        status.update(failed=True, error="simulated outage")
+                    return
+                for result in results:
+                    yield result
+                # The fault this item exists for: the category answered, then a
+                # deep offset was refused.
+                raise arxiv_error(
+                    "https://export.arxiv.org/api/query", 0, "simulated deep-offset 500"
+                )
+            for result in results_by_category.get(category, []):
+                yield result
+
+        build_index.arxiv_common.iter_results = fake_iter_results
+
+    def _written(self, out_dir):
+        with open(os.path.join(out_dir, "index.json"), encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        papers = []
+        for name in sorted(os.listdir(out_dir)):
+            if not name.startswith("papers-"):
+                continue
+            with open(os.path.join(out_dir, name), encoding="utf-8") as handle:
+                papers.extend(json.load(handle)["papers"])
+        return manifest, papers
+
+    def test_no_paper_in_the_shards_carries_a_failed_category(self):
+        import tempfile
+
+        categories = ["cs.CV", "cs.AI", "cs.RO"]
+        self._install(
+            {
+                "cs.CV": [make_result("2401.00001", categories=["cs.CV"])],
+                # Answers three pages, then 500 at a deep offset.
+                "cs.AI": [
+                    make_result("2401.0000%d" % (2 + n), categories=["cs.AI"])
+                    for n in range(3)
+                ],
+            },
+            failing=["cs.AI", "cs.RO"],
+        )
+        with tempfile.TemporaryDirectory() as out_dir:
+            exit_code = build_index.main(
+                ["--out-dir", out_dir] + sum(
+                    [["--category", c] for c in categories], []
+                )
+            )
+            self.assertEqual(exit_code, 0)
+            manifest, papers = self._written(out_dir)
+            self.assertEqual(manifest["failedCategories"], ["cs.RO"])
+            self.assertEqual(manifest["truncatedCategories"], ["cs.AI"])
+            self.assertIn("cs.AI", manifest["categories"])
+            self.assertNotIn("cs.RO", manifest["categories"])
+            for name in manifest["failedCategories"]:
+                carried = [
+                    p["id"] for p in papers if name in (p.get("categories") or [])
+                    or name == p.get("primaryCategory")
+                ]
+                self.assertEqual(
+                    carried, [], "cs.RO's failedCategories entry contradicts %d "
+                    "paper(s) in the shards" % len(carried),
+                )
+            # And the short category really is there, which is the other half.
+            self.assertEqual(
+                {p["id"] for p in papers if "cs.AI" in p["categories"]},
+                {"2401.00002", "2401.00003", "2401.00004"},
+            )
+
+    def test_a_cross_listed_paper_cannot_leave_its_own_category_failed(self):
+        # arXiv cross-lists, so a paper answered by cat:cs.LG can carry cs.AI.
+        # The failedCategories entry would then be false in a way nothing at the
+        # query layer can see, so the records get the last word.
+        import tempfile
+
+        self._install(
+            {
+                "cs.LG": [
+                    make_result("2401.00001", categories=["cs.LG", "cs.AI"]),
+                ],
+            },
+            failing=["cs.AI"],
+        )
+        with tempfile.TemporaryDirectory() as out_dir:
+            exit_code = build_index.main([
+                "--out-dir", out_dir,
+                "--category", "cs.LG",
+                "--category", "cs.AI",
+            ])
+            self.assertEqual(exit_code, 0)
+            manifest, papers = self._written(out_dir)
+            self.assertEqual(manifest["truncatedCategories"], ["cs.AI"])
+            self.assertNotIn("failedCategories", manifest)
+            self.assertIn("cs.AI", manifest["categories"])
+            self.assertEqual(
+                [p["id"] for p in papers if "cs.AI" in p["categories"]],
+                ["2401.00001"],
+            )
+
+
 class ParseArgsValidationTests(unittest.TestCase):
     """Out-of-range and malformed values must be rejected, not reinterpreted.
 
@@ -1031,28 +1347,143 @@ class DeployStepCommandTests(unittest.TestCase):
             "%d-result ceiling" % (index + 1, cap, ARXIV_RESULTS_PER_QUERY),
         )
 
-    def test_the_cap_stays_clear_of_the_real_window_sizes(self):
-        """The cap is a safety bound, so it must not sit just above a window.
+    def test_the_deepest_offset_the_deploy_can_request_is_bounded(self):
+        """IMP-216 criterion 3: the cap is a bound on depth.
 
-        cs.AI held 10,785 papers in its 60-day window on 2026-10-02 (measured
-        from ``opensearch`` totalResults by IMP-198's verifier) and arXiv grows
-        ~9% per window. A cap at 12,000 was +11% over that -- one growth step
-        from binding, and binding was silent, since a cap-bound truncation is
-        not a failed query. Two times the largest measured window is the floor
-        that keeps this a safety bound instead of a content budget; the ceiling
-        itself is the cap's other bound and is enforced by
-        ``QueryCeilingTests``.
+        arXiv answered a deep offset with a 5xx rather than a page --
+        ``cat:cs.AI`` returned HTTP 500 at ``start=10000`` on two consecutive
+        production builds on 2026-10-02, at the identical offset, while other
+        categories paginated past it -- and the client's retries do not help
+        because arXiv does not space them and the offset moves with category
+        size. So what has to be pinned is the deepest ``start`` the deploy can
+        ask for, not the size of a cap in the abstract and certainly not an
+        attempt count.
+        """
+        index, lines = self._index_step()
+        cap = self._cap_on_the_command_line(index, lines)
+        page_size = build_index.arxiv_common.build_client(cap).page_size
+        deepest = max(start for start, _ in requested_pages(cap, page_size))
+        self.assertLess(
+            deepest,
+            build_index.DEPLOY_OFFSET_BUDGET,
+            "deploy.yml:%d caps at %d, whose deepest request is start=%d -- at or "
+            "above DEPLOY_OFFSET_BUDGET (%d), the offset arXiv has been observed "
+            "to answer with HTTP 500"
+            % (
+                index + 1,
+                cap,
+                deepest,
+                build_index.DEPLOY_OFFSET_BUDGET,
+            ),
+        )
+        # The budget is a number the repository states, and the step has to cite
+        # it, or the two drift apart silently and this test asserts against a
+        # constant nobody reads.
+        self.assertIn(
+            "DEPLOY_OFFSET_BUDGET",
+            self._comment_above_the_run_line(index, lines),
+            "deploy.yml:%d does not cite DEPLOY_OFFSET_BUDGET, so the comment "
+            "cannot explain the cap" % (index + 1),
+        )
+
+    def test_raising_the_retries_does_not_stand_in_for_a_depth_bound(self):
+        # The other half of criterion 3. ``DEFAULT_NUM_RETRIES`` is the lever
+        # that looks available and is not: the fault is persistent at the
+        # offset and the offset is a function of how many in-window papers a
+        # category holds, so arXiv invalidates any pinned number over time and
+        # more attempts at a refused offset only cost minutes. What makes it
+        # unanswerable rather than merely unattractive is that there is nowhere
+        # to turn the dial: the builder exposes no retry option and the deploy
+        # passes none, so the attempt count can only change at its source.
+        self.assertEqual(build_index.arxiv_common.DEFAULT_NUM_RETRIES, 5)
+        options = sorted(vars(build_index.parse_args([])))
+        retry_options = [name for name in options if "retr" in name]
+        self.assertEqual(
+            retry_options,
+            [],
+            "build_index.py grew a retry option (%s); the attempt count is a "
+            "module constant precisely because a per-run dial invites trading "
+            "minutes for the deep-offset 5xx that more attempts cannot fix"
+            % ", ".join(retry_options),
+        )
+        index, lines = self._index_step()
+        retry_flags = [
+            token
+            for token in lines[index].split()
+            if token.startswith("-") and "retr" in token
+        ]
+        self.assertEqual(
+            retry_flags,
+            [],
+            "deploy.yml:%d passes a retry flag (%s); a refused deep offset does "
+            "not answer on a retry, so the attempt count must not become a "
+            "deploy-time dial standing in for the depth bound"
+            % (index + 1, ", ".join(retry_flags)),
+        )
+
+    def test_the_cap_is_measured_against_the_real_window_sizes(self):
+        """IMP-216 criterion 4: this assertion used to point the other way.
+
+        It required ``cap >= 2 * largest_measured_window`` (21,570) on the
+        reasoning that a safety bound must not sit just above a real window
+        size. That reasoning is sound and the assertion is unsatisfiable
+        alongside a depth bound: the largest measured 60-day window is cs.AI
+        at 10,785 papers, and a category that holds 10,785 papers needs a page
+        at ``start=10000``, which is the offset arXiv answered with HTTP 500
+        on 2026-10-02. So every cap that keeps the fault out of reach is below
+        the 21,570 this used to demand, and the two invariants cannot both
+        hold. Criterion 4 allows exactly one of them to move; this one moved,
+        and the test still measures the cap against the same measurement.
+
+        **The papers lost, per category, is the cost of the move.** At the
+        shipped cap of 10,000, cs.AI loses 10,785 - 10,000 = 785 of what arXiv
+        offers for its 60-day window (~7%), and nothing else: cs.LG (9,723),
+        cs.CL (5,213), cs.CV (6,742) and cs.RO (3,275) are all under it, from
+        IMP-198's verifier's measurements of 2026-10-02. So one category of five
+        is announced as truncated instead of all five staying whole. What the
+        deployed index actually loses is less than 785, by however many of those
+        papers are cross-listed and arrive through another category's query;
+        that figure is not measured here and is not claimed.
+
+        The trade is still worth taking, because the alternative was not "cs.AI
+        keeps all 10,785" but "cs.AI keeps nothing and the site says it has no
+        papers" -- which is what two production builds did. The bound is
+        structural rather than empirical, so it does not need revisiting as
+        categories grow: a deeper offset is unreachable at any size, which is
+        the whole reason the assertion below points downward.
         """
         largest_measured_window = 10785  # cs.AI, 60-day window, 2026-10-02
         index, lines = self._index_step()
         cap = self._cap_on_the_command_line(index, lines)
-        self.assertGreaterEqual(
+        # The refused offset and the window size are different quantities, so the
+        # message names each for what it is instead of printing the paper count
+        # as though it were the offset.
+        page_size = build_index.arxiv_common.build_client(cap).page_size
+        deepest = max(
+            (start for start, _ in requested_pages(cap, page_size)), default=0
+        )
+        self.assertLess(
             cap,
-            2 * largest_measured_window,
-            "deploy.yml:%d caps at %d, under 2x the largest measured 60-day "
-            "window (%d); a cap that close to a real window size truncates on "
-            "ordinary arXiv growth"
-            % (index + 1, cap, largest_measured_window),
+            largest_measured_window,
+            "deploy.yml:%d caps at %d papers per category, at or above the largest "
+            "measured 60-day window (%d papers), so the cap reaches the page at "
+            "start=%d -- the offset arXiv answered with HTTP 500 on 2026-10-02, "
+            "DEPLOY_OFFSET_BUDGET (%d)"
+            % (
+                index + 1,
+                cap,
+                largest_measured_window,
+                deepest,
+                build_index.DEPLOY_OFFSET_BUDGET,
+            ),
+        )
+        # The truncation is announced rather than silent, which is the other
+        # half of the trade and what makes a cap below the window defensible.
+        self.assertIn(
+            "truncatedCategories",
+            self._comment_above_the_run_line(index, lines),
+            "deploy.yml:%d does not say what happens to a category the cap cuts "
+            "short" % (index + 1),
         )
 
     def test_the_comment_documents_the_number_the_command_uses(self):

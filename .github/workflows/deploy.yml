@@ -82,25 +82,47 @@ jobs:
         # of build_index.py's own "Refusing to write an index: the arXiv query
         # failed for ..." (IMP-004).
         #
-        # --max-per-category 30000 is arXiv's own ceiling for one query (see
-        # RESULTS_CEILING in scripts/arxiv_common.py: the manual caps a query at
-        # 30,000 results and answers anything above it with HTTP 400), and it is
-        # deliberately equal to it rather than a smaller round number. This cap is
-        # a safety bound against the API ceiling, not a way to say how many papers
-        # we want, so it has to sit clear of real window sizes instead of just
-        # above them: the largest 60-day window among the 5 categories was cs.AI
-        # at 10,785 papers on 2026-10-02, and arXiv grows ~9% per window, so
-        # anything near 12,000 would have started truncating within a year and
-        # said nothing. 30,000 is 2.8x that measurement, and a category that
-        # reaches it is not truncated by us -- arXiv refuses the offset first,
-        # and the category degrades on its own.
+        # --max-per-category 10000 is a bound on DEPTH, not a content budget, and the
+        # number it is sized from is DEPLOY_OFFSET_BUDGET in
+        # scripts/build_index.py, which the tests read this command against.
+        # arXiv answers a deep `start` with a 5xx rather than a page: cat:cs.AI
+        # returned HTTP 500 at start=10000 on two consecutive full production
+        # builds on 2026-10-02, the same offset both times, while cs.LG reached
+        # start=9000 and cs.CV stopped at start=6000. The client's 5 retries
+        # over ~60 s all came back 500, because arXiv does not space them, and
+        # the offset is a function of how many in-window papers a category
+        # holds, so it moves and no pinned offset stays pinned.
         #
-        # What it costs: nothing on a healthy run. The 60-day retention window is
-        # what stops a healthy run -- 38 pages across the 5 categories today, the
-        # same 38 this command paged before the flag existed, because the cap only
-        # bites once a category outgrows it. If a cap ever does bite,
-        # build_index.py records it in index.json under "truncatedCategories" and
-        # the site says the index is incomplete, so it is no longer a silent cut.
+        # What does not move is the arithmetic: the client asks for page_size
+        # (1000) results at `start` and advances by page_size, so a cap of
+        # 10,000 makes start=9000 the deepest request this command can ever
+        # make, for every category, at every size. 9,000 is the deepest offset
+        # arXiv is known to have answered and 10,000 the first known to be
+        # refused, so the bound is one whole page below the fault and is
+        # enforced by a test rather than by a comment.
+        #
+        # What that costs, stated rather than waved at: it is a content trade
+        # made for a robustness one. cs.AI held 10,785 papers inside the 60-day
+        # window on 2026-10-02, so this cap truncates it by at least 785 (~7%)
+        # on a healthy run -- and only cs.AI, since cs.LG (9,723) still fits.
+        # (The deployed index loses less than that, by however many of those
+        # papers are cross-listed and arrive through another category's query;
+        # that figure is not measured here and is not claimed.) That is the
+        # deliberate trade: the papers past the offset used to be unreachable
+        # anyway, and the category used to be DELETED from the index and
+        # described on screen as having "no papers here" while those same
+        # papers sat in the shards it had just written. A category that reaches
+        # the cap now degrades by being recorded in index.json under
+        # "truncatedCategories" and announced as such on screen ("cut off ...
+        # may be missing"), which is the truth, not by disappearing. Raise the
+        # cap past 10,000 and the refused offset is back in play.
+        #
+        # Page arithmetic, recomputed for the new cap. The measured 60-day
+        # windows (IMP-198's verifier, 2026-10-02) are cs.CV 6,742 / cs.LG 9,723
+        # / cs.CL 5,213 / cs.AI 10,785 / cs.RO 3,275 = 35,738 papers, which is
+        # 38 pages of 1,000. Under this cap cs.AI's 11th page is never asked
+        # for, so a healthy deploy pages 37, where the old 30,000 cap paged
+        # those same 38 and allowed up to 30 per category (150 across the five).
         #
         # collect_papers records a failed category and moves to the next one, so
         # a total network partition costs one worst-case page fetch per category:
@@ -108,13 +130,15 @@ jobs:
         # and main() logs the category list and returns 1 without writing an
         # index. That 1800 s is what the step cap is sized against:
         #     75 min = 4500 s is 2.5x it
-        # which is what DeployStepTimeoutTests asserts. The compound case IMP-198
-        # modelled beyond it -- every page burning its full 60 s bound and still
-        # succeeding, 70 x 38 pages + 1800 s = 4460 s -- leaves 40 s, which is
-        # IMP-205's finding F-1 and not this step's to absorb; raising the cap
-        # there is IMP-205's change. A healthy deploy is ~2-5 min.
+        # which is what DeployStepTimeoutTests asserts. IMP-198's compound case
+        # beyond it -- every page burning its full 60 s bound and still
+        # succeeding -- is recomputed against 37 pages rather than 38:
+        #     37 x 70 s + 1800 s = 4390 s, which leaves 110 s (was 40 s)
+        # so the cap is no longer the one input IMP-205's F-1 is fighting, and
+        # the worst case across all five categories is now 50 pages rather than
+        # 150. A healthy deploy is ~2-5 min.
         timeout-minutes: 75
-        run: python scripts/build_index.py --max-per-category 30000
+        run: python scripts/build_index.py --max-per-category 10000
 
       - name: Build the web app
         # Order matters and is now asserted: the index has to be in
@@ -142,11 +166,18 @@ jobs:
         # this adds no dependency -- notably not jq, which the runner does not
         # guarantee -- and the whole check stays auditable in place.
         #
-        # A truncated-but-present index passes, and should: a category that hit
-        # its --max-per-category cap records itself in index.json under
-        # "truncatedCategories" and the site says so on screen. What must never
-        # ship is an index that is missing, unreadable, empty, or that points at
-        # shards which are not in the artifact.
+        # A truncated-but-present index passes, and since IMP-216 that is the
+        # EXPECTED shape rather than an exception: cs.AI sits above the cap above,
+        # so it records itself in index.json under "truncatedCategories", keeps
+        # its filter chip, and the site says its older papers may be missing.
+        # That is the honest state and this check must stay permissive on it.
+        # What must never ship is an index that is missing, unreadable, empty,
+        # or that points at shards which are not in the artifact -- and, since a
+        # category that answered is not in failedCategories unless the index
+        # truly holds nothing for it, a manifest whose failedCategories names a
+        # category its own shards contradict. That last one is a data bug rather
+        # than a pipeline one, so it is build_index.py's invariant to keep, not
+        # this step's to check.
         run: |
           set -euo pipefail
 

@@ -1,0 +1,19 @@
+VERDICT: PASS (independent verifier, did not write the change)
+1 MET - cap 10001 turns the suite red; removing the comment citation reds it.
+2 MET - in-window count asserted; ERROR-level log retained.
+3 MET, structurally - reconciliation and build_shards read the same
+  post-dedupe records, and the web filter predicate (App.tsx:374-381) is the
+  same union, so held is a subset of written.
+4 MET. 5 MET - measurement unchanged, direction flipped; non-vacuous at caps
+  10001/10785/30000. 6 MET, reproduced independently.
+SPEC-CONFLICT: Genuinely unsatisfiable - deepest = page_size*ceil(cap/page_size)
+- page_size < 10000 implies cap <= 10000 < 21570. The better alternative
+(bound the retention window, keep cap 30000) satisfies both original criteria
+but cuts ~18,000 papers instead of 785. Resolution correct.
+DATA-TRUTH: No - a reader cannot still be told a category has no papers when it
+has them. Seven adversarial cases held the invariant, 0 hollow chips.
+COST CORRECTION: the implementer claimed a ~785-paper (7%) cs.AI loss. The
+verifier proved pre-fix and post-fix write IDENTICAL id sets (34,953 papers,
+10,000 cs.AI) - arXiv refused start=10000, so those papers were already
+unreachable. Zero marginal loss.
+Evidence: .improve/reports/verify-IMP-216.md

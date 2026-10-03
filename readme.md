@@ -78,16 +78,19 @@ and everything after it run from `web/`.
    a normal build only ever asks for the first page or two.
 
    If one category's query dies part-way through, the index the other categories
-   produced is still written instead of nothing. `index.json` names what is
-   missing under `failedCategories`, the site shows a notice saying the index is
-   incomplete, and the missing category is dropped from the filter entirely — so
-   a short index cannot be mistaken for a complete one, and no filter chip can
-   send a reader to a feed that is empty for reasons of someone else's. A
-   category that used up its `--max-per-category` allowance is reported the same
-   way, under `truncatedCategories`: it keeps its papers and its chip, and the
-   notice says older papers from it may be missing. Only a run where *every*
-   category failed, or one that fetched no papers at all, exits 1 and writes
-   nothing, leaving the previously deployed index in place.
+   produced is still written instead of nothing. Whether the category is *absent*
+   or merely *short* depends on what the run actually fetched, never on the
+   query's exit status alone: a category that failed having collected nothing is
+   named under `failedCategories`, the site shows a notice saying the index is
+   incomplete, and it is dropped from the filter entirely — so a short index
+   cannot be mistaken for a complete one, and no filter chip can send a reader to
+   a feed that is empty for reasons of someone else's. A category that collected
+   papers before the failure is never described as absent: it is named under
+   `truncatedCategories`, keeps its papers and its chip, and the notice says
+   older papers from it may be missing. The same is true of a category that used
+   up its `--max-per-category` allowance. Only a run where *every* category
+   failed, or one that fetched no papers at all, exits 1 and writes nothing,
+   leaving the previously deployed index in place.
 
 2. Start the dev server. From the repository root:
 
@@ -182,15 +185,26 @@ from the command line.
 
 `.github/workflows/deploy.yml` builds the index and deploys the site to GitHub
 Pages on a weekly schedule (Sunday at 06:00 UTC), on pushes to `main`, and on
-manual dispatch. Its index step caps each category at
-`--max-per-category 30000`, which is arXiv's own ceiling for a single query and
-so a safety bound rather than a content budget: at the shipped 60-day retention
-the largest of the five categories held 10,785 papers when it was measured, so
-the cap sits well clear of any real window and costs nothing on a healthy run.
-The comment above the step records the measurement, the growth rate it has to
-outlast, and the timeout arithmetic. CI (`.github/workflows/ci.yml`) runs the
-Python `unittest` suite and, for the web app, `npm ci`, `npm run typecheck`,
-`npm test`, a small paper-index build and then `npm run build`.
+manual dispatch. Its index step runs with `--max-per-category 10000`, which bounds
+how *deep* it pages rather than how many papers it wants: arXiv answers a large
+`start` offset with a server error instead of a page (`cs.AI` measured HTTP 500
+at `start=10000` on 2026-10-02, six attempts apart, after paging past 9,000
+cleanly), and because the client asks for 1,000 results at each offset, a cap of
+10,000 makes `start=9000` the deepest request the deploy can ever make — whatever
+any category grows to. The cap does cost something on a healthy run — `cs.AI`
+holds more than 10,000 papers in the shipped 60-day window, so its oldest are
+dropped, about 785 of 10,785 when measured on 2026-10-02 — and the index says so
+on screen: a category that hits the cap is recorded in `index.json` under
+`truncatedCategories`, keeps its filter chip, and the site reports that its older
+papers may be missing. What it buys is that a category the published papers
+carry keeps its chip and its papers — including when its own query came back
+empty and it survives only because another category cross-listed into it. A
+category that no published paper carries is still dropped and reported as
+having none, which is the truth. The comment above the step records the
+measurement, the fault it is avoiding, and the page and timeout arithmetic. CI
+(`.github/workflows/ci.yml`) runs the Python `unittest` suite and, for the web
+app, `npm ci`, `npm run typecheck`, `npm test`, a small paper-index build and then
+`npm run build`.
 
 > One-time setup: in the repository's **Settings → Pages**, set **Source =
 > GitHub Actions**. The workflow cannot set this itself, and the first deploy
