@@ -1,0 +1,12 @@
+VERDICT: PASS (independent verifier, did not write the change)
+1 MET - valid 1280x900 PNG of the real React feed; index manifest confirms
+  total 14253, dated Oct 3 2026, no failedCategories; readme.md:11 unchanged.
+2 MET - 112,406 B (109.8 KiB) < 300 KB ceiling.
+3 MET - git diff -- readme.md empty; line 9 link + bullets 13-31 intact.
+Non-vacuity: old image (465,201 B, 1772x1434, 2023 serif CLI "Title:/Summary:
+/Link:") fails criteria 1+2; new sha256 edac0be1 unique across ~330 PNGs;
+verifier's independent production-build capture pixel-identical (0/1,152,000).
+npm run build exit 0. Minor: card clipped at bottom edge; Sort row wraps at
+1280px (D-2); hero count is a 30-day build vs readme's documented 60-day
+window - recapture tracked as a new item.
+Evidence: .improve/reports/verify-IMP-030.md

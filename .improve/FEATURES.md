@@ -112,7 +112,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 ---
 
 ## Tier 25.0 — the worst problems in the repo
-
 ### IMP-001 — Reject non-`http(s)` URLs in imported collection papers
 - **Status:** DONE
 - **Category:** Security
@@ -129,8 +128,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:**
-- **Notes:** commit 0beec1b
-### IMP-002 — Sanitize `--topic` before it reaches the CLI output paths
+- **Notes:** commit 0beec1b### IMP-002 — Sanitize `--topic` before it reaches the CLI output paths
 - **Status:** DONE
 - **Category:** Security
 - **Type:** bug-fix
@@ -145,8 +143,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:**
-- **Notes:** commit d3b4a1e
-### IMP-003 — Stop memoizing a rejected manifest promise in `PaperIndex`
+- **Notes:** commit d3b4a1e### IMP-003 — Stop memoizing a rejected manifest promise in `PaperIndex`
 - **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
@@ -161,8 +158,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:**
-- **Notes:** commit pending
-### IMP-004 — Refuse to write an index after any category's arXiv query failed
+- **Notes:** commit pending### IMP-004 — Refuse to write an index after any category's arXiv query failed
 - **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
@@ -177,7 +173,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:** Risk is `med` because the failure-reporting shape is a real design choice (hard fail vs. degraded index with a visible flag) and hard-failing could turn a partial outage into a red deploy. The choice must be recorded. | verifier PASS 3/3; 39 py tests
-
 ### IMP-005 — Make component and DOM testing possible
 - **Status:** DONE
 - **Category:** Test coverage & test quality
@@ -193,7 +188,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:** Dependency cost, as required by the profile: three dev-only packages, none shipped in the Pages bundle (`react` + `react-dom` remain the only runtime dependencies). `web/package-lock.json` is on the do-not-touch list, so this item — together with IMP-137 — is one of only two places that may change it, and only via `npm install`. Effort is `S` because the change is three devDependencies plus two config lines; the lockfile regeneration is one command. If `@testing-library/user-event` proves unnecessary for the first smoke test, drop it rather than carrying an unused dep. | commit 894fb9b
-
 ### IMP-143 — Export and test `readHash` / `writeHash`
 - **Status:** DONE
 - **Category:** Test coverage & test quality
@@ -210,7 +204,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:** This is a pure move plus one new test file; no behaviour may change. The profile forbids moving modules "as a side effect of a feature change" — this item **is** the move, so it is in scope here. `RecencyDays`/`SortMode` stay in `web/src/lib/types.ts` and are imported, not redeclared. | commit 5320dbb
-
 ### IMP-151 — Stop `__proto__` from passing the `id in papers` membership check
 - **Status:** DONE
 - **Category:** Security
@@ -228,7 +221,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 25.0
 - **Notes:** Same threat model as IMP-001 (a file someone sent you) with higher impact, because IMP-001's `isHttpUrl` filter does not touch this path. IMP-018 (a React error boundary around `<App />`) would blunt the symptom — a crash becomes a `role="alert"` fallback instead of a blank page — but not the defect, since the poisoned id is still written into `paperIds` and `localStorage`; it is a complement, not a substitute. Deliberately scoped to own-property semantics: OBS-1 in `.improve/reports/verify-IMP-001.md` (an array-valued `absUrl` survives `isHttpUrl` because `String(["https://x"])` stringifies to a valid prefix) is not exploitable and belongs with IMP-019's type widening, not here. Found and reported — not fixed — by the independent IMP-001 verifier. | commit pending
-
 ### IMP-154 — Validate `categories` and `published` in `isPaper` so a malformed export cannot blank the app
 - **Status:** DONE
 - **Category:** Data validation
@@ -248,7 +240,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Risk `med` because criterion 1 turns a permissive gate strict and criterion 3 is the guard against silently emptying real collections — that is exactly the failure mode IMP-001 introduced and IMP-151b had to walk back (regression sweep R1), so the "rejected count is zero against the real index" check must be run and reported, not assumed. Deliberately **not** fixed by IMP-018 (a React error boundary): that converts a blank page into a `role="alert"` fallback but still leaves the malformed snapshot in `localStorage`, and it does nothing for the *feed* path. It is a complement, not a substitute. Deliberately **not** fixed by IMP-098, which validates the manifest and shard payloads arriving over the network, not snapshots arriving from a file on disk. The point-of-use guards that would make this class of bug a degraded card rather than a blank page are IMP-160. Recorded as Issue 1 in `.improve/reports/verify-IMP-151.md`, which explicitly asks for its own backlog entry "at the same priority class as IMP-151". | commit pending
 
 ## Tier 20.0
-
 ### IMP-173 — Stop a JSON `null` manifest from hanging the app on "Loading the paper index…" forever
 - **Status:** DONE
 - **Category:** Error handling & edge cases
@@ -265,7 +256,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** Pre-existing, not a regression: `git show fc77a40:web/src/App.tsx` has the same `.then` with no `setLoading(false)` and the same `{!manifest && !error && (` guard at `:378`. Found as R4 in `.improve/reports/regression-sweep-3.md` §2 and re-derived independently at `.improve/reports/verify-IMP-018.md` §9.2. **Cross-reference — do not duplicate:** the bare cast at `paperIndex.ts:183` is the same "data validated only by cast" family as profile defect WEB-07 and as IMP-098 (TODO, `10.0`); IMP-098 owns field-level validation, this item owns the deadlock, and criterion 4 forbids this item from taking IMP-098's place. The related silent-data-loss question for a malformed `published`, which `paperIndex.ts:294` filters out rather than rejecting, is a **separate** item because it needs a product decision first. | commit pending
-
 ### IMP-007 — Add a "Try again" button to the index-unavailable panel
 - **Status:** DONE
 - **Category:** UX flows & interactivity
@@ -281,8 +271,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-003
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit ac1fae2; attempt 2 PASS (attempt 1 FAILed — the retry button was dead: one `getManifest()` per document, so a second click could not re-fetch)
-### IMP-008 — Make relevance sort agree with the Relevance chip
+- **Notes:** commit ac1fae2; attempt 2 PASS (attempt 1 FAILed — the retry button was dead: one `getManifest()` per document, so a second click could not re-fetch)### IMP-008 — Make relevance sort agree with the Relevance chip
 - **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
@@ -297,8 +286,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-143
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit 67ee0a4; attempt 2 PASS (attempt 1 FAILed — flaky test race)
-### IMP-009 — Validate `#cat=` values against the manifest
+- **Notes:** commit 67ee0a4; attempt 2 PASS (attempt 1 FAILed — flaky test race)### IMP-009 — Validate `#cat=` values against the manifest
 - **Status:** DONE
 - **Category:** Correctness
 - **Type:** bug-fix
@@ -313,8 +301,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit 228d48d; attempt 2 PASS (attempt 1 FAILed — it wrote `urlState.ts` but never wired `App.tsx` to call it, so the behaviour never changed)
-### IMP-010 — Make the category selection reversible and representable
+- **Notes:** commit 228d48d; attempt 2 PASS (attempt 1 FAILed — it wrote `urlState.ts` but never wired `App.tsx` to call it, so the behaviour never changed)### IMP-010 — Make the category selection reversible and representable
 - **Status:** DONE
 - **Category:** UX flows & interactivity
 - **Type:** improvement
@@ -330,7 +317,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-143
 - **Priority score:** 20.0
 - **Notes:** Depends on IMP-143 because criterion 4 needs the extracted, testable `writeHash`. IMP-106 (a broader "Clear filters" action) and IMP-009 (validating hash categories against the manifest) touch adjacent UI; keep the copy unambiguous about which control resets what. | commit pending
-
 ### IMP-011 — Surface `saveState` failure to the user
 - **Status:** DONE
 - **Category:** Error handling & edge cases
@@ -346,8 +332,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending
-### IMP-012 — Darken `--text-muted` until it clears 4.5:1 on every surface
+- **Notes:** commit pending### IMP-012 — Darken `--text-muted` until it clears 4.5:1 on every surface
 - **Status:** DONE
 - **Category:** Accessibility
 - **Type:** bug-fix
@@ -362,8 +347,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending
-### IMP-013 — Raise `--border` to 3:1 against `--surface`
+- **Notes:** commit pending### IMP-013 — Raise `--border` to 3:1 against `--surface`
 - **Status:** DONE
 - **Category:** Accessibility
 - **Type:** bug-fix
@@ -378,7 +362,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** Raising `--border` also affects `.paper` and `.collection` outlines; check both screenshots before declaring success. | commit pending
-
 ### IMP-014 — Restore the search input's keyboard focus ring
 - **Status:** DONE
 - **Category:** Accessibility
@@ -394,8 +377,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** same commit
-### IMP-015 — Make a single failed shard non-fatal
+- **Notes:** same commit### IMP-015 — Make a single failed shard non-fatal
 - **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** bug-fix
@@ -410,8 +392,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending; attempt 2 (AC2 completed)
-### IMP-016 — Distinguish "papers failed to load" from "no papers available"
+- **Notes:** commit pending; attempt 2 (AC2 completed)### IMP-016 — Distinguish "papers failed to load" from "no papers available"
 - **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** bug-fix
@@ -426,8 +407,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending
-### IMP-017 — Replace the raw `Error.message` with human-readable copy
+- **Notes:** commit pending### IMP-017 — Replace the raw `Error.message` with human-readable copy
 - **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** improvement
@@ -442,8 +422,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending
-### IMP-018 — Add a React error boundary around `<App />`
+- **Notes:** commit pending### IMP-018 — Add a React error boundary around `<App />`
 - **Status:** DONE
 - **Category:** Error handling & edge cases
 - **Type:** improvement
@@ -459,7 +438,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** The boundary is a safety net; it does not replace IMP-098 (runtime validation) — a boundary that silently hides a schema violation would be worse than the bug. | commit pending
-
 ### IMP-019 — Align `web/src/lib/types.ts` nullability with `record_from_result`
 - **Status:** DONE
 - **Category:** Correctness
@@ -475,7 +453,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** Risk `med` because widening the types may surface compile errors in `PaperCard.tsx` and `App.tsx` filter code (`App.tsx:211-212` uses `paper.primaryCategory` in a `Set` lookup, which is fine for `null` but changes the filter semantics subtly). **Advisory carried forward from `.improve/reports/verify-IMP-151b.md` OBS-D, which must survive this item:** widening the types to `string | null` makes it *tempting* to simplify `hasSafeUrls` (`web/src/lib/collections.ts:96-101`) from `url == null || isHttpUrl(url)` down to `isHttpUrl(paper.absUrl)`. Do not. `parseExportPayload` validates a file read off disk, so a `null` is reachable there regardless of what the declared type says, and `PaperCard.tsx:33-35`'s `safeHref(url: string | undefined)` is likewise now inaccurate about what it receives. The `null` exemption is load-bearing for correctness, and `isHttpUrl`'s `(value: unknown)` parameter is what makes it safe — narrowing that parameter to `string` would let a `null` flow straight into an `href`. | commit pending
-
 ### IMP-020 — Make the retention window a filter, not only an ordered `break`
 - **Status:** DONE
 - **Category:** Correctness
@@ -491,7 +468,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** Risk `med` because dropping non-`datetime` records changes what reaches the index for any upstream shape change; verify a real run still produces ~the same paper count before merging. The baseline index on disk is `totalPapers: 2812` across 2 shards; a smoke run of `--category cs.CV --max-per-category 300` is the comparison to record. | commit pending
-
 ### IMP-021 — Write the manifest before deleting stale shards
 - **Status:** DONE
 - **Category:** Correctness
@@ -507,8 +483,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending
-### IMP-022 — Validate every CLI flag in both scripts
+- **Notes:** commit pending### IMP-022 — Validate every CLI flag in both scripts
 - **Status:** DONE
 - **Category:** Configuration & defaults
 - **Type:** bug-fix
@@ -525,7 +500,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** Adding validation ranges changes `--help` output, which profile §4.5 requires to be reconciled with `readme.md` in the same change — that is criterion 5. IMP-114 documents `--category` in the readme and should be sequenced with this item. | commit pending
-
 ### IMP-023 — Make `safe_filename` a real sanitizer
 - **Status:** DONE
 - **Category:** Security
@@ -542,8 +516,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending
-### IMP-024 — Pass `filter="data"` to `tarfile.extractall`
+- **Notes:** commit pending### IMP-024 — Pass `filter="data"` to `tarfile.extractall`
 - **Status:** DONE
 - **Category:** Security
 - **Type:** bug-fix
@@ -558,7 +531,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** Risk `med` because a real arXiv source archive may contain members that `filter="data"` rejects, and `--download-sources` is a documented flag. Test against a real source archive before merging and log every rejection so a user can see what was skipped. | commit 19f8dbb; attempt 2 PASS (attempt 1 FAILed — the no-`filter` fallback branch still allowed traversal: `FORCE_FALLBACK=1` measured 21 escape routes)
-
 ### IMP-025 — Make `--save-csv` honor `--output-dir`
 - **Status:** DONE
 - **Category:** Correctness
@@ -574,8 +546,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending; AC1 already fixed by IMP-002
-### IMP-026 — Add `npm run build` to CI
+- **Notes:** commit pending; AC1 already fixed by IMP-002### IMP-026 — Add `npm run build` to CI
 - **Status:** DONE
 - **Category:** CI & automation
 - **Type:** tooling
@@ -590,7 +561,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** A broken `npm run lint` step is a bug, not a gate (profile §4.5). Do not add one until IMP-137 creates the script. | commit pending; AC3 size stale-baseline proven
-
 ### IMP-027 — Reconcile the deploy cron with its comment and `readme.md`
 - **Status:** NEEDS-HUMAN
 - **Category:** CI & automation
@@ -607,7 +577,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 20.0
 - **Notes:** The current weekly cron is the baseline (PE-4). Whichever direction is chosen, the *decision* is the deliverable; do not leave the two files disagreeing.
 **NEEDS-HUMAN — decision required.** Cron cadence is an operator/cost decision, not a bug fix: `0 6 * * 0` costs roughly 1/7 the Actions minutes of `0 6 * * *`, and every arXiv page costs `delay_seconds=10` (`scripts/arxiv_common.py:16`), so daily means ~5x the request volume against arXiv's terms of use. Pick weekly (fix only the comment at `deploy.yml:5` and `readme.md:122-123`) or daily (and accept the load), then implement. The minimum deliverable is the doc fix and is two lines.
-
 ### IMP-028 — Fail a production web build when the index is absent
 - **Status:** DONE
 - **Category:** CI & automation
@@ -623,8 +592,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-- **Notes:** commit pending
-### IMP-029 — Assert `web/dist/data` exists in the deploy workflow
+- **Notes:** commit pending### IMP-029 — Assert `web/dist/data` exists in the deploy workflow
 - **Status:** DONE
 - **Category:** CI & automation
 - **Type:** tooling
@@ -639,9 +607,8 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** Deliberately checks the filesystem, not HTTP — profile §4.5: a `curl -w %{http_code}` health check returns 200 from the SPA fallback and cannot catch this. | commit pending; closed with IMP-028
-
 ### IMP-030 — Replace the stale README hero screenshot
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Documentation
 - **Type:** docs
 - **Area / files:** `readme.md:11` (`![Example feed](images/feed_example.png)`), `images/feed_example.png` (465 KB, a 2023 screenshot of the legacy CLI's HTML output)
@@ -654,8 +621,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** `images/feed_example.png` is on the profile's "do not touch unless the item is specifically about it" list — this is that item.
-
+- **Notes:** **DONE** (commit above). Binary-only change; no test suites affected. `images/feed_example.png` is on the profile's "do not touch unless the item is specifically about it" list — this is that item.
 ### IMP-031 — Fix `CONTRIBUTING.md`'s Python command and add a venv step
 - **Status:** DONE
 - **Category:** Onboarding & developer experience
@@ -671,7 +637,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** The repo has no venv of its own and the profile's working command is `/usr/local/bin/python3.11 -m unittest discover -s tests -v`; the docs should not hardcode that machine-specific path. | commit pending; attempt 2 PASS
-
 ### IMP-032 — Document the `web/` test and build workflow in `CONTRIBUTING.md`
 - **Status:** DONE
 - **Category:** Onboarding & developer experience
@@ -687,7 +652,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** If IMP-026 adds a build gate, this is the doc side of it. Combine the two PRs if convenient. | commit pending; same commit
-
 ### IMP-033 — Add an upper bound to `arxiv` in `requirements.txt`
 - **Status:** DONE
 - **Category:** Packaging & installation
@@ -703,7 +667,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:** This item is a *floor* fix, not a substitute for IMP-093 (replace the removed APIs) — pinning to 2.x would also "fix" the crash while leaving the code on a dead API. State that in the PR. | commit pending
-
 ### IMP-034 — Resolve the notebook's divergent fork and correct `readme.md:113-118`
 - **Status:** NEEDS-HUMAN
 - **Category:** Documentation
@@ -720,7 +683,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 20.0
 - **Notes:** Risk `med` because deleting a documented artifact is user-visible; the readme and any external links must be corrected in the same change. The notebook is not in CI and not in deploy.
 **NEEDS-HUMAN — decision required.** This item's own criteria offer two mutually exclusive outcomes: delete a documented artifact, or rewrite it as a thin wrapper. That is a product decision about whether the notebook is a supported entry point. Until it is made, IMP-035, IMP-036, IMP-077, IMP-078 and IMP-079 are all blocked, because "if the notebook was deleted, mark this not-applicable" is written into each of them.
-
 ### IMP-035 — Add `html.escape` to the notebook's generated HTML
 - **Status:** TODO
 - **Category:** Security
@@ -736,7 +698,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-034
 - **Priority score:** 20.0
 - **Notes:** If IMP-034 deletes the notebook, mark this not-applicable rather than leaving it as dead work.
-
 ### IMP-036 — Add `max_results` to the notebook's `arxiv.Search`
 - **Status:** TODO
 - **Category:** Correctness
@@ -752,7 +713,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-034
 - **Priority score:** 20.0
 - **Notes:**
-
 ### IMP-037 — Add a component render smoke test
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -768,7 +728,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-005
 - **Priority score:** 20.0
 - **Notes:** Follow the repo's 1:1 mirror convention — a component at `web/src/components/PaperCard.tsx` gets tests at `web/src/components/__tests__/PaperCard.test.tsx`, not inline.
-
 ### IMP-038 — Add a `paperIndex` test for a single failing shard
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -784,7 +743,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-015
 - **Priority score:** 20.0
 - **Notes:**
-
 ### IMP-039 — Add a `paperIndex` test that a rejected manifest can be retried
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -800,7 +758,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-003
 - **Priority score:** 20.0
 - **Notes:**
-
 ### IMP-040 — Add a regression test that a failed category cannot produce a complete manifest
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -816,7 +773,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-004
 - **Priority score:** 20.0
 - **Notes:**
-
 ### IMP-041 — Add a quality gate to the deploy `build` job
 - **Status:** TODO
 - **Category:** CI & automation
@@ -836,7 +792,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 ---
 
 ## Tier 15.0
-
 ### IMP-205 — Raise or derive `deploy.yml`'s index-step cap from the measured page count
 - **Status:** TODO
 - **Category:** CI & automation
@@ -855,7 +810,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Impact 3, Confidence 5, Effort S = 15.0, and the arithmetic puts this item **above IMP-204 (12.5)** even though IMP-204 is the one that is breaking the deploy today — the gap is purely the `S` versus `M` effort divisor, not a judgement that a 40-second margin is worse than a total run failure. If the two are ever triaged together, IMP-204 goes first; this item's urgency is that the slack is consumed by arXiv's own growth, roughly 9 % per window, and nothing in the repository records the page count that the margin is spent against. Risk `low`: two YAML values, a comment that becomes truthful, and a test whose constant grows. **Honest caveat about the 4460 s figure:** the per-category page counts are measured, but the compound case is a *bound*, not a measurement — making 38 pages each consume the full 60 s and still succeed would take 74 minutes of wall clock, so the number is arithmetic over measured inputs, not an observation. It is filed as a bound because that is the case the cap exists for. Cross-references, deliberately **not** duplicated: **IMP-198** (DONE, `b7e23a8`) installed the caps and the `DeployStepTimeoutTests` case; this item does not reopen it — the caps it shipped are correct for the case it modelled, and the defect is that the model was one page per category. **IMP-206** covers the *job-level* caps being unpinned by any test, which is a different assertion at a different level of the same file. **IMP-204** stops the run earlier (bounded paging, per-category degradation), which reduces the page count and therefore changes the number this item's criterion 1 must state — land IMP-204 first and re-derive, or land both in one PR and say so. **IMP-183** (TODO, 7.5) bounding the retention window in the query would reduce the page count for the same reason. Evidence: finding **F-1** in `.improve/reports/verify-IMP-198-r2.md` §9, with the per-category page table in §1.4 and the case-A/B/C arithmetic in §1.4's second table.
-
 ### IMP-174 — Pin that the stale-shard sweep runs last
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -872,7 +826,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** The one real coverage gap in IMP-021's verification: `verify-IMP-021.md` §5 mutant D (`shards → sweep → manifest`) reported "Ran 55 tests … OK" while being unsafe, and mutants A, B and C were all killed. This is finding F-1 of that report. Impact is 3 rather than 4 because the shipped code is correct today — this item buys a regression guard. Cross-reference: the truncation half of the same crash family is IMP-099 (TODO, `10.0`) and is **not** duplicated here; nor is `_clean_old_shards`' default-argument path (`build_index.py:244`, D4 in `.improve/reports/discovered-IMP-021.md`).
-
 ### IMP-175 — Make the newest-first ordering deterministic within a publication day
 - **Status:** TODO
 - **Category:** Correctness
@@ -889,7 +842,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Pre-existing and unrelated to IMP-018's change; raised as finding 9.5 in `.improve/reports/verify-IMP-018.md` §3 and §9.5, and the same comparator was named independently in `.improve/reports/discovered-IMP-018.md` §2. Impact is 3 rather than 4 because no data is lost and every paper stays reachable — the harm is an unpredictable presentation order plus a verification method that reports a false negative. Cross-reference: IMP-008 (DONE) made the Relevance **chip** agree with the relevance **sort**; this item is about the comparator those sorts share, so the two do not overlap. IMP-098 (TODO) owns per-paper field validation and must not be used to defer this.
-
 ### IMP-144 — Reset load progress when a new load starts
 - **Status:** TODO
 - **Category:** Observability & logging
@@ -906,7 +858,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Profile WEB-06 and WEB-48 split this defect in two; IMP-067 owns the "0 papers match" half and this item owns the `progress` half. They touch `App.tsx` at adjacent lines — land them in the same change if convenient. Baseline `baseline-feed-preview-build-desktop-1280.png` shows the loading state to compare against.
-
 
 ### IMP-145 — Bound the size of an imported collection file
 - **Status:** TODO
@@ -925,7 +876,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 15.0
 - **Notes:** The 10 MB figure is a stated constant, not an eyeball. Component tests for these paths are IMP-131's scope; the constant must be exported or at least named so that test can assert it.
 
-
 ### IMP-147 — Remove pandas chained indexing from `build_html_feed`
 - **Status:** TODO
 - **Category:** Correctness
@@ -942,7 +892,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Touches the same lines as IMP-118 (the malformed `<body>`/`<b>` nesting in the same function); the two should land in one change so the generated output is only re-baselined once. Criterion 2's byte-identical diff is the guard against silently changing rendered output.
-
 ### IMP-042 — `dedupe_records` must not mutate its caller's input
 - **Status:** TODO
 - **Category:** Correctness
@@ -958,7 +907,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-043 — Preserve legacy arXiv ID prefixes
 - **Status:** TODO
 - **Category:** Correctness
@@ -974,7 +922,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because changing the id format changes the `id` value shipped to the browser and stored in existing `localStorage` snapshots (`rpf.papers.v1`). The shape stays "versionless arXiv id" and `PaperCard` keys on it, so the impact is bounded, but say so in the PR.
-
 ### IMP-044 — Guard `format_authors`' `str(author)` fallback
 - **Status:** TODO
 - **Category:** Data validation
@@ -990,7 +937,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-045 — Stop the retention count from over-reporting
 - **Status:** TODO
 - **Category:** Observability & logging
@@ -1006,7 +952,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-020
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-046 — Guard `write_index` so an unwritable out-dir returns exit 1
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -1022,7 +967,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-049 — Resolve `DEFAULT_OUT_DIR` against the repo root
 - **Status:** TODO
 - **Category:** Configuration & defaults
@@ -1038,7 +982,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Do not add a `scripts/__init__.py` or rename `scripts/paper-collector.py` in this change; the profile flags the hyphenated filename as do-not-touch and no item in this backlog restructures the import path.
-
 ### IMP-050 — Make downloads and extractions honor `--output-dir`
 - **Status:** TODO
 - **Category:** Correctness
@@ -1054,7 +997,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** IMP-093 repairs the arxiv-4 download API, but IMP-050 deliberately does **not** declare a dependency on it: the unit test in criterion 2 uses a fake result and needs no network, so the two can land in either order. Only the end-to-end verification run needs IMP-093 first.
-
 ### IMP-051 — Return a real exit code from `paper-collector.py`
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -1070,7 +1012,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-022
 - **Priority score:** 15.0
 - **Notes:** Depends on IMP-022 (formerly IMP-048) because the end-to-end check reuses `--max-papers 0` to prove the CLI no longer exits 0 on a zero-paper run. Criterion 2 is independent and can land first.
-
 ### IMP-052 — Pass `encoding="utf-8"` to the CLI's text writes
 - **Status:** TODO
 - **Category:** Correctness
@@ -1086,7 +1027,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-053 — Handle `pdf_url is None` in `build_html_feed`
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -1102,7 +1042,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** The mirror change on the index side is IMP-019 (`types.ts` nullability).
-
 ### IMP-054 — Make `DEFAULT_DELAY_SECONDS` configurable
 - **Status:** TODO
 - **Category:** Configuration & defaults
@@ -1118,7 +1057,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because lowering the delay toward arXiv's ToU minimum increases the chance of rate limiting. Do not default below 3 seconds; if the value is set lower, log a warning.
-
 ### IMP-055 — Move `logging.basicConfig` out of module import scope
 - **Status:** TODO
 - **Category:** Code health & refactoring
@@ -1134,7 +1072,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-056 — Inject a `now` parameter into `collect_papers`
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1150,7 +1087,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-058 — Stop the import path from leaking orphan snapshots
 - **Status:** TODO
 - **Category:** Correctness
@@ -1166,7 +1102,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-059 — Report import success and duplicate ids
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -1183,7 +1118,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-060 — Reject an import whose `version` is unknown
 - **Status:** TODO
 - **Category:** Data validation
@@ -1199,7 +1133,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-061 — Debounce the search query
 - **Status:** TODO
 - **Category:** Performance
@@ -1215,7 +1148,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because debouncing changes user-visible timing and interacts with the hash write (IMP-062) and the live-region announcement (IMP-099). Because a debounce can change which results are shown first, screenshot-verify rather than assume.
-
 ### IMP-062 — Coalesce the per-keystroke `history.replaceState`
 - **Status:** TODO
 - **Category:** Performance
@@ -1231,7 +1163,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-061
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-063 — Memoize `isSaved` as a `Set`
 - **Status:** TODO
 - **Category:** Performance
@@ -1247,7 +1178,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-064 — Wrap `PaperCard` in `React.memo`
 - **Status:** TODO
 - **Category:** Performance
@@ -1263,7 +1193,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-063
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because memoization is exactly the class of change that produces stale props. Verify the create-and-save path at `PaperCard.tsx:144-165` and the `actionSlot` path used by `CollectionsView.tsx:136-144` after wrapping.
-
 ### IMP-065 — Cap what the collections view renders
 - **Status:** TODO
 - **Category:** Performance
@@ -1279,7 +1208,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-066 — Reset scroll on view switch
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -1295,7 +1223,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-067 — Hide the result count while papers are loading
 - **Status:** TODO
 - **Category:** UI polish & visual consistency
@@ -1311,7 +1238,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-068 — Clamp the recency options to `manifest.retentionDays`
 - **Status:** TODO
 - **Category:** Correctness
@@ -1327,7 +1253,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because the recency union `RecencyDays = 7 | 30 | 60` (`web/src/lib/types.ts:38`) no longer covers the offered set; the type must be widened or the derivation constrained. Do not change the wire format.
-
 ### IMP-069 — Add "Copy BibTeX" to `PaperCard`
 - **Status:** TODO
 - **Category:** Missing features natural to this repo's purpose
@@ -1343,7 +1268,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** New styling goes in `web/src/styles.css`; never add a `style=` prop. Keep the runtime dependency set at exactly `react` + `react-dom`.
-
 ### IMP-070 — Gate the contributor build instructions on `import.meta.env.DEV`
 - **Status:** TODO
 - **Category:** Content accuracy
@@ -1359,7 +1283,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** `import.meta.env.DEV` is a Vite built-in already available in `web/src`; `web/tsconfig.json:18` already sets `types: ["vite/client"]`.
-
 ### IMP-071 — Give the file-import input a real focus target
 - **Status:** TODO
 - **Category:** Accessibility
@@ -1375,7 +1298,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** The standard fix is a `:focus-within` outline on `.import-button`; do not remove the input from the tab order, since a hidden input is the only reason the label is keyboard-operable here.
-
 ### IMP-072 — Make `<main id="main">` focusable for the skip link
 - **Status:** TODO
 - **Category:** Accessibility
@@ -1391,7 +1313,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-073 — Add list semantics to both paper lists
 - **Status:** TODO
 - **Category:** Accessibility
@@ -1407,7 +1328,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** `role="list"` on a `div` is the minimal change and avoids touching the CSS; using `<ul>` requires resetting list styling in `web/src/styles.css`, which this item should avoid.
-
 ### IMP-074 — Fix the heading hierarchy in both views
 - **Status:** TODO
 - **Category:** Accessibility
@@ -1423,7 +1343,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because `.paper__title` and `.collection__title` are styled by element-independent class selectors, but any tag change that alters default font sizing will show up. Screenshot both views before and after.
-
 ### IMP-075 — Make the reduced-motion block actually disable motion
 - **Status:** TODO
 - **Category:** Accessibility
@@ -1439,7 +1358,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Do not delete the block — it is the right place for the fix, and the profile's style discipline forbids reformatting untouched rules.
-
 ### IMP-076 — Close save menus on Escape and outside click
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -1455,7 +1373,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** This changes `<details>` open-state behavior. Verify that the checkbox state inside the panel still reflects `isSaved` after a programmatic close, and that `PaperCard`'s local `expanded` state at `:40` is unaffected.
-
 ### IMP-077 — Make the notebook's topic input non-interactive
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -1471,7 +1388,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-034
 - **Priority score:** 15.0
 - **Notes:** `jupyter` on this machine resolves to Homebrew jupyterlab on Python 3.14, not to any venv — use `<venv>/bin/jupyter-nbconvert`. This is a deliberate change to a documented interactive behavior (`readme.md:86-90`); the readme's framing of the CLI is unaffected.
-
 ### IMP-078 — Guard the notebook's download block and use `safe_filename`
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -1487,7 +1403,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-034
 - **Priority score:** 15.0
 - **Notes:** Not applicable if IMP-034 deletes the notebook.
-
 ### IMP-079 — Switch the notebook's MathJax CDN to https
 - **Status:** TODO
 - **Category:** Security
@@ -1503,7 +1418,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-034
 - **Priority score:** 15.0
 - **Notes:** Not applicable if IMP-034 deletes the notebook. The mirror assertion in `tests/test_paper_collector.py:46-49` is the pattern to copy.
-
 ### IMP-080 — Add a determinism regression test for the index
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1519,7 +1433,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-081 — Assert the arguments `main()` passes to `collect_papers`
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1535,7 +1448,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:**
-
 ### IMP-082 — Anchor the arXiv error tests to the real exception hierarchy
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1551,7 +1463,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** This is the one test that must not be hermetic; it must `skip` rather than fail when `arxiv` is absent, because the suite is otherwise network- and import-free.
-
 ### IMP-083 — Add a test for the malformed-shard branch
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1568,7 +1479,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** These tests double as the regression lock for IMP-015, since the partial-failure path reuses the same messages.
-
 ### IMP-084 — Add a test for the `mergeImport` orphan leak
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1584,7 +1494,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-058
 - **Priority score:** 15.0
 - **Notes:** This is the regression lock for IMP-058, not an independent test request; criterion 1 is exactly IMP-058's criterion 2.
-
 ### IMP-085 — Add a `pyproject.toml`
 - **Status:** TODO
 - **Category:** Packaging & installation
@@ -1600,7 +1509,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Do not add `[project]` packaging metadata that implies the repo is installable — it is a scripts repo, and `scripts/paper-collector.py` is not importable under its hyphenated name. Keep this to tool configuration.
-
 ### IMP-086 — Add `ruff` and a Python lint step in CI
 - **Status:** TODO
 - **Category:** Tooling, linting, formatting
@@ -1616,7 +1524,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-085
 - **Priority score:** 15.0
 - **Notes:** Dependency cost, as required by the profile: `ruff` is a single dev-only wheel, installed only in CI and by contributors — it never ships to Pages and never enters the deploy path (`deploy.yml:31` installs only `requirements.txt`). Risk `med` because a fresh linter will report new findings; if it does, either fix them in the same change or scope the rule set explicitly in `[tool.ruff]` and say why. Do **not** add a formatter (black/ruff-format) check — there is no formatter today and a reformat produces a diff no tool has validated.
-
 ### IMP-087 — Add `.github/dependabot.yml`
 - **Status:** TODO
 - **Category:** Packaging & installation
@@ -1632,7 +1539,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Every one of the seven outdated packages (PE-2) is a breaking-major bump, so the PRs this generates must not be batched. Add `groups` only if that makes it clearer; the per-ecosystem default already opens separate PRs. This item adds automation only — it does not touch a version.
-
 ### IMP-088 — Add an `npm audit` gate to CI
 - **Status:** NEEDS-HUMAN
 - **Category:** CI & automation
@@ -1649,7 +1555,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because introducing a failing gate on a branch that is already red provides no protection. Bump `vitest` and `vite` as separate PRs, one major each, and re-run the full web gate after each.
 **NEEDS-HUMAN — policy decision required.** Criterion 2 is self-defeating as written: the five advisories are the baseline (PE-1), so an `npm audit --audit-level=high` step fails on day one and guards nothing, while carving out a time-boxed exception to a security gate is an org policy call. Clearing the gate properly needs a breaking-major bump of `vitest` and `vite` (PE-2: every major here is breaking), which is a separate, riskier change.
-
 ### IMP-089 — Add `permissions`, `concurrency`, and `timeout-minutes` to `ci.yml`
 - **Status:** TODO
 - **Category:** CI & automation
@@ -1666,7 +1571,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** The profile confirms secret handling in this repo is already correct — no `secrets.*`, no PR-string interpolation into `run:`, and `pull_request` rather than `pull_request_target`. Do not change any of that; this item is only about the three missing keys.
-
 ### IMP-090 — Extend `.gitignore`
 - **Status:** TODO
 - **Category:** Tooling, linting, formatting
@@ -1682,7 +1586,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** `*_papers.csv` must not accidentally match anything tracked; verify with `git check-ignore` before committing.
-
 ### IMP-091 — Document the manifest and shard JSON schema in `readme.md`
 - **Status:** TODO
 - **Category:** Documentation
@@ -1698,7 +1601,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** The example must be a real captured output, not hand-written, or it will drift. The mirror test that locks the two sides together is IMP-094.
-
 ### IMP-092 — Flip the save dropdown when it would overflow the viewport
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -1714,7 +1616,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because measuring the panel requires a layout read (e.g. `getBoundingClientRect`) inside a component that currently has no DOM measurement; confirm it does not cause a layout thrash on scroll, and that the existing 390px `.save-menu__body { right: auto; left: 0 }` rule at `web/src/styles.css:749-752` still applies.
-
 ### IMP-152 — Emit `https://` arXiv `absUrl` values from the index builder
 - **Status:** TODO
 - **Category:** Security
@@ -1733,7 +1634,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Overlaps IMP-019, whose `Area / files` names `scripts/build_index.py:111-113` for the *nullability* of `absUrl`/`pdfUrl`/`primaryCategory`; the two changes are compatible but edit the same three lines, so land them together or state the ordering in the PR body. Impact is scored 3 rather than 5 because an `http` destination is a downgrade warning, not an injection — the page still renders and the visitor still reaches arXiv. Criterion 2 is load-bearing: tightening `isHttpUrl` to https-only before the shards are rebuilt would delete the link from all 50 live cards, which is exactly the trap IMP-001 documented.
 
 ---
-
 ### IMP-155 — Cover `isHttpUrl`'s whitespace/tab-obfuscated `javascript:` rejections
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1751,7 +1651,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Impact is scored 3, not 5, because nothing is currently broken — this buys *detection* of a regression rather than a fix, and its whole value is criterion 4. Do not fold this into IMP-152 (emit `https://`): that item must leave `isHttpUrl` accepting both schemes, and these tests are what pin the `http` half of that promise. The `null`/`undefined` exemption is already covered by IMP-151b's four tests (`7a2ed82`) and is not duplicated here. OBS-E in `.improve/reports/verify-IMP-151b.md`.
-
 ### IMP-156 — Cover `urlState`'s default `hash` argument and its default location writer
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1770,7 +1669,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Test-only, so effort is `S` and the bundle must not grow. The two mutations are M1 and M7 in `.improve/reports/verify-IMP-143.md` §8; the implementer disclosed M7 at `impl-IMP-143.md:135-139` and recommended exactly this follow-up. Not a defect and not attributable to IMP-143: IMP-143's criterion 3 only required that `writeHash` be *testable* without a window, which it is. This is the first test item that genuinely needs the jsdom environment IMP-005 added, so it is the cheapest proof that IMP-005 paid for itself. Also see profile WEB-37's "not yet closed" note.
-
 ### IMP-157 — Make `applyState` immune to React 18 batching
 - **Status:** TODO
 - **Category:** Correctness
@@ -1788,7 +1686,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Risk `med` because switching to a functional update changes *when* `writeHash` is called, and the push/replace split is load-bearing for Back (profile WEB-34) — criterion 3 exists so a verifier checks that rather than assuming it. **Pre-existing, not a regression:** `applyState` and every setter built on it are byte-identical to `fc77a40` (verified by content hash), and IMP-143 only moved `readHash`/`writeHash` out of `App.tsx` while ignoring the new `{ hash }` return value at the call site. Do not credit this to IMP-143. Second prerequisite alongside IMP-143 for IMP-008, IMP-132 and IMP-133 — those add keyboard shortcuts and bulk actions, which are exactly the shapes that trip it. D-1 in `.improve/reports/discovered-IMP-143.md`, independently reproduced in `.improve/reports/verify-IMP-143.md` §7, whose verdict was that it must not block IMP-143 but "should be filed as its own backlog item".
-
 ### IMP-192 — Stop the order-dependent alert race in `App.loadFailure.test.tsx`
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1806,7 +1703,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 15.0
 - **Notes:** Impact is 3, not 5: no reader ever sees this, and the shipping gate is unaffected — `ci.yml:37-38` runs plain `npm test`, and the file was 0/14 there. The impact is on **this loop's evidence**: a green suite is the only thing standing between a verifier's claim and a false one, and a test that flips on correct renders is worse than a missing test, because it is a test that reports. Confidence is 5: the race is read directly off `:904`/`:906` and the rates (1/12 at HEAD, 2/23 in tree, 0/14 plain) were measured by running the harness 49 times. Effort is `S` — one `waitFor` in two tests — which is what makes the 15.0 honest. Cross-references, deliberately **not** duplicated: IMP-163 (TODO, 7.5) closes three IMP-024 extraction-test gaps in `tests/test_paper_collector.py` and shares only the "a test that cannot fail is worse than no test" principle; IMP-132 (TODO, 6.7) adds coverage for `App`'s load/error/retry states but does not own the race in the tests that already exist; IMP-176 (NEEDS-HUMAN) touches the alert machinery's *policy*, not its tests. **Ordering note:** if IMP-132 or IMP-163 lands first, re-run criterion 4 afterwards — either may shift which file the racing assertion lives in. Finding row 5 (`OUT OF SCOPE`) in §9 of `.improve/reports/verify-IMP-019.md`, with the attribution run quoted in §5 of the same report.
-
 ### IMP-193 — Generate the paper index inside CI so the new build gate is not green on an empty checkout
 - **Status:** DONE
 - **Category:** CI & automation
@@ -1826,7 +1722,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Risk `med` for two reasons: the step adds a **network** call to a job that is currently offline and deterministic, so an arXiv outage turns a green PR red; and it duplicates the `pip install` that `python-tests` already does, lengthening the job. Keep the flags to one small page (criterion 3) and quote the measured duration. Impact is 3, not 4 — no reader is harmed today, but the gate IMP-026 just added is blind to the most common deploy failure, and this item is a hard prerequisite for IMP-028. Confidence is 5: the absent-data behaviour was measured **twice**, with `public/data` absent and with it present-but-empty, and the content-hash identity is what proves the gate is silent rather than merely lenient. Effort is `S`: four `uses:`/`run:` lines and one flag change in one file. **Ordering constraint, load-bearing:** this must land **before** IMP-028 (TODO, 20.0). IMP-028 makes a missing `public/data/index.json` a non-zero build exit, and CI never populates `public/data` until this item lands — shipping IMP-028 first turns `ci.yml:39-40` red on every single run. Cross-references, deliberately **not** duplicated: IMP-028 owns the fail-closed production-build guard, and its AC1 already requires the check to name `public/data/index.json` specifically rather than test `dist/data` with `isdir` — this item adds no guard; IMP-029 (TODO, 20.0) asserts `web/dist/data` in the **deploy** workflow, which already has the index build at `deploy.yml:33-34`, so it needs no companion step and is untouched; IMP-041 (TODO, 20.0) adds the Python suite and typecheck to the deploy job, also already index-populated; IMP-134 (TODO, 6.0) pins actions to SHAs, a separate change. Evidence: §4 (both probes, verbatim exit codes and hashes) and §8 row 5 of `.improve/reports/verify-IMP-026.md`, whose severity is "actionable for IMP-028's implementer — coordinate before shipping that guard". | commit pending
 
 ## Tier 12.5
-
 ### IMP-204 — Stop the weekly deploy's uncapped index build from paging past arXiv's limits
 - **Status:** DONE
 - **Category:** Correctness
@@ -1844,7 +1739,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.5
 - **Notes:** Impact 5 — the weekly production index build is on this path, and when it fires the operator gets an empty deploy and a stale live site. Confidence 5 — the mechanism was reproduced deterministically with only the 5xx stubbed, and the upstream constraint is quoted from arXiv's manual, which is a document rather than an observation. Effort `M`, so 5 × 5 ÷ 2 = 12.5 is the arithmetic ceiling; this is the highest-scoring item in the backlog that is not a small-effort web nit, and `12.5` on an `M` item is a genuinely severe signal rather than a rounding artifact. **Its score sits below IMP-205 (15.0) only because that item is `S`-effort; IMP-204 is the one that is deterministically breaking the deploy today, and if the two are ever triaged together this one goes first.** Risk `med` because criterion 2 changes a contract IMP-004 (`468b80d`) deliberately installed: the hard-fail is correct for a *total* failure and must survive (criterion 2 says so explicitly), but a partial refusal is currently indistinguishable from a total one, and making it distinguishable weakens the loudest failure signal the pipeline has. The PR body must argue that trade-off rather than assert it, and the existing IMP-004 tests are the check. Cross-references, deliberately **not** duplicated: **IMP-095** (TODO, 12.0) is "Cap `UNLIMITED` under arXiv's 30,000-result ceiling" and already owns the constant in criterion 1; its own Intent assumes "the retention `break` stops long before that" and only asks for a clamp, which is **not** sufficient — the deploy runs uncapped and `main()` discards every category, and neither half is in IMP-095's scope. **IMP-183** (TODO, 7.5) bounds the retention window in the arXiv query "instead of relying on the sort" and would reduce the page count; it is a complement, not a substitute, and landing it does not close criterion 3's deploy default. **IMP-205** owns the step cap's thin slack, which only becomes reachable once this item stops the run early. **IMP-211** owns the readme's unverified `cs.AI` / `start=9000` figures and stays open until the numbers are re-measured or hedged. **IMP-195** (TODO, 10.0) owns stale measured figures in the profile and the readme, but not this claim. Raised as R-1 (HIGH) in `.improve/reports/verify-IMP-031-r2.md` §3 and §6, and as D-9 in `.improve/reports/discovered-IMP-031.md`; disclosed in `readme.md:73-76` but deliberately not fixed there, because `scripts/` was outside the docs item's scope. Evidence caveat, stated honestly: the *mechanism* and the code-side defect were confirmed deterministically, and the upstream ceiling was confirmed from the manual; the specific live offset (`start=10000` → 500) and the `cs.AI`-specific attribution are **implementer-only** and must not be written into this item's own acceptance criteria as if they were verified. | commit pending; attempt 2 PASS
-
 ### IMP-006 — Make the two `localStorage` writes crash-consistent
 - **Status:** TODO
 - **Category:** Correctness
@@ -1861,7 +1755,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.5
 - **Notes:** Risk `med` because the fix changes the persistence format or write order, so a migrating reader is required for anyone whose `localStorage` predates the change — criterion 4 makes that explicit. Related growth path, deliberately **not** bundled here: full snapshots with abstracts mean the 5 MB quota is reachable after roughly 2–2.5k saved papers, so a size cap is a reasonable companion item.
-
 ### IMP-093 — Repair `--download-pdfs` and `--download-sources` on arxiv 4.x
 - **Status:** TODO
 - **Category:** Correctness
@@ -1878,7 +1771,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.5
 - **Notes:** Risk `med` because this introduces direct HTTP downloading in place of the library's helpers, which is a new failure surface (timeouts, redirects, content types). No new dependency is introduced — use `urllib.request` from the standard library, or `requests` which `arxiv` already depends on; say which in the PR body. The arXiv download URL path must carry the same terms-of-use delay as the client (`scripts/arxiv_common.py:16`); do not add a bare hammer loop. Pairs with IMP-033 (upper bound on `arxiv`), which changes which versions this item must support — do not batch them into one PR. **Verified evidence added 2026-10-02, and AC1's migration path is already concrete enough that no separate item was filed for it.** (a) arxiv **3.0.0 already deprecates** both helpers in its own source — `arxiv/__init__.py:235-236` reads *"Deprecated: future versions of this client library will not provide download helpers (out of scope). Use `result.pdf_url` directly."* — so the breakage is announced one major version *before* it happens, and `grep -n "def download" ` over the installed package returns hits on 2.1.0/3.0.0 and **zero** on 4.0.0/4.0.1. (b) Both replacements named in AC1 are verified present on **both** sides of the break: `Result.pdf_url` and `Result.source_url` exist on 3.0.0 *and* on 4.0.0/4.0.1, so the fix does not need a version branch — AC1's "falling back to a `result.source_url` attribute or method only if the installed arxiv exposes one" is satisfiable with a single `getattr` on every version in `[2.1.0, 4)`. (c) **N3, the except tuple:** `scripts/paper-collector.py:245`'s `except (arxiv.ArxivError, OSError, tarfile.TarError)` does **not** catch `AttributeError`, measured on all three installed versions — `AttributeError` escapes the clause everywhere, and that *is* the 4.x crash. This is what AC2 ("the `except` at `:80` is widened so no unexpected exception from an optional download can abort the run") exists to fix, and the pin in IMP-033 only makes 4.x uninstallable — it does not touch the handler, so do not read IMP-033's DONE as closing this. (d) The green Python suite is **not** evidence here: the repo's own `tests/` pass 77/77 against arxiv 4.0.1, the known-broken version, because `tests/test_build_index.py` replaces `iter_results` with fakes and every result fixture is a `SimpleNamespace`-style double, never a real `arxiv.Result`. AC3's fake-based tests are therefore mandatory, not optional. **Line drift:** this item's Area field cites `scripts/paper-collector.py:74-79` and `:80-81`; in the working tree the `download_pdf` / `download_source` calls are at `:239` and `:241` and the `except` is at `:245` — read the line from the file, per FEATURES.md's evidence rule 1. Evidence: §2, §7 N1 and §7 N3 of `.improve/reports/verify-IMP-033.md`; IMP-033 (DONE) names this item as the substitute for the removed-API work, and its `requirements.txt` comment's "This is a floor, not the fix" framing is verified accurate.
-
 ### IMP-094 — Add a Python→TypeScript wire-contract test
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -1896,7 +1788,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Risk `med` because committing a fixture under `tests/fixtures/` adds a new tracked path and a hand-maintained copy of the schema can itself drift; the point is that the *Python* test regenerates the truth and the *TS* test consumes the committed copy, so a divergence shows up as a failing key assertion rather than as a browser blank page. The fixture must be a real captured output, not hand-written.
 
 ## Tier 12.0
-
 ### IMP-176 — Decide what a paper with no usable `published` date should do to the feed
 - **Status:** NEEDS-HUMAN
 - **Category:** Data validation
@@ -1913,7 +1804,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 12.0
 - **Notes:** Raised as spec inaccuracy 9.2 in `.improve/reports/verify-IMP-018.md` §9.2, which states the real defect "is *silent data loss*, which belongs to runtime validation (IMP-098), not to a boundary". IMP-098 (TODO, `10.0`) does own dropping malformed papers and explicitly requires logging the drop count, but its acceptance criteria name only `id`, `title`, `authors` and `abstract` — **not** `published` — so it does not cover this record. Do not widen IMP-098's criteria in place to absorb this item; the decision below comes first. Confidence is 4 rather than 5 because the behaviour is measured but the severity is exactly what is undecided.
 **NEEDS-HUMAN — product decision required.** Decide which of two honest behaviours the feed should have when a shard paper has no usable `published` date: (a) drop the paper but **count it and say so**, extending IMP-098's drop-and-log policy to this field; or (b) treat the shard as malformed and fail the whole window loudly with the IMP-016 panel. Option (a) preserves availability and loses one paper quietly-but-visibly; option (b) preserves the "the feed is complete or it says it is not" guarantee IMP-015 shipped, at the cost of hiding every other paper in that week over one bad record. This is a product call about whether a research feed may quietly omit a paper, and an implementer must not make it unilaterally. **Decision needed before implementation.**
-
 ### IMP-177 — Name the partial-shard alert with the same words the reader can see
 - **Status:** TODO
 - **Category:** Accessibility
@@ -1930,7 +1820,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.0
 - **Notes:** Rated MEDIUM by the IMP-017 verifier and recorded in `.improve/reports/impl-IMP-017.md` "Finding (c)". It is WCAG 2.5.3 in the direction that matters: the visible label is a **prefix** of the accessible name, so voice-control users can still say the visible words — the defect is that the accessible name is *shorter* than the visible text, not that it contradicts it. Cross-reference: this is the same author-named-`alert` trap IMP-017 fixed at `App.tsx:631` (`aria-label={error.message}`, already the full visible string) and IMP-018 fixed in `web/src/ErrorBoundary.tsx:76` (whose label **does** equal its `<h1>`); neither covers this third site. Do not "fix" it by deleting the `aria-label` — that is what put the shard file name into the accessible name in the first place.
-
 ### IMP-146 — Revoke the export blob URL after the download has started
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -1947,7 +1836,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.0
 - **Notes:** The failure is engine- and timing-dependent, so it will not reproduce reliably in CI; criterion 3 (unchanged filename and payload) is the checkable part a verifier can rely on, and criterion 1's "no synchronous revoke" is grep-checkable via `grep -n "revokeObjectURL" web/src/App.tsx`.
-
 ### IMP-095 — Cap `UNLIMITED` under arXiv's 30,000-result ceiling
 - **Status:** TODO
 - **Category:** Configuration & defaults
@@ -1963,7 +1851,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.0
 - **Notes:** Keep this consistent with IMP-020, which removes the ordered-`break` dependency that currently keeps the run well under the ceiling. **Superseded in scope by IMP-204 (TODO, 12.5) — read that item first.** This item's Intent ("Today the retention `break` stops long before that, but if it ever stopped working…") is now known to be optimistic in a way that matters: `.github/workflows/deploy.yml:55` runs the **bare, uncapped** command, so the run is not bounded by anything local, and when a deep-offset 5xx does fire, `collect_papers` records the failure and `main()` discards **all five** categories and writes nothing. That was reproduced deterministically against a stubbed upstream. IMP-204 owns the bound *plus* per-category degradation *plus* a documented default for the deploy path; this item still owns the constant alone, so a PR that only lowers `UNLIMITED` closes this item and leaves the production failure untouched. Do not renumber either, and do not treat an IMP-204 PR as discharging this one without a PR-body line saying the constant moved here.
-
 ### IMP-096 — Add a 404 page and a `robots.txt` for the Pages site
 - **Status:** NEEDS-HUMAN
 - **Category:** Missing features natural to this repo's purpose
@@ -1980,7 +1867,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 12.0
 - **Notes:** Risk `med` because Vite's single-page build does not emit a `404.html` on its own, so this needs either a tiny Vite plugin, a `public/` copy, or a post-build copy step — pick one and say which. Note that GitHub Pages serves `404.html` only for not-found paths, and the SPA fallback in the profile's deploy health check means an HTTP probe cannot confirm it.
 **NEEDS-HUMAN — decision required.** Criterion 2 explicitly asks the implementer to choose between a crawlable `robots.txt` and a `disallow: /` personal-tool stance. That is a publishing decision for the site owner. The `404.html` half (criterion 1) does not depend on it and can be split out and started immediately.
-
 ### IMP-097 — Add a Python version matrix to CI
 - **Status:** TODO
 - **Category:** CI & automation
@@ -1996,7 +1882,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.0
 - **Notes:** Risk `med` because pinning reveals version-specific failures (the pandas chained-indexing deprecation and `tarfile.extractall` filtering both differ by version). Add one version at a time and fix what surfaces rather than adding the matrix and the fixes in the same PR.
-
 ### IMP-153 — Scrub non-`http(s)` urls already persisted in `localStorage` on load
 - **Status:** TODO
 - **Category:** Data validation
@@ -2015,7 +1900,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.0
 - **Notes:** Risk `med` because this *deletes* user-visible saved papers rather than merely deactivating a field — a user who deliberately saved a paper carrying an odd url loses it, so the PR body must state that trade-off instead of presenting the change as a pure win. Recorded as OBS-2 in `.improve/reports/verify-IMP-001.md`, where the verifier confirmed the render guard already renders these inert and explicitly deferred the scrub to a separate item. Independent of IMP-151: that item fixes the own-property membership check, this one filters url *values*, and they touch `loadState` at different lines — so neither needs to wait for the other.
-
 ### IMP-158 — Catch `KeyError` from a dangling in-tree hardlink in the source-extraction path
 - **Status:** TODO
 - **Category:** Correctness
@@ -2032,7 +1916,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 12.0
 - **Notes:** Confidence is 4, not 5: the behaviour is confirmed by reading CPython's `_find_link_target` and by the IMP-024 verifier's independent reproduction, but no real arXiv archive has ever been observed to trigger it, so reachability from the actual arXiv corpus is theoretical. Impact is 3, not higher, because the flag is a legacy convenience path (`--download-sources`) that the web app does not use. D6 in `.improve/reports/discovered-IMP-024.md`, restated as R4.1 in `.improve/reports/verify-IMP-024-r2.md`, which classed it HIGH for severity and pre-existing. Pairs with IMP-093 (repair both download flags on arxiv 4) — do not batch, but note that IMP-093's criterion 2 already widens that same `except` tuple, so if both land the tuple must not be widened twice inconsistently.
-
 ### IMP-159 — Require `loadState`'s storage key to agree with `paper.id`
 - **Status:** TODO
 - **Category:** Correctness
@@ -2053,7 +1936,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 
 ## Tier 10.0
 
-
 ### IMP-148 — Announce the empty states with `role="status"`
 - **Status:** TODO
 - **Category:** Accessibility
@@ -2071,7 +1953,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 10.0
 - **Notes:** Distinct from IMP-110, which changes *when* the result count is announced; this item changes whether the empty state is announced at all. Profile WEB-61.
 
-
 ### IMP-150 — Stop installing `pandas` on the deploy path
 - **Status:** TODO
 - **Category:** CI & automation
@@ -2088,7 +1969,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Saving is the install time and image size on the deploy runner, not correctness. Profile INF-07. The constraint duplication between `deploy.yml` and `requirements.txt` is the cost of this item — an alternative is a `requirements-deploy.txt`, which would be a new tracked file and is not proposed here.
-
 ### IMP-098 — Validate the manifest and shard payloads at runtime
 - **Status:** TODO
 - **Category:** Data validation
@@ -2104,7 +1984,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Risk `med` because a strict validator will reject data the app currently renders "successfully" (badly). Log every rejection and, on the first run against a real index, confirm the rejection count is zero before tightening. **Cross-reference — this is the item that owns the "data validated only by cast" half of profile defect WEB-07** (`REPO_PROFILE.md:685`); the other half, the missing React error boundary, was fixed by IMP-018 (DONE), whose report failed to name WEB-07 as `.improve/reports/verify-IMP-018.md` §9.4 records. Two read sites to cover, not one: `web/src/components/PaperCard.tsx:50` (`paper.abstract.length`) and, reached from the **search box** rather than by scrolling, `web/src/lib/search.ts:55-57` (`paper.title.toLowerCase()`, `paper.authors.join`, `paper.abstract.toLowerCase` — measured blanking the page on a query that matches nothing, per `.improve/reports/discovered-IMP-018.md` §1). `published` is deliberately **not** in this item's field list; see IMP-176, which needs a product decision first and must not be settled by widening these criteria.
-
 ### IMP-099 — Make index writes atomic
 - **Status:** TODO
 - **Category:** Correctness
@@ -2120,7 +1999,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-021
 - **Priority score:** 10.0
 - **Notes:** Keep `encoding="utf-8"` and `ensure_ascii=False` exactly as they are at `:241,244`; only the file lifecycle changes. **This item owns profile trap `PY-7`, confirmed twice after the fact:** `.improve/reports/discovered-IMP-021.md` D1 records that after IMP-021's reorder a crash during a same-week shard write — the normal weekly-deploy case — leaves the deployed `index.json` pointing at a 24-byte shard, and `.improve/reports/verify-IMP-021.md` F-2 injects `OSError(28)` mid-write and records `index.json` truncated to `'{\n  "totalPapers": 1,\n  "sha'` (24 bytes, `JSONDecodeError`) with the old shards still on disk. Neither is fixed by ordering, and neither is claimed by IMP-174 or IMP-179. Note also `.improve/reports/discovered-IMP-021.md` D2: if `PY-9` (error handling around `write_index`) is ever implemented as `return 0` or as a `finally` that sweeps stale shards, the ordering guarantee is silently voided — that form is forbidden.
-
 ### IMP-100 — Abort in-flight fetches and add a timeout in the browser
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -2137,7 +2015,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Risk `med` because aborting changes the shard cache's interaction with the recency filter — a request aborted by a superseded effect must not be cached as a failure, and a re-run must still fetch it.
-
 ### IMP-101 — Keep the previous list mounted while a new window loads
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -2153,7 +2030,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Risk `med` because showing stale papers while loading can be mistaken for the new window's results. The status text must name the window being loaded, and the count must reflect the window (see IMP-067 for the loading-time count and IMP-108 for its formatting).
-
 ### IMP-102 — Add a request timeout to the shared arXiv client
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -2169,7 +2045,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Risk `med` because arxiv 4.x does not expose a `timeout` constructor argument; the honest implementation either subclasses/wraps the session or sets a session default, and a too-aggressive read timeout will cause spurious failures on large pages. Pair with IMP-089's `timeout-minutes` so a hung job fails fast rather than at 6 hours.
-
 ### IMP-103 — Add network-free tests for `collect_papers`
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -2185,7 +2060,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-056
 - **Priority score:** 10.0
 - **Notes:** Follow the existing fake-client pattern in `tests/test_arxiv_common.py:11-18,49-65` rather than inventing a new one; monkeypatch and restore in `tearDown` or `try/finally` as the file already does.
-
 ### IMP-104 — Add tests for `fetch_papers` including the download-failure path
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -2201,7 +2075,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-093
 - **Priority score:** 10.0
 - **Notes:** No network in any of these; the fake result object only needs the attributes `fetch_papers` reads at `:62-70`.
-
 ### IMP-105 — Add `content-visibility: auto` to `.paper`
 - **Status:** TODO
 - **Category:** Performance
@@ -2217,7 +2090,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Risk `med` because `content-visibility: auto` changes the scroll height estimate while `contain-intrinsic-size` is approximate, which can cause a visible scrollbar jump. Set `contain-intrinsic-size` to a realistic card height and verify at both viewports. This is the cheap first step; true virtualization is deliberately not proposed because it would add a dependency the profile discourages.
-
 ### IMP-106 — Add a "Clear filters" action to the empty-filter state
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -2233,7 +2105,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Distinct from IMP-010, which is specifically the all-categories-deselected dead end. Both may render in the same state; keep the copy unambiguous about what each resets.
-
 ### IMP-107 — Enlarge sub-44px tap targets at 390px
 - **Status:** TODO
 - **Category:** Accessibility
@@ -2249,7 +2120,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Achieved with padding or a pseudo-element hit area so the rendered text metrics do not move; the one CSS breakpoint is at 520px (`web/src/styles.css:720`), so the padding can be unconditional.
-
 ### IMP-108 — Format result counts consistently and pluralize
 - **Status:** TODO
 - **Category:** UI polish & visual consistency
@@ -2265,7 +2135,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** `Intl.NumberFormat` is standard; no new dependency. Consider reusing the existing `formatDate` helpers' placement rather than adding a fourth formatting helper in a fourth place (see IMP-117's dedup item).
-
 ### IMP-109 — Add `aria-expanded` and `aria-controls` to "Show more"
 - **Status:** TODO
 - **Category:** Accessibility
@@ -2281,7 +2150,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** The card must generate a unique id; `PaperCard` is rendered in both the feed and the collections view, so the id must not be derived from a global counter that would differ between views.
-
 ### IMP-110 — Stop the result count from being a per-keystroke live region
 - **Status:** TODO
 - **Category:** Accessibility
@@ -2297,7 +2165,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Interacts with IMP-061 (query debounce) and IMP-067 (the `role="status"` loading region beside the count). If the debounce lands first, re-evaluate whether the count still needs to be a live region at all.
-
 ### IMP-111 — Remove the unused `PaperList.renderAction` prop
 - **Status:** TODO
 - **Category:** Code health & refactoring
@@ -2313,7 +2180,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** This is listed because `tsc --noEmit` with `noUnusedLocals` cannot see an unused *prop*, and no linter exists yet. Removing a documented-looking extension point is a judgment call — say so in the PR.
-
 ### IMP-112 — Make `addPaper` return the same identity when nothing changes
 - **Status:** TODO
 - **Category:** Performance
@@ -2329,7 +2195,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** `CollectionsState` is treated as immutable throughout; identity stability is what makes `React.memo` (IMP-064) and the save effect's dependency array meaningful.
-
 ### IMP-113 — Document `npm run typecheck` in `readme.md`
 - **Status:** TODO
 - **Category:** Documentation
@@ -2345,7 +2210,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** If IMP-137 adds a `lint` script later, this readme section needs a second pass.
-
 ### IMP-114 — Document `--category` in `readme.md`
 - **Status:** TODO
 - **Category:** Documentation
@@ -2361,7 +2225,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Pair with IMP-022, which adds the accepted-range statement for `--category` that this readme section must then reflect.
-
 ### IMP-115 — Fix the `iso_date` docstring and its naive-datetime branch
 - **Status:** TODO
 - **Category:** Content accuracy
@@ -2377,7 +2240,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** All four branches are currently untested, which is why the docstring drifted without anyone noticing.
-
 ### IMP-160 — Guard the collection render path against a paper snapshot it does not own
 - **Status:** TODO
 - **Category:** Correctness
@@ -2394,7 +2256,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Defence in depth, deliberately **not** scored as a bug: no current code path reaches either site with a bad value, which is why impact is 2. Its value is converting the *next* regression of this class from "permanently blank page until the user clears localStorage" into a degraded card — IMP-151 closed one reachable route and this closes the class. IMP-018 (a React error boundary around `<App />`) is the broader, coarser complement and should be treated as the backstop for anything this and IMP-154 miss; if IMP-018 lands first, criteria 1 and 2 still hold value because a boundary shows a fallback page rather than a working view with one bad card hidden. D-2 and D-3 in `.improve/reports/discovered-IMP-151.md`, restated as Issue 3 of `.improve/reports/verify-IMP-151.md`, which confirmed the current state is safe purely by the producer invariant.
-
 ### IMP-161 — Guard `mergeImport`'s `papers[paper.id]` write against a prototype key
 - **Status:** TODO
 - **Category:** Security
@@ -2412,7 +2273,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2, not higher, precisely because the verifier measured no global pollution, no crash and no persistence — this is closing a latent inconsistency with IMP-151's own invariant, not a live vulnerability. Note the toolchain constraint recorded by IMP-151's implementer: `Object.hasOwn` is **not** usable here, because `web/tsconfig.json:5` sets `lib: ["ES2020", …]` and it fails with TS2550; use `Object.prototype.hasOwnProperty.call(...)` via the existing `hasOwnKey` helper. Do not introduce `Object.hasOwn`. Issue 2 in `.improve/reports/verify-IMP-151.md`; keep the cited line number current, since the file shifted when IMP-151 landed.
-
 ### IMP-162 — Handle `TarInfo.mode is None` and strip privileged mode bits on the fallback path
 - **Status:** TODO
 - **Category:** Security
@@ -2430,7 +2290,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 because the branch is unreachable on every patched CPython ≥3.8.17 and in CI, and because the extracted file is owned by the user running the tool — a preserved setuid bit grants no privilege and there is no traversal or write-outside-`dest` consequence. It is a hardening/consistency gap, not an escape, and the verifier explicitly recommended accepting IMP-024 with this folded into a follow-up. Do not "fix" it by warning on every member (criterion 3c). Related but deliberately **not** bundled: the fallback *rejects* absolute member names while `data_filter` *relocates* them into the destination — both safe, not equivalent, and only worth reconciling in whichever item eventually removes the fallback (D8 in `.improve/reports/discovered-IMP-024.md`). R1 and D7 in the discovery/verification reports.
-
 ### IMP-166 — Pin the Node version in both workflows and declare `engines`
 - **Status:** TODO
 - **Category:** CI & automation
@@ -2447,7 +2306,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 — it cannot fail today. It is included because IMP-005 inherited a floating-version dependency constraint and nothing in the repo will catch it when it does drift, and because the fix is a one-line change in two files. Unverified on the machine that found it: every Homebrew `node@21`/`node@22` keg under `/opt/homebrew/opt/` symlinks into `Cellar/node/25.6.1`, so no real Node 20 was available to test against and the author could only reason about `setup-node`'s resolution, not observe it — criterion 2 exists to close that gap. Do **not** bundle the alternative fix (`npm install --save-dev jsdom@^26`, which declares `node >=18`): that would churn `web/package-lock.json`, which profile §6 restricts to IMP-005 and IMP-137. Recorded as §2 of `.improve/reports/discovered-IMP-005.md`; profile INF-19 records the absence of `engines`/`.nvmrc` but no item owns it.
-
 ### IMP-167 — Require every implementer report to quote the command behind each figure
 - **Status:** TODO
 - **Category:** CI & automation
@@ -2464,7 +2322,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 — no user or operator harm, and not one line of shipped code was wrong. The reason to itemize it is that `.improve/` is the memory of this loop: a fabricated figure in a DONE item's report is read by the next three implementers as a baseline, and the loop's whole value is that the baseline is measured. The verifier's judgement was that this "is the most serious report defect, because it is the one that would mislead a human reviewer skimming for evidence" — record that reasoning in the PR body so the item is not dismissed as pedantry. D1, D4 and D5 in `.improve/reports/verify-IMP-012.md`. This item does **not** retroactively invalidate the IMP-012 code change, which passed 7/7 criteria.
-
 ### IMP-168 — Suffix the reserved-name **stem**, not the whole slug, in `safe_filename`
 - **Status:** TODO
 - **Category:** Correctness
@@ -2481,7 +2338,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 — Windows-only, narrow input, no traversal and no overwrite of anything a user owns; the failure is that the sanitized name *is* the device, so the write lands on the console or `NUL` instead of the disk. Confidence is 5: the mechanism is fixed at `paper-collector.py:65` and was reproduced on Python 3.9.6/3.11.8/3.14.3. This is **not** a regression — the pre-IMP-023 one-liner returned `con.txt`, equally a device — and it reopens nothing IMP-023 closed (its criteria 1, 3 and 4 are untouched); the IMP-023 verifier scored criterion 2 MET because the criterion's literal wording ("gains a `_` suffix") is satisfied while flagging the intent as only partly delivered. Cross-references, deliberately not duplicated: IMP-023 is DONE and correct as scored; IMP-162 touches `scripts/paper-collector.py` on the same extraction path but concerns `TarInfo.mode`; IMP-050 rewrites the same `title_slug` call sites to honour `--output-dir` and must not absorb this. The sibling slug-collision finding from the same verification is IMP-171. Issues **I1** and **I2** in `.improve/reports/verify-IMP-023.md`; also §6 of `.improve/reports/regression-sweep-2.md`, whose CLI table shows `NUL.txt` → `NUL.txt_` and does not flag it.
-
 ### IMP-169 — Reject prototype-keyed collection ids in `isCollection`
 - **Status:** TODO
 - **Category:** Security
@@ -2498,7 +2354,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is deliberately 2, not higher: the verifier traced every use of a collection id and found no prototype-chain read, so this closes an inconsistency rather than a live vulnerability — it is scored identically to IMP-161 for the identical reason. Confidence 5: the absence of the check is a fact in the file as it stands. Cross-references, deliberately **not** duplicated: IMP-151 (DONE) closed the paper-id read/write paths and its criterion 2 names only `isPaper`; IMP-161 guards `mergeImport`'s `papers[paper.id]` write and names `isCollection` only as the site performing its own validation, never as a site that must reject a prototype id; IMP-160 guards the render path, not the validator. Finding **F3** in §8 of `.improve/reports/regression-sweep-2.md`, whose minimal fix is exactly `!PROTOTYPE_KEYS.has(collection.id) &&` in the `isCollection` return chain, and which confirms the gap was left by `34ea96c`.
-
 ### IMP-170 — Guard `noCategoriesSelected` on a manifest that actually has categories
 - **Status:** TODO
 - **Category:** Correctness
@@ -2515,7 +2370,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 and confidence 5: the verifier reproduced the state directly with a stubbed zero-category manifest — `[ZERO-CATEGORY INDEX] hash="" … emptyPanel="No categories selected" selectAllButtonPresent=true` — and confirmed it is unreachable through the shipped pipeline, so this is latent coupling rather than a shipped bug. Cross-references, deliberately **not** duplicated: IMP-010 (DONE) owns the `null`-vs-`[]` contract in `resolveCategories`/`readHash`/`writeHash` and met all four of its criteria; IMP-098 validates the manifest arriving **over the network**, but its criterion 1 only requires `categories` to be a string array — which `[]` satisfies — so IMP-098 does **not** close this and the two are complements rather than substitutes. Non-blocking §6.3 in `.improve/reports/verify-IMP-010.md`, which proposes exactly this one-line guard and notes the optional one-line hardening for "whoever touches this file next".
-
 ### IMP-171 — Stop title-derived slugs from colliding in the download and extraction tree
 - **Status:** TODO
 - **Category:** Correctness
@@ -2532,7 +2386,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 — measured, but negligible in practice: of the 2,812 real titles, **0** collide, and the failure mode is an overwrite rather than data loss or an escape. Confidence 5: the collisions were measured with `os.path.samefile` on this machine's volume and the class is inherent to a title-derived key. Every alternative fallback name has the same property (the verifier's own words), which is why the item is about the **caller** deriving the base rather than the sanitizer inventing more names — hence criterion 4's "do not touch `safe_filename`". Cross-references: IMP-050 (TODO) rewrites these same three call sites to honour `--output-dir` and deletes the `.tar.gz` after extraction; land IMP-050 first (it is 15.0, above this item) and let it carry the distinctness assertion into its criterion-2 test, but do **not** declare a `Depends on`, so this item's unit tests can land independently in the same three lines. IMP-023 (DONE) chose `FALLBACK_SLUG = "_"` deliberately and disclosed the collision in its own report; this item does not reopen that choice. Issue **I3** in `.improve/reports/verify-IMP-023.md` and §8 of `impl-IMP-023.md`. Only the `CON`/`CON_` and dot-only classes are new; the `Report`/`report` case collided under the pre-IMP-023 one-liner too.
-
 ### IMP-189 — Cap the length of a `--category` value
 - **Status:** TODO
 - **Category:** Configuration & defaults
@@ -2551,7 +2404,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2: a nonsense category is accepted and produces an empty feed, which costs one deploy cycle and a confusing log line, but nothing is corrupted and no untrusted character class is admitted. Confidence is 5 — the pattern is quoted from the file and the acceptance measured at four lengths. Effort is `S` because the change is one bound plus one subtest. **This was deliberately NOT an IMP-022 failure**: AC2 says the pattern is used verbatim, the implementer kept it verbatim, and the verifier scored AC2 MET while recording the gap separately. The item therefore amends a DONE item's regex rather than reopening its criteria, and IMP-022's own acceptance criteria are untouched. Cross-references, deliberately **not** duplicated: IMP-114 (TODO, 10.0) documents `--category` in `readme.md` and its criterion 2 requires readme/`--help` agreement — if IMP-114 lands first, extend its section rather than writing the bound twice; IMP-033 bounds the `arxiv` library version, not CLI values; IMP-046 guards the out-dir, not the category. Finding 1 in §8 of `.improve/reports/verify-IMP-022.md`, which also asks that the residual be filed as **D6** in `.improve/reports/discovered-IMP-022.md` — do that as part of this item, since the profile's residual-recording rule is what makes the gap visible to the next implementer.
-
 ### IMP-190 — Pin IMP-004's exit code to `1` instead of "not 0"
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -2569,7 +2421,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2: no shipped behaviour is wrong today, and the codes were verified correct by direct execution. The item is about **false confidence in a landed item's only guard** — IMP-004's exit-1 path is the difference between a green deploy and a silently truncated research feed, and a single `assertNotEqual` is not a pin for it. Confidence is 5: the assertion is quoted from the file and the weak mutant was demonstrated, not reasoned about. Effort is `S` — one line, plus the mutant demonstration in criterion 3 that keeps it honest. Cross-references, deliberately **not** duplicated: IMP-004 (DONE) owns the `failures`/`return 1` production behaviour and all three of its criteria passed; this item changes **no** file under `scripts/` and reopens nothing. IMP-046 (TODO, 15.0) guards a different exit-1 path (an unwritable `--out-dir`) and is a production change, not a test tightening. IMP-040 (DONE) adds the regression test that a failed category cannot produce a complete manifest — it asserts the manifest, not the exit code, so the two are complementary. §6.3 and Finding 2 in `.improve/reports/verify-IMP-022.md`; the sibling-exit-code table in §6.2 of the same report is the evidence that the codes are genuinely distinct. **Note the line drift:** the report cites `:388`, which is `:490` in the working tree — read the line from the file, per FEATURES.md's evidence rule 1.
-
 ### IMP-194 — Name the `setPapers`/`setFailedShards` batching invariant four `App.partialShard` assertions depend on
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -2587,7 +2438,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 and **not** higher, stated plainly: no reader sees this, the four tests are green today, and the verifier measured 0/8 un-amplified detection for this file — this is insurance against a refactor, not a red build. Confidence is 5 for both the shape and the invariant, because both are read directly off the files (the four assertion sites and `App.tsx:259-264`); that is what makes effort `S` and the score an honest 10.0. The verifier's own recommendation is "worth a comment at those four lines recording the invariant they depend on, so the next agent who splits that pair knows which assertions just became racy" — criterion 4 is the strictly stronger version of that, and an implementer who takes the comment-only route should say so in the PR body. **Deliberately not a `waitFor`:** the verifier classified `:277` and `:315` under "safe, must not accumulate — count 1 as a *negative* proof", where wrapping in `waitFor` is a **strictness loss**. Cross-references, deliberately **not** duplicated: IMP-192 repaired six *other* sites (`App.loadFailure.test.tsx:886`, `:903`, `:920`; `App.partialShard.test.tsx:421` and `:440`; `App.storage.test.tsx:159`) and none of them is one of these four; IMP-182 (TODO, 7.5) protects the papers-load `useLayoutEffect` from a silent revert — a different statement in the same effect; IMP-178 (TODO, 8.0) adds a `console.error` to the soft-failure path and cites `App.tsx:241-250`; IMP-177 (TODO, 12.0) names the partial-shard alert's **copy**, not its arrival. Evidence: §6 ("Same shape, currently safe by a different invariant — the one thing I would escalate") and §8 addition 5 of `.improve/reports/verify-IMP-192.md`, plus the follow-up in its §9 verdict.
-
 ### IMP-195 — Re-baseline the bundle sizes recorded in `REPO_PROFILE.md` and `FEATURES.md`
 - **Status:** TODO
 - **Category:** Documentation
@@ -2606,7 +2456,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2: no reader sees this and no code is wrong — the harm is to **this loop's evidence**, and it is already realised, since IMP-026's AC3 is unmet for a reason no implementer can fix. Confidence is 5 for both figures, which were measured by rebuilding the two SHAs rather than recalled, and the CSS-delta-0 result independently validates the profile's method. Effort is `S`: prose plus two measured numbers. **The file this item edits is `.improve/REPO_PROFILE.md`, not `FEATURES.md`,** and that is called out in the Area field because the escalation arrived as a profile correction and the tempting move is to fold it into a code item. Cross-references, deliberately **not** duplicated: IMP-026 (DONE) added the CI build step and met 2 of 3 criteria; its AC3's size conjunct is unmeetable and its own Notes already carry "AC3 size stale-baseline proven", so this item does not reopen it — it fixes the baseline the AC was written against. IMP-167 (TODO, 5.0) owns the *process* rule that every figure quotes its command; that rule is what made this gap findable, and it is complementary, not a substitute. IMP-105 (TODO, 7.5) and IMP-013 / IMP-014 budget built-CSS growth against the 10.93 kB figure, which criterion 5 leaves valid. Evidence: §3 and §8 rows 1–2 of `.improve/reports/verify-IMP-026.md`, including the per-module `renderedLength` attribution table and the `index-D7spZXJu.js` content-hash identity that proves the CI change itself contributed 0 bytes.
-
 ### IMP-196 — Format every `.improve/PROGRESS.log` row through one helper
 - **Status:** TODO
 - **Category:** Observability & logging
@@ -2624,7 +2473,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact is 2 and only 2: the file is correct as it stands, so this is purely preventive. It is filed because the sweep names the durable fix explicitly, it has not been done, and the third occurrence of a class is the point at which "it keeps getting repaired by hand" becomes a defect in the loop's process rather than in any one commit. Confidence is 5 — the file was parsed field by field and the 4-field invariant holds on all 35 current rows, so criterion 3 guards a real, currently-satisfied invariant rather than a guess. Effort is `S`: one helper plus one check. **Neither logged defect is currently present**: the fused pair and the three swapped rows were repaired by the commit that logged `REGRESSION-4 | FIXED` (`PROGRESS.log:32`), which I confirmed by re-parsing all 35 rows — this item owns the *formatter*, not a re-fix. Cross-references, deliberately **not** duplicated: IMP-167 (TODO, 5.0) requires implementer reports to quote the command behind each figure, which governs `.improve/reports/` and not this log's row format; IMP-089 (TODO, 10.0) adds `permissions`/`concurrency`/`timeout-minutes` to `ci.yml` and touches no loop file. Evidence: regressions 2 and 3 in `.improve/reports/regression-sweep-4.md:117-184`, whose §4 recommends "a single `logRow(ts, item, result, sha)` helper — rather than three call sites each formatting the string by hand", and §12's "the format itself has now broken three times in this file's history".
-
 ### IMP-206 — Pin the `deploy.yml` job-level caps so a job cap below its step cap is caught
 - **Status:** TODO
 - **Category:** CI & automation
@@ -2642,7 +2490,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact 2, Confidence 5, Effort S = 10.0. Impact is 2, not 3, because **no shipped value is wrong** — the hazard is a future edit, and the failure mode (a deploy that dies on a generic timeout instead of the CLI's own message) is the one IMP-198 was written to prevent. Confidence 5 because the mutation matrix was executed rather than reasoned about: `deploy.yml` `build` 90 → 20 survives the suite, and the two other mutants (deleting either deploy job cap) survive too. Risk `low`: a test plus, at worst, one shared helper. The honest constraint is criterion 2 — detecting "a job cap is below its own step cap" needs to associate a cap with the step list of the same job, which is the part that wants a real YAML parse, and PyYAML is not available in CI. A structural scan is cheaper and sufficient for the current three-value file; say in the PR body that it will not survive a reformat of the workflow, and that if the workflows grow a nested structure the test should start failing loudly rather than silently scanning nothing. Cross-references, deliberately **not** duplicated: **IMP-198** (DONE, `b7e23a8`) shipped the caps and `DeployStepTimeoutTests`, which owns the *step* caps; this item is the missing *job* relationship only and must not re-litigate the step values. **IMP-089** (TODO, 10.0) adds `permissions`/`concurrency`/`timeout-minutes` to `ci.yml` wholesale and overlaps criterion 4 — if IMP-089 lands first, criterion 4 is satisfied and should be dropped rather than reimplemented. **IMP-205** owns the deploy *step* cap's thin slack; this item owns the job/step *ordering* and the test that would catch a job cap being lowered. **IMP-200** (TODO, 5.0) touches `ci.yml`'s `web-tests` steps but not their caps. Evidence: finding **F-3** of `.improve/reports/verify-IMP-198-r2.md` §9, confirmed independently there as mutant M28, and originally the implementer's M18.
-
 ### IMP-207 — Declare `requests` in `requirements.txt`; it is imported directly
 - **Status:** TODO
 - **Category:** Configuration & defaults
@@ -2660,7 +2507,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact 2, Confidence 5, Effort S = 10.0. Confidence 5 is easy here: the import is at `arxiv_common.py:12` and the requirement is absent from a two-line file, both read directly. Impact is 2 and not higher **because this cannot fail today** — `import requests` cannot fail where `import arxiv` on the line above has not, on any version in the admitted `[2.1.0, 4)` range, since both majors declare it. The item is filed because the repo now has production behaviour — a client-side timeout and three workflow caps — justified in terms of a package it does not declare, and the verifier's own worst-case arithmetic depends on which version gets resolved. A future `arxiv` major is a real but unquantified risk, which is the same class of exposure IMP-198's own Notes call "a floor, not a guarantee". Cross-references, deliberately **not** duplicated: **IMP-198** (DONE, `b7e23a8`) added the `requests`-dependent timeout and deliberately did not touch `requirements.txt`; this item owns the declaration and must not reopen the timeout mechanism. **IMP-033** (DONE, `bbe2d18`) owns the `arxiv` upper bound and its long comment; that comment is the style to match and its claim that "everything the scheduled index build uses … is unchanged through 4.x" is about `arxiv`, not about `requests`. **IMP-085** (TODO, 15.0) adds a `pyproject.toml`, which would eventually move these declarations somewhere else — it does not have to land first, but if both land in the same window the requirements must not be duplicated. **IMP-093** (TODO, 12.5) is told in its own Notes to "use `urllib.request` from the standard library, or `requests` which `arxiv` already depends on"; this item is the answer to that note — the declared-dependency form is the right one, and IMP-093's PR should then use `requests` without re-deciding. Evidence: finding **R-1** in `.improve/reports/verify-IMP-198-r2.md` §8, including the `importlib.metadata.requires('arxiv')` reading and the two different resolved versions observed on the same day.
-
 ### IMP-208 — Document that arXiv does not space its retries, and that the repo must not add client-side sleeps
 - **Status:** TODO
 - **Category:** Observability & logging
@@ -2678,7 +2524,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact 2, Confidence 5, Effort S = 10.0. This is a documentation item with a documentation-shaped risk profile, filed because the highest-cost outcome here is a **wrong** fix: a maintainer who sees `delay_seconds=10, num_retries=5` and an observed burst of six identical requests will very reasonably add a sleep, silently changing the request rate this project sends to a service whose terms of use govern that rate, and no test would fail. Confidence 5 — the behaviour was read out of the installed package's source at 2.1.3 (`Client.__Client__try_parse_feed`) and then measured, with attempt offsets exactly one timeout apart. Effort is `S` and risk is `low` **only because the fix is prose**: criterion 3 makes that a hard constraint, and any behavioural change to the retry or pacing path is a different item requiring a fresh decision. Cross-references, deliberately **not** duplicated: **IMP-198** (DONE, `b7e23a8`) added the timeout and deliberately left `delay_seconds` and `num_retries` as context lines in its diff; its verifier recorded this gap as "a real, unfiled question for the orchestrator", and this item is that filing. **IMP-054** (TODO, 15.0) makes `DEFAULT_DELAY_SECONDS` configurable — if it lands, the comment in criterion 1 must move with the constant rather than be left pointing at a literal. **IMP-204** (TODO, 12.5) is the item that changes what the pipeline does about paging and will rewrite the same neighborhood of code; its Notes already require the deploy path to be bounded, and the two must not each decide the retry contract independently. Evidence: §1.1 and §5 of `.improve/reports/verify-IMP-198-r2.md`, including the `inspect.getsource` excerpt of `_parse_feed` and of `__try_parse_feed`, the exception-MRO readings showing `ConnectTimeout` retried and `ReadTimeout` not, and the live 10.2 s pacing observation on the success path.
-
 ### IMP-209 — Make the CI matrix include the documented Python floor, and un-float the two sites IMP-097 does not name
 - **Status:** TODO
 - **Category:** CI & automation
@@ -2696,7 +2541,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-097
 - **Priority score:** 10.0
 - **Notes:** Impact 2, Confidence 5, Effort S = 10.0. Impact is 2 and not 3 because nothing is broken for a contributor on 3.11 or 3.14 today — both were measured green — the harm is to the *claim*, and to a future `pandas` or `feedparser` release that breaks an interpreter nobody runs. Confidence 5: the three floating values were read directly out of both files, and the docs' exact wording was quoted rather than paraphrased. Risk `med` for the honest reason IMP-097's own Notes give: pinning reveals version-specific failures (`pandas` chained indexing, `tarfile.extractall` filtering, and now the `requests`/timeout path all differ by version), so this item can legitimately turn CI red and the discovery is the point. **Deliberately scoped as the delta, not a duplicate:** IMP-097 (TODO, 12.0) already owns "add a Python version matrix to CI" and its own Notes say "Add one version at a time and fix what surfaces rather than adding the matrix and the fixes in the same PR" — so this item adds only the two halves IMP-097 does not cover (the floor must be **in** the matrix, and the two floating sites outside its Area), depends on it, and must not re-implement the matrix. If IMP-097's implementer folds both halves in, this item is satisfied by their PR and should be closed as absorbed rather than re-run. Cross-references, deliberately **not** duplicated: **IMP-085** (TODO, 15.0) adds the `pyproject.toml` where a `requires-python` floor would be *declared* — a declaration, not an enforcement, and it does not make criterion 1 obsolete. **IMP-086** (TODO, 15.0) adds `ruff` and a Python lint step, which is a separate gate. **IMP-166** (TODO, 10.0) pins the **Node** version and declares `engines`; it is the same shape of item on the other stack and neither waits on the other. **IMP-031** (DONE, `299d753`) is what created the accurate-but-unenforced wording, and correctly deferred the workflow half to its own filing rather than over-claiming. Evidence: D-3 and R-3 in `.improve/reports/verify-IMP-031-r2.md` §2 and §6, and **D-8** plus **D-5** in `.improve/reports/discovered-IMP-031.md`, which names all three lines and the measured `Requires-Python` readings for `arxiv` (>=3.10) and `pandas` (>=3.11).
-
 ### IMP-212 — Document in `CONTRIBUTING.md` why the index-guard tests live outside `src/` and shell out
 - **Status:** TODO
 - **Category:** Onboarding & developer experience
@@ -2713,7 +2557,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 10.0
 - **Notes:** Impact 2, Confidence 5, Effort S = 10.0. Impact is 2, not 3, because nothing is broken today and the arrangement works — the harm is entirely to the next maintainer's ability to change this code safely, and the specific failure modes (a silently green suite, or a needless `@types/node` dependency that would also churn `web/package-lock.json`, which profile §6 restricts to IMP-005, IMP-137 and IMP-197) are both severe *if* triggered. Confidence 5: every element was measured, not inferred — the `.ts`-under-`src/` failure was reproduced by the independent verifier (11 `npm run typecheck` errors: `TS2591 Cannot find name 'process'` plus 10 `TS7006`/`TS7031` under `strict`), the glob deletion was reproduced (exit 0, 17 files, 266 tests), and the `../../../` reads are visible at `indexGuards.test.mjs:45-46`. Effort S: one paragraph. Risk low: prose only, no executable surface. **Deliberately split from its sibling.** The `REPO_PROFILE.md` half of this finding — what the guards check, where they live, that `failedCategories`/`truncatedCategories` pass deliberately, and why the pin shells out — has **already been done** in `.improve/REPO_PROFILE.md` §3.3 and §8 trap 19 by the absorber that filed this item; this item owns only the `CONTRIBUTING.md` half, because `CONTRIBUTING.md` is a repo doc outside the profile and was left stale. Do not re-document the profile. Cross-references, deliberately **not** duplicated: **IMP-028b** (DONE, `d57b77c`) created both suites and the glob, **IMP-028c** (DONE, `49af325`) created the pin, and **IMP-028d** (DONE, `2ebdbd3`) bounded its `spawnSync` and dropped the false-positive witness — none of them had `CONTRIBUTING.md` in scope, and none is incomplete on this point. **IMP-032** (DONE, `299d753`) wrote the `web/` section and correctly said nothing about `scripts/`; this is its follow-on, not a re-do. **IMP-137** (TODO, 5.0) adds ESLint, which would not catch a misplaced test file either. **IMP-166** (TODO, 10.0) pins the Node version and declares `engines` — a different concern, and it does not cover the `@types/node` trap. Evidence: §8.1, §8.3, §8.4, §8.7 and §8.8 of `.improve/reports/verify-IMP-028b.md`, §5.3 of the same report (the measured typecheck failure), and `.improve/reports/verify-IMP-028c.md` §1 experiment A (the silent exit-0).
-
 ### IMP-213 — Exercise the `web` suite on the Node version CI actually runs
 - **Status:** TODO
 - **Category:** CI & automation
@@ -2733,7 +2576,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Impact 2, Confidence 5, Effort S = 10.0. Impact is 2, not 3, because the failure mode is speculative and the verifier's own assessment was "low risk, but unverified rather than absent" — the harm is to a claim, not to a running site, and a Node-20 break would be loud (red CI) rather than silent. Effort is S: a matrix over one existing step. Risk is `med` for the reason IMP-097 and IMP-209 both give and it is not a hedge — adding a version leg can legitimately turn CI red, and if it does, that red is the item working. **Deliberately scoped as the delta, not a duplicate.** IMP-166 (TODO, 10.0) already owns pinning the Node version and declaring `engines.node`; this item depends on it so the matrix names an explicit minor rather than a floating `"20"`, and must not re-do the pinning or the `engines` declaration. IMP-209's own Notes record that precedent in the other direction ("depends on IMP-097, must not re-implement the matrix"). IMP-097 (TODO, 12.0) adds a **Python** matrix — a different interpreter, a different job, no overlap in files beyond the shared workflow, and neither waits on the other. Cross-references, deliberately **not** duplicated: **INF-19** in `.improve/REPO_PROFILE.md` (`web/package.json` has no `engines` and no `.nvmrc`) is owned by IMP-166; the *absence of a second Node run* is not recorded there and is why this item is filed. **IMP-197** (TODO, 7.5) adds a CSS gate and **IMP-137** (TODO, 5.0) an ESLint gate — both are new checks with their own risk profiles, neither runs a second interpreter. Do **not** bundle the "document the guard-test indirection" work into this item; that is IMP-212. Evidence: the "Residual risk not testable here" paragraph in `.improve/reports/verify-IMP-028c.md` §7, quoted verbatim for the claim under test — "CI runs Node 20 and every Homebrew Node keg on this machine resolves to v25.6.1, so I could not execute the pin under Node 20 … the risk is low — but it is unverified, not absent" — and `.improve/reports/verify-IMP-028d.md` §1, which re-measured the pin's margins on Node 25.6.1 only (`918–1330 ms` file time, worst single spawn `1.03 s` against a `30 s` timeout) and therefore also carries the same unverified-on-20 caveat.
 
 ## Tier 8.0
-
 ### IMP-178 — Log the soft shard failure that only the tooltip carries
 - **Status:** TODO
 - **Category:** Observability & logging
@@ -2750,7 +2592,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** Rated LOW by the IMP-017 verifier and recorded in `.improve/reports/impl-IMP-017.md` "Finding (c)". Scored 8.0 rather than higher because the reader-facing prose IMP-015 shipped already names the missing week and its date range without any hover, so no reader is left with nothing — this is an operator-diagnosability gap, not a user-facing one. Cross-reference: IMP-144 (TODO) owns load **progress** observability and IMP-011 (DONE) owns the storage-failure alert; neither emits a line for this path. Match the message shape of `App.tsx:190` and `:258` ("paper feed: …", cause last) rather than inventing a third format.
-
 ### IMP-149 — Give the search field a visible label that fits at 390px
 - **Status:** TODO
 - **Category:** Accessibility
@@ -2767,7 +2608,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** Profile WEB-63. Distinct from IMP-121 (a clear × control) and IMP-106 (a reset action): this item is about *labelling*, not about clearing. If IMP-121 lands first and the placeholder is replaced by a clear affordance, re-check whether a visible label is still needed.
-
 ### IMP-116 — Correct the readme's "only the week shards it needs" claim
 - **Status:** TODO
 - **Category:** Content accuracy
@@ -2783,7 +2623,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** Deliberately a docs fix. Changing `selectShards` to an exclusive boundary would silently drop papers published inside the window that happen to sit in an earlier shard, which is worse.
-
 ### IMP-117 — Stop returning the shared `EMPTY_STATE` singleton
 - **Status:** TODO
 - **Category:** Correctness
@@ -2799,7 +2638,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** The exported `EMPTY_STATE` is part of the module's public surface; if it is removed, check that nothing in `web/src` imports it.
-
 ### IMP-118 — Fix the malformed legacy-CLI HTML and the `Mathedemo` title
 - **Status:** TODO
 - **Category:** Content accuracy
@@ -2815,7 +2653,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** The lowest-value fix in this tier. The SPA has replaced this output path, but `readme.md:96-104` still documents the CLI as supported, so it should render correctly. IMP-147 (pandas chained indexing) edits the same lines and the same function — land both in one change so the generated HTML is re-baselined once.
-
 ### IMP-119 — Make the two-stage abstract truncation explicit and correct the copy
 - **Status:** TODO
 - **Category:** Content accuracy
@@ -2831,7 +2668,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** The complete fix — shipping the full abstract in the index — is IMP-139. This item only makes the current two-layer behavior honest and testable.
-
 ### IMP-120 — De-duplicate `PAGE_SIZE` and `LOAD_MORE_STEP`
 - **Status:** TODO
 - **Category:** Code health & refactoring
@@ -2847,7 +2683,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** A module-level constant in `web/src/lib/types.ts` or a small `constants.ts` is fine; the profile forbids moving modules as a side effect of this change.
-
 ### IMP-121 — Add a clear (×) button to the search field
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -2863,7 +2698,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** New styling goes in `web/src/styles.css`; never add a `style=` prop. A native `<input type="search">` already renders a browser clear affordance in some engines, so confirm whether this duplicates it before adding a custom control.
-
 ### IMP-122 — Validate the create-collection name and clear the input
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -2879,7 +2713,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** The profile's baseline note that the input is "not cleared after submitting" does not hold for the code as written — both forms do call `reset()` on the success path. Only the empty-submit path is silent, so this item is scoped to that.
-
 ### IMP-123 — Add `-webkit-backdrop-filter`
 - **Status:** TODO
 - **Category:** UI polish & visual consistency
@@ -2895,7 +2728,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** Keep this item to the `-webkit-` prefix only. Any `@supports` fallback would belong in a separate item, and none is proposed here.
-
 ### IMP-124 — Add Open Graph, canonical, and `theme-color` metadata
 - **Status:** TODO
 - **Category:** Documentation
@@ -2911,7 +2743,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** Depends on a real image asset. If IMP-030 is landing in the same cycle, the 1280px feed capture it produces can double as the OG image — copy it into `web/public/` rather than linking `images/`, which is outside the build's `public/` root.
-
 ### IMP-125 — Pin or document the date locale
 - **Status:** NEEDS-HUMAN
 - **Category:** Internationalization
@@ -2928,7 +2759,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 8.0
 - **Notes:** Risk `med` because pinning the locale is a visible behavior change for non-US visitors. This is the only genuinely applicable i18n item in the repo: the site is English-only by design and has no message catalog, so proposing a localization framework would be out of scope. The related machine-readable-date gap is folded into the acceptance criteria for the hero date in this item's own verification.
 **NEEDS-HUMAN — decision required.** Criterion 1 offers "pin the locale" or "leave it visitor-dependent and document why". Pinning to `en-US` is a visible change for every non-US reader of a research paper feed, and is the owner's call, not an implementer's.
-
 ### IMP-126 — Add a `--log-level` flag to `build_index.py`
 - **Status:** TODO
 - **Category:** Observability & logging
@@ -2944,7 +2774,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** Pairs with IMP-055 (move `basicConfig` out of import scope); without that, the flag cannot take effect because the import-time call already configured the root logger.
-
 ### IMP-164 — Treat an empty-string URL as "no URL" rather than unsafe
 - **Status:** TODO
 - **Category:** Data validation
@@ -2961,7 +2790,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 8.0
 - **Notes:** OBS-A in `.improve/reports/verify-IMP-151b.md`, which called it "latent, not live" and "arguably correct-by-design" — that judgement is the reason this sits at 8.0 rather than higher. The argument for doing it anyway: the exemption set already contains `null` and `undefined` for exactly the same reason, so an empty string is an inconsistency in a rule rather than a new rule. The argument against: an export carrying `"absUrl": ""` may signal a producer that is not `build_index.py`, and silently keeping such a paper is more permissive than silently dropping it. Whichever way the implementer decides, decide it **explicitly** and record it in the PR body; the acceptance criteria above take the permissive side because it matches IMP-151b's stated posture. Do not fold this into IMP-153, which filters the `localStorage` read path; this is the import path.
-
 ### IMP-165 — Reject tab, LF and CR inside `isHttpUrl`
 - **Status:** TODO
 - **Category:** Security
@@ -2981,7 +2809,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Risk `med` because this is the one change in this group that alters what the app accepts on a path that currently works: a paper whose url carries an interior control character would stop rendering a link. Criterion 2 is the safety valve — if an implementer misreads the trim ordering they will reject every whitespace-padded url instead. Impact is 2 and confidence 4 deliberately: the verifier proved the *mechanism* in real Chromium but also proved the scheme cannot change, so this is defence in depth and the score must not be inflated to suggest an open XSS. OBS-B in `.improve/reports/verify-IMP-151b.md`, which stated the obligation this item discharges. Do not tighten the scheme requirement in the same change — `http` must stay accepted until IMP-152 has shipped and the shards have been rebuilt.
 
 ## Tier 7.5
-
 ### IMP-127 — Precompute a lowercased search haystack
 - **Status:** TODO
 - **Category:** Performance
@@ -2997,7 +2824,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 7.5
 - **Notes:** Risk `med` because the search index changes the shape of the scored data, so a subtle bug changes result order for every user without failing a test. Screenshot-verify the ranking, do not assume.
-
 ### IMP-128 — Debounce the `saveState` writes
 - **Status:** TODO
 - **Category:** Performance
@@ -3013,7 +2839,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 7.5
 - **Notes:** Risk `med` because debouncing persistence can lose the last change if the page unloads mid-debounce; the flush path must be explicit. This item must not move persistence into `collections.ts` — the profile's testability argument for the explicit `Storage` injection depends on `saveState` staying a plain function.
-
 ### IMP-129 — Add component tests for `PaperCard`
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -3030,7 +2855,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-037
 - **Priority score:** 7.5
 - **Notes:** Follow the 1:1 mirror convention. `PaperCardProps` is deliberately not exported, so the tests must render the component rather than construct props against a type.
-
 ### IMP-130 — Add component tests for `FeedControls`
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -3046,7 +2870,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-037
 - **Priority score:** 7.5
 - **Notes:** The component is presentational and takes everything through props, so no store or router setup is needed.
-
 ### IMP-131 — Add component tests for `CollectionsView`
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -3062,7 +2885,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-037
 - **Priority score:** 7.5
 - **Notes:** Risk `med` because `window.confirm` must be stubbed, and stubbing it incorrectly makes the delete tests pass vacuously. Assert both the confirmed and the cancelled branch.
-
 ### IMP-163 — Close the three IMP-024 extraction-regression test gaps
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -3081,7 +2903,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 7.5
 - **Notes:** Effort is `M`, not `S`, because all three gaps must be closed and the fallback branch driven separately — three test changes plus a second code path, not one assertion. Impact is 3 and confidence 5: every claim here was measured by mutation testing on five interpreters, not inferred. The value is entirely criterion 6 — an escape test that cannot see its own escape is worse than no test, because it converts a live hole into a documented pass. R2 and R3 in `.improve/reports/verify-IMP-024-r2.md`, D1 and D9 in `.improve/reports/discovered-IMP-024.md`. Test-only: no file under `scripts/` may change except the docstring wording in criterion 2's target, and a docstring change must be paired with the test that makes it true.
-
 ### IMP-182 — Protect the papers-load `useLayoutEffect` from a silent revert
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -3103,7 +2924,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 7.5
 - **Notes:** Rated **MEDIUM (coverage, not correctness)** in §9.2 of `.improve/reports/verify-IMP-173.md`, and deliberately non-blocking: the shipped code is correct and the verifier's own verdict was "I do not require a change." Impact is 3 because the failure mode is a **silent regression of a landed item's user-visible guarantee**, reintroduced by an ordinary refactor that the suite will call green. Confidence is 5 — the 6/6-vs-0/6 measurement is reproducible on two different servers. Effort is `M`, not `S`, because the item requires a **decision** between a self-maintaining one-token hook and a ~6-line `settledKey` guard, plus whichever implementation, plus a demonstrated mutant: three pieces of work, and a `/tmp` reverted copy with `node_modules` symlinked to prove it. Risk is `med` because route (b) duplicates the effect's dependency list and can silently stop covering a newly added dependency — the exact bug class being fixed — and because a `useLayoutEffect` costs a p90 tail of roughly 63 ms on the first paint after a recency click (inside the INP "good" band, but not zero, and it must not be reported as zero). Cross-references, deliberately **not** duplicated: IMP-016 (DONE) owns the load-failure panel whose copy this flash falsely shows and must not be reopened; IMP-173 (DONE) met all four criteria and its own scope guard at `paperIndex.test.ts:414` already pins "no field-level validation"; IMP-018 (DONE) owns the error boundary; IMP-167 (TODO, 10.0) owns the report-evidence rule that criterion 3's quoted counts exist to satisfy. **Do not treat the SSR warning as a risk** — `grep -rn "renderToString\|hydrateRoot\|prerender" web/src web/index.html` returns nothing, `main.tsx:14` is `createRoot(...).render(...)`, and the app is a client-only static SPA, so React's "useLayoutEffect does nothing on the server" warning is structurally unreachable. Note that `.improve/REPO_PROFILE.md` §10's "still-open halves" list still describes IMP-019's pre-change state; whoever edits the profile under criterion 1 should refresh that row in the same change, but that edit is **not** part of this item.
-
 ### IMP-183 — Bound the retention window in the arXiv query instead of relying on the sort
 - **Status:** TODO
 - **Category:** Correctness
@@ -3123,7 +2943,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 7.5
 - **Notes:** Impact is 3, not 4, because the current behaviour is **verified correct**: 0 order inversions in 2,000 real results, 0 in roughly 18,500 observations across all of the IMP-020 verifier's runs, and the live URL confirms `sortBy=submittedDate&sortOrder=descending`. The harm is a latent reliance that a change in arXiv's behaviour, a library upgrade, or a future `iter_results` refactor could turn into a silently short index — which for a research feed is a quiet correctness failure, not a crash. Confidence is 5 for the reliance's existence and 4 for the query-bound remedy: the arXiv `submittedDate` range syntax is documented by the API and used by the existing client, but the exact accepted spelling (upper bound inclusive, `TO` vs `-`, hour precision) must be confirmed against a live response, not from memory — hence criterion 5's requirement to quote the URL and criterion 3's replay. Effort is `M`: it touches the query string, the flag's production call site, the tests that pin the flag, and the live verification. Risk is `med` because an incorrectly-formed date range returns **zero** results rather than an error, and the zero-paper path is IMP-004's `No papers fetched; refusing to write an empty index.` exit 1 — so a malformed bound looks like an outage, not like a bug, which is exactly the "indistinguishable" failure IMP-022 was raised against. Cross-references, deliberately **not** duplicated: IMP-020 (DONE) is the item that created `assume_newest_first` and met all three criteria — this item does not reopen it, it removes the residual its verifier recorded; IMP-004 (DONE) owns the empty-index refusal this item must not confuse with a bad bound; IMP-022 (DONE) owns the flag validation this item's new query string must not undermine; IMP-183 does **not** touch `--retention-days`'s range check; IMP-104 and IMP-093 own arXiv paging volume, not the query's date bound. Finding **F1** in §9 of `.improve/reports/verify-IMP-020.md`, which itself credits `.improve/reports/discovered-IMP-020.md` with the remedy and asks that it "be promoted to a real item rather than left as a note" — that is what this is. Live-API caveat: the verifier measured with a real arXiv client, so a network-enabled run is required for criterion 5 and the unit suite must stay hermetic per criterion 7.
-
 ### IMP-197 — Make a CSS syntax error fail CI instead of shipping a larger stylesheet
 - **Status:** TODO
 - **Category:** CI & automation
@@ -3144,7 +2963,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Impact is 3: a dropped CSS rule is visible to every reader while CI is green, which is a real shipping defect — but not 4, because nothing is currently broken, `styles.css` is hand-maintained rather than generated, and the app remains usable with styles missing. Confidence is 5 for the gap (measured twice, with exact exit codes and the 10.93 → 11.86 kB signature) and 4 for the remedy, which is why this is 7.5 rather than higher: the parser choice in criterion 2 is a judgement call the item deliberately delegates. Effort is `M` — a devDependency, a check, a CI step, and the `package-lock.json` amendment in criterion 3. Risk is `med` because a stricter parser can reject CSS that browsers accept (vendor prefixes, at-rules, newer syntax), so criterion 4's "0 errors on the stylesheet as it stands" is the guard that keeps the gate from becoming a blocker. **The verifier's severity note is understated and this item corrects it:** §2 and §8 row 3 of `verify-IMP-026.md` say "`web/src/styles.css` is 2 lines, so nothing is currently at risk" — the file is **759 lines**, re-read here per this file's own evidence rule 1, which is also why the item is filed at all instead of closed as informational. Cross-references, deliberately **not** duplicated: IMP-026 (DONE) added the build step, and its Intent claims "a CSS pipeline error" fails it — this item is the gap inside that claim and reopens none of its criteria; IMP-137 (TODO, 5.0) creates the ESLint config and `npm run lint` for JavaScript/TypeScript and already amends the `package-lock.json` rule, so if it lands first, extend its amendment rather than writing a second one; IMP-086 (TODO, 15.0) adds `ruff` and a Python lint step, an unrelated toolchain; IMP-088 (TODO, NEEDS-HUMAN) is about adopting a *failing* security gate, a different decision with a different owner. Evidence: §2 Break B2 and §8 row 3 of `.improve/reports/verify-IMP-026.md`.
 
 ## Tier 6.7
-
 ### IMP-132 — Add component tests for `App`'s load, error, and retry states
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -3163,7 +2981,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Effort is `L` because `App` owns hash routing, a reducer, blob/anchor/revoke export plumbing, and a `PaperIndex` held in a ref; stubbing `fetch` and seeding `location.hash` is most of the work. IMP-143's `web/src/lib/urlState.ts` should land first so seeding `location.hash` in these tests is a one-liner against a pure function rather than a `window.history` dance.
 
 ## Tier 6.0
-
 ### IMP-179 — Assert `write_index`'s manifest / `shard_files` caller contract
 - **Status:** TODO
 - **Category:** Correctness
@@ -3179,7 +2996,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 6.0
 - **Notes:** Latent, not live — finding F-3 in `.improve/reports/verify-IMP-021.md` §8, with `CASE B` / `CASE C` from its §4b and the 0/500 randomized agreement from the same section. Confidence is 3 rather than 5 because the defect has never been observed; impact is 2 because the guard only helps a future second caller. Two related notes that are **not** claimed here: `_clean_old_shards`' empty default (`build_index.py:244`, D4 in `.improve/reports/discovered-IMP-021.md`) has no test of its own, and IMP-099 (TODO) changes the write lifecycle this check sits in front of — if IMP-099 lands first, re-read `write_index` and place the assertion **after** the atomic rename so a failed rename cannot leave a validated-but-unwritten manifest. The regression guard for the ordering itself is IMP-174.
-
 ### IMP-133 — Add per-paper deep links
 - **Status:** TODO
 - **Category:** UX flows & interactivity
@@ -3195,7 +3011,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-143
 - **Priority score:** 6.0
 - **Notes:** Risk `med` because it adds a hash parameter to a hand-rolled parser. That is exactly why it depends on IMP-143, which extracts and covers `readHash`/`writeHash` first. Scope note: this is a feature, not a defect — it can be deferred without leaving the app broken.
-
 ### IMP-134 — Pin the GitHub Actions to commit SHAs
 - **Status:** TODO
 - **Category:** CI & automation
@@ -3211,7 +3026,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 6.0
 - **Notes:** Risk `med` is maintenance, not security: pins must be updated deliberately, and dependabot (IMP-087) is what will keep them current. Do not combine this with a version bump in the same PR.
-
 ### IMP-135 — Add a shard and manifest cache TTL
 - **Status:** TODO
 - **Category:** Performance
@@ -3227,7 +3041,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 6.0
 - **Notes:** Keep the existing within-session cache benefit — the point is bounding staleness, not removing caching. The shard-cache-reuse test asserts `fetch` call counts, so a TTL change must not make it flaky.
-
 ### IMP-136 — Add word-boundary-aware search scoring
 - **Status:** TODO
 - **Category:** Correctness
@@ -3246,7 +3059,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Risk `med` because this **changes user-visible result order for every query**. Screenshot-verify against a pre-change capture, and consider shipping it behind the same release as IMP-127 so the two ranking changes land together.
 
 ## Tier 5.0
-
 ### IMP-180 — Clear the partial-shard notice when a new window load starts
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -3262,7 +3074,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Cosmetic — finding R5 in `.improve/reports/regression-sweep-3.md` §2, which records it as verified benign ("the banner is not re-announced, it does not produce a duplicate notice, and it clears correctly as soon as the shard loads") and rates it stale-worded only. Impact is 1 for that reason. It is itemized because the fix is one line beside an existing `setError(null)` and because the false sentence is the same class of claim IMP-015 shipped specifically to avoid making. Cross-reference: do not fold this into IMP-101 (TODO, "Keep the previous list mounted while a new window loads") — that item is about not destroying card state and deliberately keeps a loading indicator visible, so the two are compatible but independent.
-
 ### IMP-181 — Keep the Sort group on the controls row at 1280px
 - **Status:** TODO
 - **Category:** UI polish & visual consistency
@@ -3279,7 +3090,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Finding R6 in `.improve/reports/regression-sweep-3.md` §2, which judged it "a consequence of a deliberate feature, not breakage" — that judgement is why impact is 1. Risk is `med` because `.controls__row` is a shared flex row and the two obvious fixes both reach outside this item: widening `--max-width` changes the whole page's measure, and adding a breakpoint in the 520–1000px band is IMP-141's decision. **If one row at 1280px cannot be achieved without either, stop and report rather than making the call.** IMP-141 (NEEDS-HUMAN, "Add an intermediate layout breakpoint") owns that band and its own criterion 2 forbids changing 1280px, so it does not cover this.
-
 ### IMP-137 — Add an ESLint config and an `npm run lint` script
 - **Status:** TODO
 - **Category:** Tooling, linting, formatting
@@ -3296,7 +3106,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Dependency cost, as required by the profile: three dev-only packages, none shipped to Pages. Risk `med` because turning on new rules will report existing violations — that is IMP-138's work, and the two should land together. Do **not** add Prettier or a formatting rule set: the profile forbids mass-reformatting, and there is no formatter today, so a reformat would produce a diff no tool has validated.
-
 ### IMP-138 — Fix the violations the new linter finds
 - **Status:** TODO
 - **Category:** Tooling, linting, formatting
@@ -3313,7 +3122,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-137
 - **Priority score:** 5.0
 - **Notes:** Risk `med` because some findings are judgment calls about a hand-maintained wire contract. Do not "fix" a finding by deleting a field from `web/src/lib/types.ts` that `scripts/build_index.py` legitimately emits — that is the Python→TypeScript drift IMP-094 exists to prevent.
-
 ### IMP-139 — Ship the full abstract so "Show more" can reveal it
 - **Status:** TODO
 - **Category:** Missing features natural to this repo's purpose
@@ -3330,7 +3138,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Effort is `L` because this is a wire-format change across two languages plus a payload-size decision plus the shard-weight impact on the browser. The cheaper precursor — making the current two-stage truncation explicit and honest — is IMP-119. If the index size proves unacceptable, the alternative is to raise `--abstract-chars` and say so; record which path was taken.
-
 ### IMP-140 — Remove the dead `name:` override and the dead `yielded` counter
 - **Status:** TODO
 - **Category:** Code health & refactoring
@@ -3346,7 +3153,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** The profile warns against cosmetic churn, and this is the smallest item in the backlog — it is here because both pieces actively mislead, and because removing them is a prerequisite for ESLint reporting zero findings honestly (IMP-138). The `import` version check that belongs in the same neighborhood is IMP-060.
-
 ### IMP-172 — Put the "No categories selected" action inside the `.empty` panel
 - **Status:** TODO
 - **Category:** UI polish & visual consistency
@@ -3363,7 +3169,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Impact is 1 — purely cosmetic, and the current form is fully usable and correctly keyboard-reachable as shipped; the IMP-010 verifier explicitly called this "not a defect" and recorded it as an observation. It is itemized because the fix is a two-line DOM move with no behavioural risk, and because the inconsistency is now visible to anyone who compares the two empty-state panels side by side. Cross-references: IMP-106 (TODO) adds a functional "Clear filters" action to the **other** empty state (`PaperList`'s generic "No papers match the current filters.") and is a separate change — if both land, that action belongs inside the same `.empty` panel for the same reason, so do not duplicate the nesting work across the two items. IMP-148 (TODO) adds `role="status"` to the empty states and constrains its own criterion 3 to "no CSS changes"; it neither covers this button nor should be allowed to substitute a markup-only nudge for it. §8.6 of `.improve/reports/verify-IMP-010.md`, which names `App.tsx:391-399` as the structure to copy.
-
 ### IMP-184 — Count undated drops in the manifest, not only in the log
 - **Status:** TODO
 - **Category:** Observability & logging
@@ -3382,7 +3187,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-094
 - **Priority score:** 5.0
 - **Notes:** Impact is 2, deliberately not higher: the counter has never fired on real data (0 of roughly 18,500 observations), so no shipped index is short today. The item is about the **absence of a boundary** on a silent-data-loss path, which is the same argument IMP-018's notes make for why a boundary must not hide a schema violation and IMP-176's notes make for why a log line is "better than silence but is not a boundary". Confidence is 5 for the gap (the counter is quoted from the file and never returns) and 4 for the remedy, because adding a field to the manifest is a **wire-contract change** with three consumers. Effort is `M` because it touches `collect_papers`'s return shape, `main`'s call, `build_shards`, the manifest JSON, `web/src/lib/types.ts`, and the tests that pin the existing return value — and criterion 2's absent-vs-zero requirement is a real design decision, not a one-liner. **Depends on IMP-094** (TODO, 12.5, above this item) because that item adds the Python→TypeScript wire-contract test; landing this field first means the contract test is written against a manifest shape that then changes. Cross-references, deliberately **not** duplicated: IMP-020 (DONE) created the `undated` counter and its warning and met all three criteria — this item does not reopen it, it carries the number past the log line; IMP-004 (DONE) owns the total-wipe refusal, which is the half that already works; IMP-176 (NEEDS-HUMAN, 12.0) is the **web-side** half of the same philosophy — a shard paper with no usable `published` is silently filtered by `paperIndex.ts:294` — and its product decision must be made separately; do not implement this item's reader-visible half under either ID. IMP-179 (TODO, 6.0) asserts `write_index`'s `manifest`/`shard_files` contract and is a natural place to see a new manifest key, but it is scored below this item and must not be used to hold this one up. IMP-167 (TODO, 10.0) requires the quoted commands in criterion 6. Finding **F3** in §9 of `.improve/reports/verify-IMP-020.md`, whose own suggested shape is a `droppedUndated` counter in `manifest`; §4a of the same report records the warning's current placement and confirms the total-wipe path is already covered.
-
 ### IMP-185 — Let `_result_datetime` accept a bare `date` instead of dropping it
 - **Status:** TODO
 - **Category:** Correctness
@@ -3401,7 +3205,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Impact is 1, honestly: 0 of roughly 18,500 real result observations were a `date`, so no shipped index is affected and no user sees anything. The reason to itemize it is that a **type inconsistency inside one module** is a latent bug with a loud-but-wrong failure mode, and the fix is three lines. Confidence is 5 — the two branches are quoted from the file and the matrix was driven end-to-end through `collect_papers`, not inferred. Risk is `low` because the coercion is additive: only shapes that are dropped today can change, and criterion 4 requires every one of them to be enumerated and asserted. Cross-references, deliberately **not** duplicated: IMP-020 (DONE) created the undated-drop policy at `:251` and its own criterion 1 required non-datetime records to be dropped — this item narrows what "non-datetime" means for the one shape the rest of the module can already handle, and it does not reopen IMP-020's criteria. IMP-115 (TODO, 10.0) owns `iso_date`'s docstring and its naive-datetime branch; criterion 2 must not duplicate that work, and if IMP-115 lands first, the `date` handling it documents there is what this item makes consistent. IMP-184 (TODO) carries the undated count into the manifest and depends on this item's shape decision landing first, since a `date` must stop counting as undated before the count means anything. IMP-176 (NEEDS-HUMAN) is the web-side policy question for records with no usable date and is unaffected either way. Finding **F2** in §9 and the complete shape matrix in §4b of `.improve/reports/verify-IMP-020.md`; the matrix is the evidence for criterion 4 and should be re-run, not re-derived.
-
 ### IMP-186 — Make `_result_datetime` total: return `None` instead of raising `OverflowError`
 - **Status:** TODO
 - **Category:** Error handling & edge cases
@@ -3419,7 +3222,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** IMP-185
 - **Priority score:** 5.0
 - **Notes:** Impact is 1: the shapes are unreachable from arXiv today, so this is hardening against a future client change rather than a live bug. Confidence is 5 — the two overflowing shapes were driven through the real `collect_papers` path and the traceback was observed, and the absence of a handler was confirmed by reading `:265`. Effort is `S`: a two-exception `try/except` and two test cases. **Depends on IMP-185** only because both edit the same function in the same file and would otherwise conflict textually; IMP-185 is 5.0 like this item, so ordering inside the tier is free, and the dependency costs nothing in practice. The dependency is for edit hygiene, **not** correctness — either item can be implemented first as long as the other is rebased. Cross-references, deliberately **not** duplicated: IMP-020 (DONE) touched the retention filter and explicitly recorded this as out of scope in its own report ("`OverflowError` … is pre-existing and unchanged by this diff … Recorded as F4 for the backlog; **not** a regression from IMP-020"); IMP-046 (TODO, 15.0) guards a different uncaught exception — `OSError` from an unwritable `--out-dir` — and the same "return a code, do not raise" argument applies there, but it is a production change in `main()` rather than a helper's totality; IMP-176 (NEEDS-HUMAN) is the web-side policy question. Finding **F4** in §9 and the `OverflowError` paragraph in §4c of `.improve/reports/verify-IMP-020.md`.
-
 ### IMP-187 — Declare `| undefined` on `Paper.absUrl` and `Paper.pdfUrl`
 - **Status:** TODO
 - **Category:** Correctness
@@ -3437,7 +3239,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Impact is 1 and confidence is 5. Impact is 1 because the verifier's R7/R7b mutants prove the **runtime** is already pinned and correct — no user can currently see a wrong `href` from this — and the harm is latent: a declaration that is narrower than reality, which this repo has now paid for once (IMP-019 at 20.0, where a `null` genuinely reached `href={null}`). The item is here because the fix is two characters of type and one sentence of comment, and because a second narrower-than-reality declaration on the same interface is the pattern that produced the 20.0 item. **Cross-referenced to IMP-098 rather than duplicated, as instructed.** IMP-098 (TODO, 10.0, `### IMP-098 — Validate the manifest and shard payloads at runtime`, at `.improve/FEATURES.md:2012`) owns **field-level runtime validation** for shard payloads, and its criteria name `id`, `title`, `authors`, `abstract`, `categories`, `primaryCategory` and `published` — it does **not** name `absUrl`/`pdfUrl` and it operates on the shard path, not the import path, so it does not close this. Do not widen IMP-098's criteria in place to absorb this item. Also cross-referenced and not duplicated: **IMP-151** (TODO) owns `isPaper`'s import-side field validation and is where a decision to *reject* an absent `absUrl` would belong if anyone ever wants that; criterion 4 forbids doing it here. **IMP-094** (TODO, 12.5) owns the Python→TypeScript wire-contract test, which pins the producer side of this declaration. Finding row 1 in §9 of `.improve/reports/verify-IMP-019.md`, and the R7/R7b mutant table in §4 of the same report. **Stale-profile note:** `.improve/REPO_PROFILE.md` §10 still lists IMP-019's "still-open half" as "`types.ts` still declares `absUrl`/`pdfUrl` as non-nullable `string`", which stopped being true when IMP-019 landed; the profile is not this item's write target, but whoever next edits it should correct that row rather than re-report it as a live defect.
-
 ### IMP-188 — Resolve the runtime no-op in the `primaryCategory` filter guard
 - **Status:** TODO
 - **Category:** Correctness
@@ -3455,7 +3256,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Impact is 1 and confidence is 5. The verifier rated it **INFO**, and that rating is preserved here: nothing is broken, no user is harmed, and `tsc` enforces the current form. The item exists for two narrow reasons — a dead runtime clause carrying a four-line explanatory comment is a lie the reader cannot check, and four tests that look like enforcement but are not are worse than no tests, because the next verifier will count them. That second reason is the real content: the verifier explicitly wrote "a reviewer should not credit them as extra enforcement", and nothing in the codebase records that. Effort is `S` — one clause, one comment, two test cases. Cross-references, deliberately **not** duplicated: IMP-019 (DONE, 20.0) introduced both the clause and the four tests, met all three of its criteria, and reopened none of them here — this item records a residual of its implementation, not a failure of it. IMP-098 (TODO, 10.0) owns shard-side field validation; its criterion-2 drop-and-log policy is the right home if anyone decides a `null` primary category should be *dropped* rather than rendered, and that decision must not be smuggled in under this item's narrower scope. IMP-170 (TODO, 10.0) guards `noCategoriesSelected` on a manifest that actually has categories and edits the same `activeCategories` derivation at `App.tsx:191-192`; the two are compatible but touch adjacent lines, so state the ordering in the PR body if both land. IMP-176 (NEEDS-HUMAN) is the `published`-date analogue on the web side. Finding row 2 in §9 and the "Is `tsc`-only pinning of the types adequate?" section of `.improve/reports/verify-IMP-019.md`, which is the source of the characterization-test caveat this item's criterion 2 exists to resolve.
-
 ### IMP-191 — Test that `readme.md` and `--help` agree, instead of checking by hand
 - **Status:** TODO
 - **Category:** Test coverage & test quality
@@ -3474,7 +3274,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Impact is 2: the agreement currently holds, so no reader is misled today; the item buys the ability to **notice** the next drift automatically. Confidence is 5 — the absence of any readme or `--help` test was established by grep over `tests/`, and IMP-022's hand reconciliation is documented in its report. Effort is `M` rather than `S` because the cheap 80% (readme rows versus the parser) is only half the item: covering `--help` needs either a `subprocess` call with a hermetic environment or a `build_parser()` extraction, and criterion 3's range-token check needs the `--help` text specifically. Risk is `low` — it is a test plus, at most, a pure extraction inside `parse_args`; no flag, default, or validation rule may change, which is what criterion 6's byte-identical requirement enforces. Cross-references, deliberately **not** duplicated: IMP-022 (DONE) met AC5 by hand and its own verifier filed the residual here, so this item does not reopen it; IMP-114 (TODO, 10.0) documents `--category` in the readme and its criterion 2 already requires readme/`--help` agreement by hand — when it lands, the readme row it adds must also satisfy this item's criterion 2, and the two must not each grow a private copy of the flag list; IMP-051 (TODO, 15.0) returns a real exit code from `paper-collector.py` and may change that script's `--help` text, so **re-run criterion 3 afterwards** if both land; IMP-163 (TODO, 7.5) closes test-quality gaps in the same `tests/` tree but is Python-extraction-specific. §8 Finding 3 of `.improve/reports/verify-IMP-022.md`, which names `MaxPapersArgumentTests.test_documented_example_command_still_parses` as the near-miss and explicitly recommends the readme-row route as "the cheaper 80%".
-
 ### IMP-210 — Correct `ci.yml`'s "~0.3 s" and "~3000x" figures for the index step
 - **Status:** TODO
 - **Category:** Repo hygiene
@@ -3491,7 +3290,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Impact 1, Confidence 5, Effort S = 5.0 — the arithmetic is the honest summary of a comment-accuracy fix, and the harm is to this loop's evidence rather than to any user. Filed anyway because the comment is the *justification* for a cap that IMP-198's tests then lock in, so a reader checking the margin finds a number that does not reproduce. Confidence 5 for the corrected figure (0.49 s measured on the exact command) and 4 for the original 0.3 s being wrong rather than measured on a different machine — the discrepancy's origin is not recoverable, which is itself the reason to re-measure rather than to argue about it. **Deliberately not bundled with IMP-205**, which edits the same step's cap in `deploy.yml` and re-derives the same arithmetic from the measured page count: this item is a comment in `ci.yml`, that one is two YAML values and a test constant, and combining them puts a one-line hygiene fix inside a change that should be reviewed on its own. Cross-references, deliberately **not** duplicated: **IMP-198** (DONE, `b7e23a8`) wrote the comment and is the source of the numbers; this is a residual of its implementation, not a failure of it — its verifier recorded it as **F-4**, explicitly non-blocking and with the direction of the claim unaffected. **IMP-167** (TODO, 5.0) owns the process rule that every figure quote its command; this item is that rule applied to two numbers in one file. Evidence: finding **F-4** in `.improve/reports/verify-IMP-198-r2.md` §9, and the 0.49 s measurement in that report's §4, which also records the `index.json` (287 B) and shard the same run wrote.
-
 ### IMP-211 — Make `readme.md`'s deep-offset claim name no category or offset it did not measure
 - **Status:** TODO
 - **Category:** Docs
@@ -3509,7 +3307,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Impact 1, Confidence 5, Effort S = 5.0. Impact is 1 because the paragraph's *advice* is correct and its mechanism is verified — a reader who caps `--max-per-category` does avoid the failure, which is the only action the sentence asks of them. What is wrong is the precision: two unverified specifics stated flatly in the file the repo treats as authoritative onboarding, in a paragraph that exists precisely because it was evidence-cited. Confidence 5 that the specifics are implementer-only, because the verifier who checked them said so explicitly and declined to re-measure them against the live API on instruction. Effort is `S` — the minimum honest fix is deleting a category name and an offset, and the re-measuring route is a few `curl` calls. Cross-references, deliberately **not** duplicated: **IMP-204** (TODO, 12.5) is the fix — it bounds the paging, adds per-category degradation and gives the deploy path a documented default — and its own Notes require `readme.md:73-76` to be updated to describe the new default rather than a workaround. This item is only the interim accuracy fix for the disclosure, so **if IMP-204 lands first, close this item as absorbed** rather than editing a paragraph the code fix has already rewritten. **IMP-191** (TODO, 5.0) tests readme/`--help` agreement for the **flag table** and would not catch a prose claim like this one. **IMP-116** (TODO, 8.0) is the other readme-accuracy item in this tier area and owns a different paragraph. Evidence: finding **R-4** in `.improve/reports/verify-IMP-031-r2.md` §6, whose wording is the recommendation this item implements: "Keep the prose; soften to 'deep offsets' (no category or offset named) unless someone re-verifies against live arXiv."
-
 ### IMP-214 — Drop the unsupported staleness clause from the pin's header comment
 - **Status:** TODO
 - **Category:** Repo hygiene
@@ -3526,7 +3323,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 5.0
 - **Notes:** Impact 1, Confidence 5, Effort S = 5.0. Impact is 1: no behaviour changes, nothing is broken, and the verifier explicitly said no change to the code was required. What is wrong is that a comment asserts something the implementer's own evidence contradicts, in a file whose whole job is to be the trustworthy witness — so the cost of leaving it is that a future reader re-derives a decision from a premise that was tested and found false. Confidence 5: the refutation is a reproduction, not an argument — the verifier built the config-split refactor, restored the witness verbatim, and got `4 passed (4)`. Effort S: one sentence. Risk low: prose only. Cross-references, deliberately **not** duplicated: **IMP-028d** (DONE, `2ebdbd3`) is the change this comment describes and is **not** incomplete on behaviour — its verifier named this exact sentence as the one thing worth changing and said the code itself needs none. **IMP-028c** (DONE, `49af325`) created the file and its comment; the paragraph was edited by 028d and this is the residue. **IMP-212** (TODO, 10.0) documents the same suite's arrangement in `CONTRIBUTING.md` for contributors; this item is the source comment's own accuracy and neither satisfies the other. **IMP-167** (TODO, 5.0) owns the general rule that every figure and claim quote its evidence — this is one clause of that rule applied to one comment. Evidence: §2d of `.improve/reports/verify-IMP-028d.md`, quoted verbatim for the claim under test: "So the brief's staleness claim was **wrong**, and the implementer's correction is **right** … the stale-sentence remaining in the surviving header comment … is the one clause of that paragraph that its own evidence does not support" and "the brief's staleness claim was wrong — witness 4 read the resolved imported config and passed a config-split refactor."
-
 ### IMP-215 — `readme.md:63` drops the `web/public/` prefix from the shard path
 - **Status:** TODO
 - **Category:** Content accuracy
@@ -3546,7 +3342,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Impact 1, Confidence 5, Effort S = 5.0. Impact is 1: a wrong path in one onboarding sentence, with no runtime effect — the build is correct and the readme's *primary* claim (the manifest is at `web/public/data/index.json`) is right. Confidence 5: the two locations were read from source, the divergence was confirmed present at `b2447c5` via `git show`, and the sentence is quoted verbatim. Risk low: one line of prose. Cross-references, deliberately **not** duplicated: **IMP-116** (TODO, 8.0) is the other `readme.md` path/claim accuracy item and owns `readme.md:22`'s "only the week shards it needs" over-claim — a different line and a different kind of wrongness (a bandwidth promise versus a path). **IMP-091** (TODO, 15.0) documents the manifest and shard **schemas** in `readme.md`; if it lands first this item is likely absorbed, since a schema section would restate the location — close it as absorbed in that case rather than editing the same paragraph twice. **IMP-049** (TODO, 10.0) resolves `DEFAULT_OUT_DIR` against the repo root, which touches the *same* `build_index.py:38` line; it changes where the path resolves from, not whether the two files share a directory, so it does not obsolete this item — but if it lands first, re-read this sentence against the new resolution before editing. **IMP-192** and **IMP-211** (TODO, 5.0) are the other readme items in this tier area; neither touches `:63`. Evidence: §1.2 row `63` and §8.5 of `.improve/reports/verify-IMP-028b.md`, both quoting the pre-existing status: "`git show b2447c5:readme.md | grep -n 'papers-<YYYY>'` returns line 63 unchanged" and "Pre-existing, not introduced: `readme.md:63` documents the shard output as `data/papers-<YYYY>-W<NN>.json`, missing the `web/public/` prefix … the readme names a repository-root `data/` that never exists … it makes step 1 look like it writes outside the web app."
 
 ## Tier 4.0
-
 ### IMP-141 — Add an intermediate layout breakpoint
 - **Status:** NEEDS-HUMAN
 - **Category:** Responsiveness
@@ -3563,7 +3358,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 4.0
 - **Notes:** Risk `med` because adding a breakpoint touches the shared token-driven layout, and the profile's de-facto viewports are 1280 and 390 — a new intermediate layout is untested ground. Verify at least three widths before merging, and do not re-indent the existing `520px` block.
 **NEEDS-HUMAN — design decision required.** This is a subjective layout overhaul in a width band the repo has never been reviewed at. The profile's de-facto viewports are 1280 and 390 with one breakpoint at 520px, so there is no baseline to improve against and no evidence that any reader is unserved between 520px and 1000px. A maintainer must first decide whether an intermediate layout is wanted at all.
-
 ### IMP-142 — Add `@media print` styles
 - **Status:** NEEDS-HUMAN
 - **Category:** Missing features natural to this repo's purpose
@@ -3582,7 +3376,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 **NEEDS-HUMAN — product decision required.** The item's own Notes concede it is "honestly speculative about whether anyone prints this". No reader of a browser-based research feed is known to print it. Needs an owner decision before spending a change on it.
 
 ## Tier 20.0 — new from the IMP-193 / IMP-025 / IMP-026 verification round
-
 ### IMP-198 — Bound the arXiv HTTP request with a real timeout and a CI job timeout
 - **Status:** DONE
 - **Category:** Correctness
@@ -3602,7 +3395,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:** Risk `med` because criterion 1 reaches into a private attribute (`Client._session`) — the sole available hook on the admitted version range, and one that arxiv could rename in a future major. It is a **floor, not a fix**, in the same sense as IMP-033's `requirements.txt:10-12` disclaimer: if a future arxiv release moves the request off that session, this hook silently stops applying. That is exactly why criterion 2's workflow-level `timeout-minutes:` is required rather than optional — it bounds the cost regardless of what the library does, which is the property that actually matters here. Confidence is 5: the missing `timeout=` is read directly off the installed package source at two versions, and the hang was measured with a live black-hole server rather than inferred. Impact is 4, not 5: no reader sees anything, but a six-runner-hour burn per occurrence on a bill, plus a block on every PR once IMP-028 lands. Effort is `S`: one constant, one session subclass, two YAML keys. **Order this before or with IMP-028**, not after — IMP-028 turns the hang from "expensive occasionally" into "blocks every PR". Evidence: finding 1 of `.improve/reports/verify-IMP-193.md` §9 (`med`, "Actionable: Yes… Worth doing before or with IMP-028"), with the hang measurement in §1.4 and the API facts in §1.1; independently re-verified for this item against `arxiv` 3.0.0 and 2.1.3 (`Client.__init__` signature, `_session` type, and the `self._session.get(url, headers=…)` call site). IMP-033 (`bbe2d18`) is a **prerequisite in spirit only** — its `<4` bound keeps the same private-session shape valid across the admitted range, so the two compose and neither needs the other to land first. | commit pending; attempt 2 PASS
 
 ### Tier 5.0 — new from the IMP-193 / IMP-025 verification round
-
 ### IMP-199 — Give the two `web-tests` install steps distinct names
 - **Status:** TODO
 - **Category:** Repo hygiene
@@ -3618,7 +3410,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 5.0
 - **Depends on:** none
 - **Notes:** Impact 1, Confidence 5, Effort S = 5.0, and the arithmetic is the honest summary of a cosmetic fix. Filed because the ambiguity is permanent and grows: the verifier for every future CI item reads this file's step names. **Not an IMP-193 defect** — AC2's byte-identity requirement is why the name collides, and the verifier explicitly declined to reopen the item over it (`.improve/reports/verify-IMP-193.md` §6, "cosmetic nit (non-blocking)"). Deliberately **not** bundled with IMP-200: that item changes what the pip step *does* (caching), this one changes only what it is *called*, and separating them means either can land without the other.
-
 ### IMP-200 — Cache the `web-tests` pip install, or stop paying for it twice
 - **Status:** TODO
 - **Category:** Repo hygiene
@@ -3636,7 +3427,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 5.0
 - **Depends on:** none
 - **Notes:** Impact 1 (developer and runner minutes, not correctness), Confidence 5 (the duplication is visible by diffing `ci.yml:16-17` against `:31-33`), Effort S = 5.0. The genuine uncertainty is which fix is right — a cache helps both jobs, de-duplication helps more but restructures the workflow, and the profile's INF-09 already lists "no pip cache" as pre-existing. That is why criterion 1 demands a stated judgement instead of naming a solution. **Pre-existing, not an IMP-193 regression:** `python-tests` was uncached before this item and is still uncached; IMP-193 only made the gap visible by adding a second caller. Evidence: `.improve/reports/verify-IMP-193.md` §9 row 6 ("cosmetic… `pip install` is uncached in `web-tests`, duplicating ~10–40 s of install that `python-tests` already pays") and the profile's INF-09.
-
 ### IMP-201 — Correct the `--output-dir` flag description to mention the CSV
 - **Status:** TODO
 - **Category:** Docs
@@ -3653,7 +3443,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 5.0
 - **Depends on:** none
 - **Notes:** Impact 1, Confidence 5, Effort S = 5.0. Filed as a **known-remaining inaccuracy that IMP-025 deliberately left in place**, not as an IMP-025 defect — the verifier scored AC3 met and recorded this residue as nit N2 (`.improve/reports/verify-IMP-025.md` §3.3), explicitly noting that AC3 forbade touching the row and that `:111-112` is the sanctioned workaround. IMP-025's `readme.md` diff is `3 additions, 0 deletions`, which is the evidence that the constraint was honoured. Do not remove or reword `:111-112` as part of this item — it remains accurate and it is what makes the interim state safe. **Read alongside IMP-202**, which fixes the same note's *scope*: `:106` is incomplete and `:111-112` is over-broad, so they are two halves of one small docs cleanup. They are separate items only so that either can be closed by a different owner.
-
 ### IMP-202 — Scope the `--output-dir` note to the CLI, or give the notebook the same fix
 - **Status:** TODO
 - **Category:** Docs
@@ -3670,7 +3459,6 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Priority score:** 5.0
 - **Depends on:** none
 - **Notes:** Impact 2 (a reader following the readme into the notebook gets different behaviour from the one the readme just promised), Confidence 5, Effort M = 5.0. **This is deliberately scoped as a judgement, not a mandate:** Route A is one word of wording and closes the inaccuracy; Route B is a real change to an unowned surface and drags six pre-existing notebook defects into the blast radius. The item states both so the owner picks, but recommends A. Raised by `.improve/reports/verify-IMP-025.md` §9 item 1 (nit N1, §3.3): the note is true of the CLI table it sits under, and "a reader could over-apply it to the notebook". **Pre-existing, not an IMP-025 regression:** the notebook's CWD CSV write predates this loop entirely and was already inventoried as part of the NB-* rows; IMP-025 only placed an accurate note next to a stale surface. The profile's trap 6 applies — `scripts/paper-collector.py` and the notebook are separate surfaces and a fix to one is not a fix to the other. Cross-references, deliberately **not** duplicated: IMP-201 fixes the same note's *completeness* at `readme.md:106`; this item fixes its *scope* at `:111-112`. Profile PY-31 (downloads also land in CWD, `paper-collector.py:239-243`) is the same defect class on the CLI and is inventoried separately — do not fold it in here.
-
 ### IMP-203 — Close PY-29 in the profile; it was fixed by IMP-002
 - **Status:** DONE
 - **Category:** Repo hygiene
