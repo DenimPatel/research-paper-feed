@@ -10,26 +10,32 @@
 - CMD_TIMEOUT: 10 min
 
 ## Phase
-- **PHASE:** loop (Phase 4) — report written, resumable; 166 TODO remain
+- **PHASE:** loop (Phase 4) — resumed and still running; 166 TODO remain
 - **START_SHA:** 1c075b322eafa1fdfe07775136ca573513b4904b
 - **PLAYWRIGHT MCP:** available and used throughout
 - **PRE-PUSH GUARD:** installed at .git/hooks/pre-push; nothing has ever been pushed
 
 ## Counters
-- Commits since start: 80
-- Items DONE: 38
+- Commits since start: 85
+- Items DONE: 42
 - Items BLOCKED: 0
 - Items NEEDS-HUMAN: 8 (product decisions)
-- Items TODO: 166
-- Backlog total: 212
+- Items TODO: 166 (150 ready, 16 dep-blocked)
+- Backlog total: 216
 - Impl attempts used on current item: 0
 - Regression sweeps run: 6 (all 6 found real problems except #6, which was CLEAN; all fixed)
 - Discovery rounds: 0 (findings absorbed continuously instead)
-- Items needing a retry: IMP-007, IMP-008, IMP-009, IMP-024, IMP-031, IMP-198, IMP-204
+- Items needing a retry: IMP-007, IMP-008, IMP-009, IMP-024, IMP-031, IMP-198, IMP-204, IMP-216 (r2)
+
+## Verified baselines (supersede the older figures in FINAL_REPORT.md)
+- Python: **118 tests** OK on 3.11.10, ~1.1s, hermetic (was 104)
+- Web: **20 test files / 293 tests**, typecheck clean, build clean
+  (41 modules, JS 172.50 kB, CSS 10.91 kB) (was 19/292)
+- Baselines moved again by IMP-216 (truncation classification + depth bound)
+  and IMP-037 (PaperCard render test). Verifiers must use THESE numbers.
 
 ## Verified baselines (current truth — verifiers must not blame these on new changes)
-- Python: 104 tests OK on 3.11.10 and 3.14.3, ~1.9s, hermetic
-- Web: 292 tests / 19 files, typecheck clean, build clean (41 modules, JS 172.50 kB, CSS 10.91 kB)
+- (superseded — see the new baselines above)
 - Pre-existing failures (do NOT treat as regressions):
   - `npm audit`: 5 dev-only advisories (vitest 2.1.9 critical, vite 5.4.21 high, 3 moderate)
   - `jupyter nbconvert --execute` on `notebooks/paper-collector.ipynb` fails by design (`input()`)
@@ -73,9 +79,25 @@
 8. **An implementer may be right and a spec wrong.** IMP-192d rejected the regression
    sweep's diagnosis with evidence, and IMP-028d refuted the orchestrator's own claim.
    Give implementers license to push back, and read their corrections.
-9. **Never forget `--max-per-category` bounds.** `UNLIMITED`/ceiling changes alter the
+9. **THE COMMIT HELPER CORRUPTED THE BACKLOG — do not repeat it.** `finish_item.py`
+   used `re.split(r'\n(?=### IMP-)', txt)` + `"".join(...)`. That split **consumes**
+   the newline it matches, so all 208 item headings were glued onto the previous
+   line; the text survived but the file became unreadable to any line-anchored
+   parser. Fixed in `4a39b84` by rebuilding from `c1a89bd`. The correct form is
+   `re.split(r'(?m)^(?=### IMP-)', txt)` — a zero-width `(?m)^` lookahead, which
+   consumes nothing. **Rule: any script that splits and rejoins a file must either
+   use a zero-width lookahead or assert byte-equality after the round trip.**
+   The same bug also destroyed four freshly-filed items (IMP-216..219) before
+   they were ever committed; they had to be regenerated from the discovery reports.
+10. **Verify `.improve/FEATURES.md` integrity after every write**, not just at the
+   end of a batch: count `(?m)^### IMP-\d+` headings, assert the count equals the
+   number of unique IDs, and assert every item still carries all ten mandatory
+   fields. A silent item loss looks exactly like "the file is fine".
+11. **Never forget `--max-per-category` bounds.** `UNLIMITED`/ceiling changes alter the
    deploy's page count, which feeds IMP-198's workflow timeout arithmetic. Recheck it
-   whenever pagination changes.
+   whenever pagination changes. IMP-216 has now made this concrete: the deploy
+   is bounded by `DEPLOY_OFFSET_BUDGET=10000` (deepest offset `start=9000`), so
+   re-measure page counts against that bound, not against an unbounded query.
 
 ## Recon summary
 - Reports: `.improve/reports/recon-{classifier,runbook,architect,web,python,quality,experience,critic-notes}.md`
