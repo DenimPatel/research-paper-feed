@@ -754,7 +754,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:**
 
 ### IMP-037 — Add a component render smoke test
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Test coverage & test quality
 - **Type:** test
 - **Area / files:** `web/src/components/__tests__/PaperCard.test.tsx` (new), `web/vite.config.ts:7-10`
@@ -767,7 +767,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** IMP-005
 - **Priority score:** 20.0
-- **Notes:** Follow the repo's 1:1 mirror convention — a component at `web/src/components/PaperCard.tsx` gets tests at `web/src/components/__tests__/PaperCard.test.tsx`, not inline.
+- **Notes:** **DONE** (commit above). Verifier judged the UTC/local date bug REAL and understated; the weakened assertion is a scope decision, and the underlying defect is filed as a new item. Follow the repo's 1:1 mirror convention — a component at `web/src/components/PaperCard.tsx` gets tests at `web/src/components/__tests__/PaperCard.test.tsx`, not inline.
 
 ### IMP-038 — Add a `paperIndex` test for a single failing shard
 - **Status:** TODO

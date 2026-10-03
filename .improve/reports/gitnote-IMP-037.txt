@@ -1,0 +1,20 @@
+VERDICT: PASS (independent verifier, did not write the change)
+AC-1 met - real PaperCard import, full Paper fixture, href===absUrl (proven
+  red); date rendering is new coverage, no prior test touches <time>.
+AC-2 met - mirrored path web/src/components/__tests__/PaperCard.test.tsx,
+  collected by the existing src/**/*.test.tsx; measured 19/292 -> 20/293.
+AC-3 met - typecheck exit 0. Build green. No dep, no @types/node, no
+  lockfile/config/include/source change; git diff -- web/ empty.
+Issues (none blocking): (1) the visible-date assertion is too weak - a
+  Feb-for-Jan mutation, a hardcoded "2024", and an updated-for-published swap
+  all stay GREEN. (2) The baseline screenshot shows "Sep 30, 2026" for a paper
+  whose shard says published=2026-10-01, so it bakes in the bug; re-capture on
+  fix. (3) REPO_PROFILE.md counts stale at 292/19. (4) FIXTURE duplicates
+  domEnvironment.test.tsx's.
+DATE-BUG: REAL, understated. Every card shows yesterday's date west of UTC;
+visible text also contradicts the card's own dateTime. The fixture
+(2024-01-02, 00:00Z) can expose it - only the assertion hides it. Fix
+PaperCard.formatDate only; App.tsx:63 formatGeneratedAt parses a real instant
+and must stay local.
+Evidence: .improve/reports/verify-IMP-037.md (7 mutations tabulated, 5-zone
+matrix); web/src/components/PaperCard.tsx:20-30,85; scripts/build_index.py:101
