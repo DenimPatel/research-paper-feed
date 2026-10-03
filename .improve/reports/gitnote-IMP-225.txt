@@ -1,0 +1,21 @@
+VERDICT: PASS after four independent verification passes.
+An earlier draft FAILED on substance and was reworked. The verifier caught:
+(a) the draft claimed TWO causes and that neither was the one regression 7
+assumed - measurement showed the 15.46% is entirely headless-vs-headed and
+regression 7 was right; (b) it classified baseline #1 as "unproven" when the
+corpus recorded baseline-vs-realHeaded = 1 px, so #1 IS comparable; (c) a
+timezone error in its clock arithmetic; (d) a row reason contradicted by
+recon-experience.md:54; (e) arithmetic slip 0.0280%->0.0286% with the 390px
+figure needing a projection label; (f) wrong fixture sizes; (g) four false
+variation axes claimed for the 8 environments when all 42 sidecars show single
+values for browser build, tz, locale and args; (h) "bit-identical" surviving in
+three places against its own 282/312 measurement.
+Confirmed independently by the verifier: within-environment 0 px (identical
+SHA-256), headless-vs-headed 15.2475% byte-for-byte, and the full 312-pair
+aggregate (282 zero / 30 non-zero / worst 330 px) recomputed from the retained
+corpus. Sidecar re-derivation: views {desktop 34, mobile 8}, dsf {1,1.5,2},
+headless 2, version/tz/locale/args each single-valued, 5 distinct
+dataIndexSha256. Sizes re-derived by du -skc: 176 KB total, 138.3 KB apparent.
+Escapes absent: 14 baseline mtimes unchanged, SHA 61988696c454bb36 intact.
+check_features 223 items / 0 missing; product diff empty.
+Evidence: verify-IMP-225{,-r2,-r3,-r4}.md; tools/imp225/measurements-2026-10-03.txt

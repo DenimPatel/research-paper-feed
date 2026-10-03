@@ -1,0 +1,21 @@
+{
+  "categories": [
+    "cs.CV",
+    "cs.LG",
+    "cs.CL",
+    "cs.AI",
+    "cs.RO"
+  ],
+  "generatedAt": "2026-10-03T10:02:17Z",
+  "retentionDays": 30,
+  "shards": [
+    {
+      "count": 5,
+      "file": "papers-fixture-thin.json",
+      "from": "2026-09-28",
+      "to": "2026-10-01",
+      "week": "2026-W40"
+    }
+  ],
+  "totalPapers": 5
+}
