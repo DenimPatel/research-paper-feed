@@ -1,0 +1,17 @@
+VERDICT: PASS (independent verifier, did not write the change)
+AC1-AC6 met. App.tsx byte-identical, formatGeneratedAt unchanged.
+TZ: UTC, New_York, LA, Honolulu, Berlin, Kolkata, Kathmandu, Lord_Howe,
+Chatham, Auckland, Kiritimati, Midway, Etc/GMT+12, Troll, Tokyo - 90 renders,
+exactly 1 distinct value per date, 0 dateTime mismatches. Control with the fix
+removed correctly showed Jan 1 west of UTC, so the probe is sensitive.
+NONVACUOUS: M1 remove timeZone @New_York, M2 Feb-for-Jan, M3 hardcoded year,
+M4 updated-for-published - all 4 RED. V5/V6 (delete or neuter the NaN guard)
+stay GREEN: published:"not-a-date" renders "Invalid Date", zero coverage.
+OVER-BROAD: none. A time-bearing published falls through the NaN guard to the
+raw value, identical pre/post; 0 of 14253 shipped papers are non-bare; updated
+is never rendered; dateTime now agrees everywhere.
+Issues (none blocking): the new assertion is en-US-only (green in 1 of 6
+locales vs the old 5 of 6 - sv/de/ja/fr red) - record for IMP-125; the NaN
+guard is untested; AC1's route (b) trap is that new Date("2024-01-02") is
+UTC-parsed and would recreate the bug.
+Evidence: .improve/reports/verify-IMP-219.md; PaperCard.tsx:42

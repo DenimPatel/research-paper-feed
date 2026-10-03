@@ -17,6 +17,19 @@ interface PaperCardProps {
   actionSlot?: ReactNode;
 }
 
+/**
+ * `published` is a zoneless calendar day from the producer (`iso_date`,
+ * `scripts/build_index.py`), not an instant, so it has to read as the same day
+ * for every reader. Anchoring the parse at midnight UTC and then formatting in
+ * UTC — the choice `formatWeekRange` (`App.tsx:87-100`) already makes for bare
+ * days — keeps the visible text in agreement with the `dateTime` attribute
+ * beside it. Formatting that instant in the reader's local zone printed the day
+ * *before* for everyone west of Greenwich, so every card contradicted itself.
+ *
+ * `formatGeneratedAt` (`App.tsx:64-74`) takes a real instant and deliberately
+ * does the opposite; the two take different kinds of value. The `locale` axis
+ * is still the runner's — IMP-125 owns that decision, not this one.
+ */
 function formatDate(value: string): string {
   const date = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) {
@@ -26,6 +39,7 @@ function formatDate(value: string): string {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 

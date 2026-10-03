@@ -30,12 +30,17 @@ describe("PaperCard", () => {
     const titleLink = screen.getByRole("link", { name: FIXTURE.title });
     expect(titleLink.getAttribute("href")).toBe(FIXTURE.absUrl);
 
-    // `formatDate` returns `toLocaleDateString(undefined, …)`, so the visible
-    // wording follows the runner's locale; the `dateTime` attribute is the
-    // machine-readable half and the text only has to be there.
+    // IMP-219: `published` is a zoneless calendar day, and `2024-01-02` sits
+    // exactly on `00:00Z` — the one value that slid to "Jan 1" for every
+    // reader west of Greenwich while `dateTime` kept saying the 2nd.
+    // `formatDate` now pins the zone to UTC, so the exact rendered string is
+    // the assertion: a wrong month, a wrong day, a wrong year, or the text
+    // rendering `updated` instead of `published` are all red, and the visible
+    // text can no longer contradict the attribute beside it. The `dateTime`
+    // assertion is unchanged — it was always the correct half.
     const published = container.querySelector("time");
     expect(published).not.toBeNull();
     expect(published?.getAttribute("dateTime")).toBe(FIXTURE.published);
-    expect(published?.textContent).toContain("2024");
+    expect(published?.textContent).toBe("Jan 2, 2024");
   });
 });
