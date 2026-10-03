@@ -163,6 +163,23 @@ class DedupeRecordsTests(unittest.TestCase):
         merged = build_index.dedupe_records(records)
         self.assertEqual(merged[0]["title"], "First")
 
+    def test_merge_does_not_mutate_input_records(self):
+        records = [
+            make_record("2401.00001", "2024-01-08", ["cs.CV"]),
+            make_record("2401.00002", "2024-01-08", ["cs.LG"]),
+            make_record("2401.00001", "2024-01-08", ["cs.LG", "cs.AI"]),
+        ]
+        before = [list(record["categories"]) for record in records]
+        merged = build_index.dedupe_records(records)
+        self.assertEqual(
+            [record["categories"] for record in records], before
+        )
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(
+            merged[0]["categories"], ["cs.CV", "cs.LG", "cs.AI"]
+        )
+        self.assertIsNot(merged[0]["categories"], records[0]["categories"])
+
 
 class BuildShardsTests(unittest.TestCase):
     def setUp(self):

@@ -1,0 +1,17 @@
+VERDICT: PASS (independent verifier, did not write the change)
+1 met - deep-compare NO on 4 inputs including nested mutables; reverting the
+  fix reds it. 2 met - tests/test_build_index.py:166-182 covers every record.
+3 met - both tests byte-identical and passing, 118 -> 119.
+ALIASES: output still shares authors/meta/flags/blob by identity, so writing
+to those would mutate caller input. But dedupe_records writes only categories,
+now cloned, so no input mutation is reachable; disclosed as D-1. Not blocking.
+SPEC-EDIT: legitimate in direction, sloppy in numbers. Criteria 1-3
+byte-identical, 216/216 items intact, one TODO->DONE - but :197-200 was wrong
+(union append is :200-203), :180-202 missed :205, and "IMP-216 added ~70
+lines" was +166 insertions. Corrected before commit.
+NONVACUOUS: revert RED (failures=1); no-op stub RED (3 != 2); mutation moved to
+the duplicate record RED. Verifier also found green-but-wrong mutants:
+authors-union-through-alias (mutates caller, suite stays OK), sorted order,
+and an unconditional clone. Suggested adding a test with differing authors to
+catch the first class.
+Evidence: .improve/reports/verify-IMP-042.md

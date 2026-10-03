@@ -178,7 +178,11 @@ def record_from_result(result, abstract_chars=DEFAULT_ABSTRACT_CHARS):
 
 
 def dedupe_records(records):
-    """Deduplicate by arXiv ID, unioning categories and keeping first metadata."""
+    """Deduplicate by arXiv ID, unioning categories and keeping first metadata.
+
+    The union appends into ``categories``, so the first-seen record's copy of
+    that list is cloned: the caller's records come back exactly as they went in.
+    """
     merged = {}
     order = []
     for record in records:
@@ -187,7 +191,10 @@ def dedupe_records(records):
             continue
         existing = merged.get(paper_id)
         if existing is None:
-            merged[paper_id] = dict(record)
+            first = dict(record)
+            if "categories" in first:
+                first["categories"] = list(first["categories"])
+            merged[paper_id] = first
             order.append(paper_id)
             continue
         seen = set(existing.get("categories", []))
