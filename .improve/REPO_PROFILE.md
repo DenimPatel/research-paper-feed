@@ -107,19 +107,20 @@ which is exactly how PY-1 existed — 4.x removed `Result.download_pdf` / `downl
 
 ```shell
 # from repo root
-/usr/local/bin/python3.11 -m unittest discover -s tests -v     # 89 tests, OK, ~1.1s
+/usr/local/bin/python3.11 -m unittest discover -s tests -v     # 104 tests, OK, ~1.3s
 ```
 
-Baseline: **`Ran 89 tests` / `OK`, exit 0.** *(Re-measured 2026-10-02: `Ran 89 tests in 1.104s` /
-`OK`, exit 0, from the command above. This row has read 44, then 78, then 89 as agents landed tests,
-and **each of those numbers was accurate when written** — re-measure, do not trust any of them.)*
+Baseline: **`Ran 104 tests` / `OK`, exit 0.** *(Re-measured 2026-10-03: `Ran 104 tests in 1.270s` /
+`OK`, exit 0, from the command above. This row has read 44, then 78, then 89, then 104 as agents
+landed tests, and **each of those numbers was accurate when written** — re-measure, do not trust any
+of them.)*
 Almost entirely offline and hermetic — every test injects a fake arXiv client; no network, no real
 clock, no filesystem beyond `tempfile`. Under a socket block (`socket.connect` /
-`create_connection` / `getaddrinfo` replaced by a raiser) the suite reports **89 run, 1 failure** —
+`create_connection` / `getaddrinfo` replaced by a raiser) the suite reports **104 run, 1 failure** —
 the single failure is the pre-existing `BlackHoleRequestTests`, which deliberately binds
 `127.0.0.1:0` to measure a real read timeout and so trips any blanket socket block. Breakdown:
-`test_arxiv_common.py` (18), `test_build_index.py` (43), `test_paper_collector.py` (28) — 18 + 43 +
-28 = 89. **This sentence previously read "78 run, 0 failures" and was false**; it was also the exact
+`test_arxiv_common.py` (21), `test_build_index.py` (55), `test_paper_collector.py` (28) — 21 + 55 +
+28 = 104. **This sentence previously read "78 run, 0 failures" and was false**; it was also the exact
 sentence a future verifier reads to decide hermeticity, so do not restore it without re-running the
 block.
 
@@ -129,7 +130,7 @@ green suite therefore proves nothing about the installed `arxiv` version — do 
 for a dependency pin (IMP-033's verifier drew exactly this conclusion).
 
 ```shell
-python -m pytest tests -q        # WORKS — 89 passed, but ONLY after `pip install pytest`
+python -m pytest tests -q        # WORKS — 104 passed, but ONLY after `pip install pytest`
 ```
 
 `pytest` is **not installed** in the provisioned 3.11 (`No module named pytest`) and is **not a
@@ -150,9 +151,33 @@ All from **`web/`**. `node_modules` is present and complete (62 packages, lockfi
 ```shell
 cd web
 npm run typecheck    # tsc --noEmit          -> exit 0, no output
-npm test             # vitest run            -> 16 files, 253 tests passed, ~4.2s
-npm run build        # tsc --noEmit && vite build -> 41 modules, ~0.4s
+npm test             # vitest run            -> 19 files, 292 tests passed, ~8.8s
+npm run build        # tsc --noEmit && node scripts/require-index.mjs && vite build
+                      #   -> the guard prints "Paper index present: public/data/index.json
+                      #      with N shard(s)." first, then 41 modules, ~0.4s of vite
 ```
+
+**`npm run build` is a three-step chain, not two, and the middle step gates the deploy
+(IMP-028, commit `ba0cedc`).** `web/package.json:8` is exactly
+`tsc --noEmit && node scripts/require-index.mjs && vite build`. `web/scripts/require-index.mjs`
+is a plain Node ESM script (no dependency, no `vite.config.ts` plugin) that refuses a build when
+`public/data/index.json` is **missing, empty, malformed, not an object, has no `shards` array, or
+has an empty `shards` array**, or when any `shards[].file` is **absent, a directory, a FIFO, a
+dangling symlink, or not a string**. Each refusal exits **1** and names the offending path on
+stderr, so `&&` short-circuits and **`vite build` is never spawned** — a build that would ship
+without an index cannot produce a `dist` at all. `npm run dev` and `npm test` do **not** invoke it
+(a dev server with no index renders the app's own "No paper index yet" page, which is correct and
+not a guard failure). Because `npm run build -- <args>` appends the args after `vite build`, the
+guard's optional positional `<dir>` argument is unreachable from the build script; it defaults to
+`public/data`, CWD-relative to `web/`.
+
+**A manifest carrying `failedCategories` and/or `truncatedCategories` passes both guards, by
+design.** Neither guard reads either field. That is deliberate: IMP-204 (commit `c968a01`) makes a
+category that hit `--max-per-category`, or whose query failed, record itself in the manifest and
+ship a *partial* index rather than aborting the weekly deploy. CI's own smoke index
+(`ci.yml --category cs.CV --max-per-category 5`) legitimately emits `truncatedCategories: ["cs.CV"]`
+and builds green. **Do not file this as a gap.** What the guards refuse is an index that is missing,
+unreadable, empty, or pointing at shards that are not in the artifact — never a smaller one.
 
 Baseline artifact sizes (useful for spotting an accidental bundle regression), all re-measured
 2026-10-02: **JS 171.45 kB** (171,472 B, gzip 54.92), **CSS 10.93 kB** (10,927 B, gzip 2.86),
@@ -178,37 +203,75 @@ across the same range). **Data presence does not affect the bundle at all**: the
 files, never inlined, so the JS and CSS content hashes are identical whether `web/public/data` is
 present, absent, or empty.
 
-Test files, **253 tests across 16** — re-measured 2026-10-02, and **re-confirmed 2026-10-02 after
-IMP-031/IMP-032 and IMP-198 landed**: `Test Files  16 passed (16)` / `Tests  253 passed (253)`,
-duration 4.19 s. Unchanged by those three commits (this table previously read 69 tests across 5 and
-was accurate only at the commit that created it):
+Test files, **292 tests across 19** — re-measured **2026-10-03**, after IMP-028/IMP-029 and its
+three follow-ups landed: `Test Files  19 passed (19)` / `Tests  292 passed (292)`, duration 8.76 s
+from `web/`. This row has read 69 across 5, then 253 across 16, and now 292 across 19 — the last
+two steps are **+23 tests / +1 file** (IMP-028b, `web/scripts/__tests__/indexGuards.test.mjs`) and
+**+4 / +1** (IMP-028c), then **−1** when IMP-028d dropped one false-positive witness. Every number
+was accurate when written; re-measure, do not trust it. Counts below are from
+`node node_modules/vitest/vitest.mjs list --json`, not from the run summary:
 
 | File | Tests | Environment |
 | --- | --- | --- |
 | `web/src/lib/__tests__/urlState.test.ts` | 50 | `node` (`// @vitest-environment node` docblock — the hash module needs no DOM) |
 | `web/src/lib/__tests__/collections.test.ts` | 41 | jsdom (global default) |
 | `web/src/lib/__tests__/paperIndex.test.ts` | 28 | jsdom (global default) |
-| `web/src/lib/__tests__/search.test.ts` | 12 | jsdom (global default) |
-| `web/src/lib/__tests__/failureCopy.test.ts` | 8 | jsdom (global default) |
+| `web/scripts/__tests__/indexGuards.test.mjs` | 23 | `node` — **spawns** `require-index.mjs` as a child process; see the note below |
 | `web/src/__tests__/App.loadFailure.test.tsx` | 26 | jsdom, RTL |
 | `web/src/__tests__/App.categories.test.tsx` | 21 | jsdom, RTL |
 | `web/src/__tests__/feedControls.test.tsx` | 14 | jsdom, RTL |
+| `web/src/lib/__tests__/failureCopy.test.ts` | 15 | jsdom (global default) |
 | `web/src/__tests__/errorBoundary.test.tsx` | 11 | jsdom, RTL |
 | `web/src/__tests__/App.partialShard.test.tsx` | 9 | jsdom, RTL |
 | `web/src/__tests__/App.storage.test.tsx` | 8 | jsdom, RTL |
 | `web/src/__tests__/App.retry.test.tsx` | 7 | jsdom, RTL |
 | `web/src/__tests__/paperCardNullUrls.test.tsx` | 7 | jsdom, RTL |
+| `web/src/__tests__/App.incompleteIndex.test.tsx` | 6 | jsdom, RTL |
+| `web/src/lib/__tests__/search.test.ts` | 12 | jsdom (global default) |
 | `web/src/__tests__/malformedImport.test.tsx` | 5 | jsdom, RTL |
 | `web/src/__tests__/App.relevance.test.tsx` | 3 | jsdom, RTL |
 | `web/src/__tests__/domEnvironment.test.tsx` | 3 | jsdom, RTL |
+| `web/src/__tests__/indexGuardRegistration.test.ts` | 3 | `node` — **spawns the real vitest CLI**; see the note below |
 
-**The test layout spans BOTH directories, and the verified baseline includes component/DOM tests.**
-139 of the 253 live under `web/src/lib/__tests__/` (pure-module, mirroring `web/src/lib/<module>.ts`)
-and 114 under `web/src/__tests__/` (cross-module and component tests, including 111 that drive React
-components through `@testing-library/react`). `App.tsx` alone is covered by 74 tests across six
-`App.*.test.tsx` files; every one of the four components has its own file. So "component tests are
-structurally impossible here" (INF-08) and "`App.tsx` and all four components are still untested"
-(PE-13) were both true when written and are **both false now** — see the rows below and §10.
+**The test layout now spans THREE directories, and two of the three live outside `web/src/`.**
+146 of the 292 live under `web/src/lib/__tests__/` (pure-module, mirroring `web/src/lib/<module>.ts`),
+123 under `web/src/__tests__/` (cross-module and component tests, including 120 that drive React
+components through `@testing-library/react`), and **23 under `web/scripts/__tests__/`**. `App.tsx`
+alone is covered by 80 tests across **seven** `App.*.test.tsx` files (categories 21, loadFailure 26,
+partialShard 9, relevance 3, retry 7, storage 8, incompleteIndex 6); every one of the four
+components has its own file. So "component tests are structurally impossible here" (INF-08) and
+"`App.tsx` and all four components are still untested" (PE-13) were both true when written and are
+**both false now** — see the rows below and §10.
+
+**Why the guard tests are where they are, and why they shell out — do not "tidy" this.**
+`CONTRIBUTING.md` tells contributors to put `web/` tests in `web/src/lib/__tests__/` or
+`web/src/__tests__/`. The two guard files break that rule deliberately, and moving them would break
+the thing they exist to protect:
+
+- `web/scripts/__tests__/indexGuards.test.mjs` tests a **plain `.mjs` file that is outside the
+  TypeScript project** — `web/tsconfig.json` has `include: ["src", "vite.config.ts"]` and no
+  `allowJs`, so `tsc --noEmit` never sees `require-index.mjs` at all (`--listFiles` returns 0 hits).
+  It therefore **spawns** `node scripts/require-index.mjs` as a child process rather than importing
+  it, which is also required: the script reads `process.argv` and calls `process.exit` at module
+  scope, so an import would kill the vitest worker.
+- A `.ts` version under `src/` was tried and **fails `npm run typecheck` with 11 errors**:
+  `tsconfig.json` pins `"types": ["vite/client"]` and **`@types/node` is not installed**, so
+  `process` is undefined and `strict` reports implicit `any`. Do not "fix" this by adding
+  `@types/node`.
+- Registration therefore needs `web/vite.config.ts` `test.include` to carry a third glob,
+  `"scripts/**/*.test.mjs"`. **That glob is itself pinned** by
+  `web/src/__tests__/indexGuardRegistration.test.ts` (IMP-028c, `49af325`), which shells out to the
+  real vitest CLI (`vitest list --filesOnly` / `list --json`) to ask what the runner actually
+  collects. Without that pin, deleting the glob returns `npm test` to a silent exit-0 with zero
+  guard coverage — and nothing in the suite can notice, because the suite is what stopped running.
+  Cost: **918–1330 ms** for the pin file, against a `spawnSync` timeout of `30_000 ms` plus
+  `killSignal: "SIGKILL"` (IMP-028d, `2ebdbd3`) so a wedged child fails the pin instead of hanging
+  the job. It reads `readme.md` and `.github/workflows/deploy.yml` through `../../../`, so it needs
+  a **repo-root** checkout — fine on CI and locally, not in a `web/`-only clone.
+- **Residual, unverified:** CI runs Node **20** and this pin was only ever exercised on **Node
+  25.6.1** locally. The APIs used (`process.execPath`, `spawnSync`, `createRequire`, `node:path`,
+  `node:fs`, `node:url`) are long-stable and `engines` is `^18||>=20`, so the risk is low — but it
+  is unverified. Backlog: the Node-matrix item filed alongside IMP-028's verification.
 
 Other scripts that exist: `npm run dev` (Vite, auto-increments the port — 5173/5174 are often
 taken by unrelated local projects here, so prefer `npm run dev -- --port 5199 --strictPort`),
@@ -271,8 +334,14 @@ cd web && npm run typecheck && npm test && npm run build
 ```
 
 All three are required. `typecheck` is the only lint. `build` matters because it is
-`tsc --noEmit && vite build` and **CI never runs it** (§7) — a broken Vite build passes CI today.
-If you changed anything that emits or consumes `index.json` or a shard, see §8 trap 1.
+`tsc --noEmit && node scripts/require-index.mjs && vite build` (§3.3) — it is a **three**-step
+chain, and the middle step is a real gate: with no `web/public/data/index.json` it exits 1 and
+`vite build` never runs. CI **does** run it now (IMP-026, `2ec06d0`), and CI's `web-tests` job
+generates a small index first (IMP-193, `5684b1b`), so the guard is exercised with data present.
+**Locally, `npm run build` fails on an empty checkout by design** — generate the index first, or
+treat the naming message as the expected output rather than a regression. §7's PE-3 row still says
+CI never runs the build; that row is stale. If you changed anything that emits or consumes
+`index.json` or a shard, see §8 trap 1.
 
 ### 4.2 `web/src/App.tsx` or `web/src/components/**` (component / UI / CSS)
 
@@ -307,16 +376,21 @@ cd web && npm run dev -- --port 5199 --strictPort
   renders the "No paper index yet" state (baseline
   `baseline-feed-index-missing-desktop-1280.png`).
 - **Component/DOM tests are possible as of IMP-005** (commit `894fb9b`). `vite.config.ts:7-10` now
-  sets `environment: "jsdom"`, `include: ["src/**/*.test.ts", "src/**/*.test.tsx"]` and
-  `setupFiles: ["src/test-setup.ts"]`, with `jsdom`, `@testing-library/react` and
-  `@testing-library/user-event` as devDependencies. So a component change can be verified by
+  sets `environment: "jsdom"`, `include: ["src/**/*.test.ts", "src/**/*.test.tsx",
+  "scripts/**/*.test.mjs"]` and `setupFiles: ["src/test-setup.ts"]`, with `jsdom`,
+  `@testing-library/react` and `@testing-library/user-event` as devDependencies. The **third glob**
+  exists only for the index-guard suites (`web/scripts/__tests__/`, outside the TS project) and is
+  itself pinned by a test — §3.3 explains the whole arrangement; do not delete the glob and do not
+  move those files under `src/`. So a component change can be verified by
   `@testing-library/react` render assertions *in addition to* typecheck, build and eyeballing.
-  Coverage is **no longer** thin — **this paragraph was stale for a full loop.** As of 2026-10-02,
-  111 of the 253 tests under `web/src/__tests__/` drive React components through
-  `@testing-library/react`: `App.tsx` alone has 74 across six `App.*.test.tsx` files
-  (categories 21, loadFailure 26, partialShard 9, relevance 3, retry 7, storage 8), and
-  `feedControls` (14), `errorBoundary` (11), `paperCardNullUrls` (7) and `malformedImport` (5)
-  each have their own file. `domEnvironment.test.tsx` (3 tests) is now a *fixture check* rather than
+  Coverage is **no longer** thin — **this paragraph was stale for a full loop.** As of 2026-10-03,
+  120 of the 292 tests drive React components through
+  `@testing-library/react`: `App.tsx` alone has 80 across seven `App.*.test.tsx` files
+  (categories 21, loadFailure 26, partialShard 9, relevance 3, retry 7, storage 8, incompleteIndex
+  6), and
+  `feedControls` (14), `errorBoundary` (11), `paperCardNullUrls` (7), `malformedImport` (5) and
+  `domEnvironment` (3)
+  each have their own file. `domEnvironment.test.tsx` is a *fixture check* rather than
   the only DOM test. Items IMP-037 and IMP-129 through IMP-132 remain the owners of whatever is left.
   **Caveat:** both workflows still request floating
   `node-version: "20"` and there is no `engine-strict`, so a `jsdom@29` engine mismatch would be an
@@ -592,7 +666,7 @@ any of the following to a new change, and must not claim credit for "fixing" an 
 | PE-10 | **CI has no coverage, no Python matrix (single floating `3.x`), no pip cache, no `permissions:`, no `concurrency:`, no `timeout-minutes:`, no `path:` filters, and actions pinned to mutable tags not SHAs.** | `ci.yml` | baseline |
 | PE-11 | **Deploy has no quality gate.** The `build` job runs no tests, no typecheck, no lint — it jumps straight to `build_index.py` then `npm run build`. Cross-workflow `needs:` is impossible, so anything landing on `main` publishes whether or not CI is green. | `deploy.yml:21-54` | baseline |
 | PE-12 | **`.venv/` and `.pytest_cache/` are not gitignored**, so following the readme's own instructions dirties `git status`. Same for `extracted/`, `*.pdf`, `*.tar.gz`, `*_papers.csv` in the repo root. | root `.gitignore` | baseline |
-| PE-13 | **~~Zero component/DOM test coverage, and it is structurally impossible today.~~ FIXED — infrastructure by IMP-005 (commit `894fb9b`), coverage by the items in §10.** `vite.config.ts:7-10` is `environment: "jsdom"` with `include: ["src/**/*.test.ts", "src/**/*.test.tsx"]` and `setupFiles: ["src/test-setup.ts"]`, with `jsdom` / `@testing-library/react` / `@testing-library/user-event` as devDependencies. **The coverage half is also closed** — the "still open" clause here was true when written and is false as of 2026-10-02: 111 component/DOM tests now exist under `web/src/__tests__/`, including 74 against `App.tsx`. **`@vitest/coverage-v8` is still absent**, so there is no coverage *report* — line and branch percentages remain unmeasured, and that is what IMP-037 / IMP-129–IMP-132 are for. | `vite.config.ts`; `web/package.json`; `web/src/__tests__/` | fixed (infrastructure and coverage) / live (coverage report) |
+| PE-13 | **~~Zero component/DOM test coverage, and it is structurally impossible today.~~ FIXED — infrastructure by IMP-005 (commit `894fb9b`), coverage by the items in §10.** `vite.config.ts:7-10` is `environment: "jsdom"` with `include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.mjs"]` and `setupFiles: ["src/test-setup.ts"]`, with `jsdom` / `@testing-library/react` / `@testing-library/user-event` as devDependencies. **The coverage half is also closed** — the "still open" clause here was true when written and is false as of 2026-10-03: 120 component/DOM tests now exist under `web/src/__tests__/`, including 80 against `App.tsx`. (The `scripts/**` glob and the two guard files under it are **not** component tests — see §3.3; they spawn subprocesses and run under `node`.) **`@vitest/coverage-v8` is still absent**, so there is no coverage *report* — line and branch percentages remain unmeasured, and that is what IMP-037 / IMP-129–IMP-132 are for. | `vite.config.ts`; `web/package.json`; `web/src/__tests__/` | fixed (infrastructure and coverage) / live (coverage report) |
 | PE-14 | **`scripts/paper-collector.py` duplicates the `arxiv` client construction that `scripts/arxiv_common.py` was created to centralize**, and uses a *different* record schema (Title-Cased `Title/Date/Id/Summary/URL/…`) than `build_index.py` (camelCase `id/title/published/abstract/…`). | `paper-collector.py:14, 61-71` | baseline |
 | PE-15 | Stale `__pycache__/*.pyc` for cpython-311/312/314 on disk; `.DS_Store` present. All correctly gitignored, untracked, harmless. | `git status` clean | noise only |
 | PE-16 | The README hero image `images/feed_example.png` is a **2023 screenshot of the legacy CLI's HTML output**, not the React feed — 465 KB, the heaviest asset in the repo, and it misrepresents the project. | `readme.md:11` | real doc bug |
@@ -744,6 +818,22 @@ any of the following to a new change, and must not claim credit for "fixing" an 
     `encoding="utf-8"` with `ensure_ascii=False`; `paper-collector.py:143` calls
     `open(filename, "w")` with no `encoding`, which raises `UnicodeEncodeError` on a non-UTF-8
     locale (macOS hides this via PEP 538 coercion; containers do not).
+
+19. **The index guards' own tests live outside `src/` and shell out. Do not "tidy" them.**
+    `CONTRIBUTING.md` sends `web/` tests to `web/src/lib/__tests__/` or `web/src/__tests__/`, but
+    `web/scripts/__tests__/indexGuards.test.mjs` (23 tests) and
+    `web/src/__tests__/indexGuardRegistration.test.ts` (3 tests) both break that rule on purpose, and
+    both **spawn child processes** instead of importing their subjects. Reasons, so you do not
+    "correct" them: `web/scripts/require-index.mjs` is outside the TypeScript project entirely
+    (`tsconfig.json` `include` is `["src", "vite.config.ts"]`, no `allowJs`, so `tsc --noEmit` never
+    sees it) and calls `process.exit` at module scope, so importing it from a test would kill the
+    vitest worker; and a `.ts` version under `src/` **fails `npm run typecheck` with 11 errors**,
+    because `tsconfig.json` pins `"types": ["vite/client"]` and **`@types/node` is not installed** —
+    do not add `@types/node` to make it compile. The pin additionally shells out to the real vitest
+    CLI to ask what the runner collects, and reads `readme.md` and `.github/workflows/deploy.yml`
+    through `../../../`, so `npm test` now requires a **repo-root** checkout. Its `spawnSync` carries
+    `timeout: 30_000` + `killSignal: "SIGKILL"`; a hung child therefore fails the pin in ~60 s
+    instead of wedging the job. Full mechanism and the registration glob are in §3.3.
 
 ---
 
@@ -928,12 +1018,15 @@ supposed to fix that row, in which case the row must be updated in this file.**
 | INF-20 | `readme.md` is lowercase; no `docs/`, no changelog, no issue/PR templates, no CODEOWNERS, no release process | repo root |
 
 ### Baseline (do not "fix" without being asked)
-Zero failing checks at HEAD: **Python 89/89 OK**, `tsc --noEmit` clean, **vitest 253/253 across 16
-files**, `npm run build` clean (**41 modules, JS 171.45 kB, CSS 10.93 kB**). Re-measured
-2026-10-02; this paragraph previously read "Python 44/44 … vitest 69/69 across 5 files … 39 modules,
-JS 163.72 kB", which was accurate when written and is now stale — re-measure rather than trusting
-either number. The Python figure is the one that moves every time an agent lands tests (44 → 78 →
-89 across this loop), so **treat 89 as of 2026-10-02, not as a permanent fact**. The only genuine
+Zero failing checks at HEAD: **Python 104/104 OK**, `tsc --noEmit` clean, **vitest 292/292 across 19
+files**, `npm run build` clean (the index guard prints its line, then **41 modules**; bundle sizes
+are re-baselined by IMP-195 and the JS figure here is known to lag — do not quote it without
+rebuilding). Re-measured 2026-10-03; this paragraph previously read "Python 44/44 … vitest 69/69
+across 5 files … 39 modules, JS 163.72 kB" and then "Python 89/89 … vitest 253/253 across 16 files
+… JS 171.45 kB" — each was accurate when written and is now stale. Re-measure rather than trusting
+any of them. The Python figure is the one that moves every time an agent lands tests (44 → 78 → 89
+→ 104 across this loop), so **treat 104 as of 2026-10-03, not as a permanent fact**; the vitest
+figure moves on the same schedule (69 → 253 → 292). The only genuine
 command-level failures are the notebook (PE-7) and the missing `npm run lint` script (PE-4/INF-04),
 both absences by design rather than regressions.
 
@@ -948,7 +1041,7 @@ fixed order passes, not that the suite is order-independent.
 
 ## 10. Recently fixed — do not re-report
 
-**Thirty-four items are committed** (`git log --oneline fc77a40..HEAD` is 64 commits; roughly a
+**Thirty-nine items are committed** (`git log --oneline fc77a40..HEAD` is 77 commits; roughly a
 third are `chore(improve)` bookkeeping). Each was implemented, then independently verified; the
 verifier's acceptance criteria all passed. **A verifier who re-raises any of these as a new defect is
 reporting a fixed bug.** Re-verify against the current source before believing either the row or this
@@ -989,10 +1082,26 @@ both directions.
 | IMP-193 | `5684b1b` | CI generates the paper index (`--category cs.CV --max-per-category 5 --out-dir web/public/data`) before `Build`, so the build gate is no longer green on an empty checkout. **Adds a live network call to `web-tests`** — the timeout this needed is IMP-198, below | INF-16 (half) |
 | IMP-198 | `b7e23a8` | **The arXiv client now bounds its own requests.** `DEFAULT_REQUEST_TIMEOUT_SECONDS = 60` at `scripts/arxiv_common.py:19`, installed by `install_request_timeout` (`:48-77`) by swapping `TimeoutSession` in as the class of the library's own `Client._session` — private and version-fragile by construction, and it raises rather than degrades. **Both workflows are capped**: `ci.yml` `web-tests` job 25 min / index step 15 min; `deploy.yml` `build` job 90 min / index step 75 min / `deploy` job 15 min. Measured worst case for one page fetch: **360.06 s** (6 attempts × 60 s). **Read the caveat below before quoting that margin.** | (no §9 row — the stale bullet claiming otherwise is superseded in the notes under this table) |
 | IMP-025 | `058acc0` | Non-vacuous test that `--save-csv` writes inside `--output-dir` and never the CWD; `readme.md` note added below the flag table | PY-29 (locked in) |
+| IMP-028 | `ba0cedc` | **`npm run build` is now `tsc --noEmit && node scripts/require-index.mjs && vite build`.** `web/scripts/require-index.mjs` refuses a production build whose `public/data/index.json` is missing, empty, malformed, has no `shards` array, or names a shard that is absent / a directory / a dangling symlink / not a string — exiting 1 with the offending path named, so `vite build` is never spawned. `npm run dev` and `npm test` are untouched, so the dev server still renders "No paper index yet" with no data. **A manifest carrying `failedCategories` / `truncatedCategories` passes deliberately** (see §3.3) | INF-16 (the remaining half) |
+| IMP-029 | `b2447c5` (with IMP-028) | **`deploy.yml` gained a step, `Assert the paper index reached the build output`, strictly between `Build the web app` and `actions/upload-pages-artifact`**, running from the workspace root (the workflow has no `defaults:` block). It `test -f`s `web/dist/data/index.json`, extracts `shards[].file` with plain `python3` (no `jq`), and `test -f`s each named shard, exiting 1 with a `::error::` line naming the missing path. It reads the shard list **from the manifest**, so a non-`papers-*` name is checked correctly. **A truncated-but-present index passes, by design.** | INF-16 (the remaining half) |
+| IMP-028b | `d57b77c` | **Both guards now have tests** — `web/scripts/__tests__/indexGuards.test.mjs`, 23 tests, registered by a third `test.include` glob (`"scripts/**/*.test.mjs"`). Also: the build guard's shard check moved from `existsSync` to `statSync(...).isFile()` wrapped in `try`/`catch` (`shardProblem`), closing a directory/FIFO hole and aligning the build gate with the deploy gate's `test -f` on **all seven** filesystem shapes; and `readme.md:115` was corrected to the real build command (now pinned by a test) | INF-16 (closed); readme build line |
+| IMP-028c | `49af325` | **The guard suite's own registration is pinned.** `web/src/__tests__/indexGuardRegistration.test.ts` shells out to the real vitest CLI (`list --filesOnly`, `list … --json`) and fails if `scripts/__tests__/indexGuards.test.mjs` is not collected, or if its two deploy-critical cases do not run. Without it, deleting the glob returns `npm test` to a silent exit-0 with zero guard coverage. Cost ~1 s. See §3.3 for why this file is not under `src/` and what it reads | (new surface — previously unowned) |
+| IMP-028d | `2ebdbd3` | **The pin's `spawnSync` is bounded** — `timeout: 30_000` plus `killSignal: "SIGKILL"` (SIGTERM is provably insufficient: a child that ignores it wedges the parent forever) and a `spawnErrorCode` passthrough, so a wedged child **fails the pin** (60 s worst case, versus a 120 s per-test budget) rather than hanging the job. Also **dropped the `include`-shape witness**, which was a false-positive generator: it rejected a widening to `**/*.test.mjs` under which all 23 guard tests demonstrably still ran. Net −1 test (293 → 292), zero real coverage lost | (supersedes part of the IMP-028c rationale) |
 | REGRESSION-1 | `7a2ed82` | Null-URL papers are no longer dropped on collection import | WEB-20 (half) |
 | REGRESSION-3 | `819a6d9` | Duplicate recovery control removed; no save-failure alert on a cold boot with nothing stored | (found by sweep 3) |
 
-**Five things in this table are still worth knowing, and none of them are defects:**
+**Six things in this table are still worth knowing, and none of them are defects:**
+- **The index guards permit a partial index, and that is IMP-204's contract, not a hole.** Neither
+  `require-index.mjs` (IMP-028) nor the `deploy.yml` assertion step (IMP-029) reads
+  `failedCategories` or `truncatedCategories`, so a category that hit `--max-per-category` — or whose
+  query failed — still ships, with the site telling the reader so on screen. CI's own smoke index
+  legitimately carries `truncatedCategories: ["cs.CV"]` and builds green. The two gates exist to stop
+  an index that is **missing, unreadable, empty, or naming shards that are not in the artifact** —
+  never to enforce completeness. A verifier who adds a completeness check would fail every
+  legitimate deploy. §3.3 has the mechanics; §3.3 also has the third `test.include` glob and why the
+  two guard suites live outside `src/` and shell out. **Residual and unverified:** the pin was only
+  ever exercised on Node 25.6.1 while CI runs Node 20 — low risk (the APIs are stable, `engines` is
+  `^18||>=20`), but not tested. Backlog: the Node-version item filed with IMP-028's verification.
 - **`arxiv`'s upper bound (IMP-033) is a floor, not a fix.** `--download-pdfs` / `--download-sources`
   are still written against helpers a future major can remove, and the Python suite cannot detect it
   (it passes on 4.0.1 too). IMP-093 owns the port.
