@@ -364,7 +364,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:**
 - **Notes:** commit pending
 ### IMP-013 — Raise `--border` to 3:1 against `--surface`
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Accessibility
 - **Type:** bug-fix
 - **Area / files:** `web/src/styles.css:7` (`--border: #e6e4dc`), `web/src/styles.css:208-216` (search input, `border: 1px solid var(--border)` at `:214`), `web/src/styles.css:297-299` (`.paper` border at `:299`)
@@ -377,10 +377,10 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** Raising `--border` also affects `.paper` and `.collection` outlines; check both screenshots before declaring success.
+- **Notes:** Raising `--border` also affects `.paper` and `.collection` outlines; check both screenshots before declaring success. | commit pending
 
 ### IMP-014 — Restore the search input's keyboard focus ring
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** Accessibility
 - **Type:** bug-fix
 - **Area / files:** `web/src/styles.css:218-221` (`.controls__search input:focus { outline: none }`) vs. `web/src/styles.css:86-90` (`:focus-visible` outline)
@@ -394,7 +394,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** same commit
 ### IMP-015 — Make a single failed shard non-fatal
 - **Status:** DONE
 - **Category:** Error handling & edge cases

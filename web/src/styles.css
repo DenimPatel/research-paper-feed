@@ -4,7 +4,7 @@
   --bg: #faf9f6;
   --surface: #ffffff;
   --surface-muted: #f1f0eb;
-  --border: #e6e4dc;
+  --border: #898783;
   --text: #1c1c1a;
   --text-muted: #666661;
   --accent: #1f6f5c;
@@ -30,7 +30,7 @@
     --bg: #14161a;
     --surface: #1c1f24;
     --surface-muted: #22262c;
-    --border: #2c3036;
+    --border: #6a727e;
     --text: #f1f1ee;
     --text-muted: #9b9b94;
     --accent: #3aa98a;
@@ -217,7 +217,6 @@ a:focus-visible {
 
 .controls__search input:focus {
   border-color: var(--accent);
-  outline: none;
 }
 
 .controls__row {
