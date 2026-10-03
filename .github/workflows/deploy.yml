@@ -85,8 +85,66 @@ jobs:
         run: npm ci
 
       - name: Build the web app
+        # Order matters and is now asserted: the index has to be in
+        # web/public/data before this runs, because `vite build` copies that
+        # directory into web/dist/data verbatim and only if it already exists.
+        # The step below is what makes that ordering load-bearing rather than
+        # merely correct today.
         working-directory: web
         run: npm run build
+
+      - name: Assert the paper index reached the build output
+        # IMP-029. The two steps above are ordered correctly today but nothing
+        # said so: if build_index.py failed softly, or wrote its output
+        # somewhere other than web/public/data, `npm run build` still exits 0
+        # and the artifact ships a site that renders "No paper index yet"
+        # forever, with every other check in this workflow green.
+        #
+        # This asserts the FILESYSTEM rather than HTTP, on purpose. A health
+        # check like `curl -o /dev/null -w %{http_code} .../data/index.json`
+        # returns 200 for any missing path, because the single-page-app
+        # fallback answers it, so it cannot distinguish a served index from an
+        # absent one. Reading the files is the only check that can.
+        #
+        # Only python3 (already on the runner) and shell builtins are used, so
+        # this adds no dependency -- notably not jq, which the runner does not
+        # guarantee -- and the whole check stays auditable in place.
+        #
+        # A truncated-but-present index passes, and should: a category that hit
+        # its --max-per-category cap records itself in index.json under
+        # "truncatedCategories" and the site says so on screen. What must never
+        # ship is an index that is missing, unreadable, empty, or that points at
+        # shards which are not in the artifact.
+        run: |
+          set -euo pipefail
+
+          data_dir="web/dist/data"
+
+          if [ ! -f "${data_dir}/index.json" ]; then
+            echo "::error::No paper index in the build output: ${data_dir}/index.json is missing." >&2
+            echo "The build copies web/public/data verbatim, so this means the index was never built or landed somewhere else. Refusing to publish." >&2
+            exit 1
+          fi
+
+          if ! shards="$(python3 -c 'import json, sys; print("\n".join(shard["file"] for shard in json.load(open(sys.argv[1]))["shards"]))' "${data_dir}/index.json")"; then
+            echo "::error::${data_dir}/index.json could not be read as an index manifest." >&2
+            exit 1
+          fi
+
+          if [ -z "${shards}" ]; then
+            echo "::error::${data_dir}/index.json names no shards, so there is no index to publish." >&2
+            exit 1
+          fi
+
+          while IFS= read -r shard; do
+            [ -n "${shard}" ] || continue
+            if [ ! -f "${data_dir}/${shard}" ]; then
+              echo "::error::Shard named by ${data_dir}/index.json is missing from the build output: ${data_dir}/${shard}" >&2
+              exit 1
+            fi
+          done <<< "${shards}"
+
+          echo "Paper index present: $(printf '%s\n' "${shards}" | wc -l | tr -d ' ') shard(s)."
 
       - uses: actions/configure-pages@v5
 

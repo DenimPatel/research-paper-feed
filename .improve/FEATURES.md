@@ -602,7 +602,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 **NEEDS-HUMAN — decision required.** Cron cadence is an operator/cost decision, not a bug fix: `0 6 * * 0` costs roughly 1/7 the Actions minutes of `0 6 * * *`, and every arXiv page costs `delay_seconds=10` (`scripts/arxiv_common.py:16`), so daily means ~5x the request volume against arXiv's terms of use. Pick weekly (fix only the comment at `deploy.yml:5` and `readme.md:122-123`) or daily (and accept the load), then implement. The minimum deliverable is the doc fix and is two lines.
 
 ### IMP-028 — Fail a production web build when the index is absent
-- **Status:** TODO
+- **Status:** DONE
 - **Category:** CI & automation
 - **Type:** tooling
 - **Area / files:** `web/vite.config.ts:4-11`, `web/package.json:8` (`"build": "tsc --noEmit && vite build"`), `web/public/data/` (gitignored, `web/.gitignore:7`)
@@ -616,9 +616,9 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Depends on:** none
 - **Priority score:** 20.0
 - **Notes:**
-
+- **Notes:** commit pending
 ### IMP-029 — Assert `web/dist/data` exists in the deploy workflow
-- **Status:** TODO
+- **Status:** IN-PROGRESS
 - **Category:** CI & automation
 - **Type:** tooling
 - **Area / files:** `.github/workflows/deploy.yml:33-48` (index build at `:33`, `npm run build` at `:48`, upload at `:52-54`)
