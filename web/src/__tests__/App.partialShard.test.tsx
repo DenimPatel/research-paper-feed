@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
 import { PAPERS_KEY } from "../lib/collections";
@@ -45,6 +45,30 @@ const MANIFEST: IndexManifest = {
   ],
   totalPapers: 2,
 };
+
+/**
+ * Every await below that follows a `render` is waiting on *data* — the manifest,
+ * then one request per shard — not on a settle. The default 1000 ms
+ * `asyncUtilTimeout` is the wrong budget for that on a loaded runner: measured
+ * under deliberate contention (three full suites plus six busy loops on eight
+ * cores) the slowest first load in this file was 1390 ms, so the default loses
+ * that race and the failure lands on whichever await lost it — the load above,
+ * not the `waitFor` that regression-sweep-5 blamed.
+ *
+ * Widening costs nothing when the wait is short, because `waitFor` polls every
+ * 50 ms and resolves on the first passing check: this is a ceiling, not a pause.
+ */
+const LOAD = { timeout: 3000 };
+
+/** `screen.findByText` with the data-load budget. */
+function findText(text: string | RegExp) {
+  return screen.findByText(text, undefined, LOAD);
+}
+
+/** `screen.findByRole("alert")` with the data-load budget. */
+function findAlert() {
+  return screen.findByRole("alert", undefined, LOAD);
+}
 
 function jsonResponse(data: unknown): Response {
   return new Response(JSON.stringify(data), {
@@ -219,6 +243,8 @@ async function saveSomething(): Promise<void> {
   fireEvent.click(screen.getByRole("button", { name: "Create collection" }));
   await screen.findByRole("heading", { name: /^Vision/ });
   fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+  // The papers are already in memory here — this is a view switch, not the
+  // load — so the default budget is the right one and `LOAD` is not.
   await screen.findByText(W09.title);
 }
 
@@ -245,7 +271,7 @@ describe("App with one unreachable shard", () => {
 
     render(<App />);
 
-    expect(await screen.findByText(W09.title)).toBeTruthy();
+    expect(await findText(W09.title)).toBeTruthy();
     expect(screen.queryByText(W08.title)).toBeNull();
 
     // A hard failure is gone — the load resolved — but the week is still
@@ -268,12 +294,12 @@ describe("App with one unreachable shard", () => {
 
     // The manifest is in and both shards are still outstanding, so no failure
     // has been observed yet. Announcing one here would be a guess.
-    await screen.findByText(/Loading papers from 2 weeks/);
+    await findText(/Loading papers from 2 weeks/);
     expect(screen.queryByRole("alert")).toBeNull();
 
     release();
 
-    expect(await screen.findByText(W09.title)).toBeTruthy();
+    expect(await findText(W09.title)).toBeTruthy();
     expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 
@@ -281,7 +307,7 @@ describe("App with one unreachable shard", () => {
     installFetch(() => "papers-2024-W08.json");
 
     render(<App />);
-    await screen.findByText(W09.title);
+    await findText(W09.title);
 
     const notice = partialNotice();
     // IMP-015 AC2 wants the missing week reportable; IMP-017 AC2 bars a file
@@ -301,7 +327,7 @@ describe("App with one unreachable shard", () => {
     installFetch(() => "papers-2024-W08.json");
 
     render(<App />);
-    await screen.findByText(W09.title);
+    await findText(W09.title);
     const first = partialNotice();
 
     // Typing re-renders the whole app without re-running the load. A remount
@@ -321,7 +347,7 @@ describe("App with one unreachable shard", () => {
     installFetch(() => (healthy ? "" : "papers-2024-W08.json"));
 
     render(<App />);
-    await screen.findByText(W09.title);
+    await findText(W09.title);
     expect(screen.queryByText(W08.title)).toBeNull();
     expect(partialNotice()).toBeTruthy();
 
@@ -331,10 +357,13 @@ describe("App with one unreachable shard", () => {
     healthy = true;
     fireEvent.click(screen.getByRole("button", { name: "30 days" }));
 
-    expect(await screen.findByText(W08.title)).toBeTruthy();
-    await waitFor(() =>
-      expect(screen.queryByRole("alert")).toBeNull(),
-    );
+    expect(await findText(W08.title)).toBeTruthy();
+    // `App.tsx:261-267` calls `setPapers` and `setFailedShards` from the same
+    // `.then`, so React batches them into one commit: the recovered paper
+    // appearing and the notice unmounting are the same render, never two
+    // frames. Asserting it directly is the same check the poll made — and the
+    // poll was already true on entry, so it bought a 1 s budget for nothing.
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("stays silent when every shard loads", async () => {
@@ -342,7 +371,7 @@ describe("App with one unreachable shard", () => {
 
     render(<App />);
 
-    expect(await screen.findByText(W09.title)).toBeTruthy();
+    expect(await findText(W09.title)).toBeTruthy();
     expect(screen.getByText(W08.title)).toBeTruthy();
     // The whole point of the notice is that it means something: on a clean load
     // there is nothing to warn about, so the feed must look complete.
@@ -357,7 +386,7 @@ describe("App with one unreachable shard", () => {
     // Rejection is unchanged, and the notice must not double-report it: one
     // alert, carrying the hard failure — not the hard failure *and* a stale
     // "some weeks are missing" banner describing a load that never resolved.
-    const alert = await screen.findByRole("alert");
+    const alert = await findAlert();
     // Reader-facing copy, not the shard's own `Error.message`: a file name and
     // an HTTP status belong in the tooltip, which is where IMP-017 kept them.
     expect(alert.textContent).toMatch(/Papers could not be loaded/);
@@ -380,7 +409,7 @@ describe("App with one unreachable shard", () => {
     installFetch(() => "papers-2024-W08.json");
 
     render(<App />);
-    await screen.findByText(W09.title);
+    await findText(W09.title);
 
     const notice = partialNotice();
     expect(notice.getAttribute("aria-label")).toBe(
@@ -407,20 +436,24 @@ describe("the shard notice alongside the storage notice", () => {
     installFetch(() => "papers-2024-W08.json");
 
     render(<App />);
-    await screen.findByText(W09.title);
+    await findText(W09.title);
     // A save the reader made, not a save the mount made: the notice has to be
     // earned before the two can be compared side by side.
     await saveSomething();
 
-    // Two alerts is the settled state, but not one `await` away: the shard
-    // notice rides the load effect's single `setPapers`/`setFailedShards` commit
-    // while the storage notice is a separate `saveFailed` state set by the save
-    // effect, so the two live regions mount on independent ticks. `saveSomething`
-    // ends on the paper title, which says nothing about either notice.
-    await waitFor(() =>
-      expect(screen.getAllByRole("alert")).toHaveLength(2),
-    );
+    // The settle point is the storage notice itself, not a count of alerts.
+    // `fireEvent` wraps every dispatch in `act()`, so the save effect that sets
+    // `saveFailed` has already committed by the time `saveSomething`'s last
+    // `findByText` resolves — measured, not assumed: the count was already 2 on
+    // entry to a poll here in every run (2–14 ms to resolve). The shard notice
+    // came in with the single `setPapers`/`setFailedShards` commit the load
+    // above already awaited. So the two live regions do not mount on independent
+    // ticks, and naming the node is both the cheaper wait and the one that says
+    // which notice went missing.
+    await findText("Collections could not be saved.");
     const alerts = screen.getAllByRole("alert");
+    // The same two alerts the poll asserted, now as a plain assertion.
+    expect(alerts).toHaveLength(2);
 
     const shardNotice = partialNotice();
     const storageNotice = alerts.find((node) => node !== shardNotice);
@@ -436,9 +469,12 @@ describe("the shard notice alongside the storage notice", () => {
     const search = screen.getByLabelText("Search papers");
     fireEvent.change(search, { target: { value: "abstract" } });
 
-    await waitFor(() =>
-      expect(screen.getAllByRole("alert")).toHaveLength(2),
-    );
+    // Neither notice is gated on the query — the storage one is rendered
+    // outside the view branch (`App.tsx:565`) and the shard one only on
+    // `failedShards.length > 0` — and `fireEvent` has flushed the re-render,
+    // so both are still the same two nodes. Asserted directly, exactly as the
+    // sibling test above asserts after the same keystroke.
+    expect(screen.getAllByRole("alert")).toHaveLength(2);
     expect(partialNotice()).toBe(shardNotice);
     expect(screen.getAllByRole("alert")).toContain(storageNotice as HTMLElement);
   });
