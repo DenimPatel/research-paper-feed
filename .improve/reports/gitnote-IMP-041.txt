@@ -1,0 +1,16 @@
+VERDICT: PASS (independent verifier, did not write the change)
+1 met - gates deploy.yml:44,:64 -> index :79 -> npm run build :126; both abort
+  the job on failure, proven by making each fail in a /tmp copy; no
+  continue-on-error, no `if:`, no `|| true`.
+2 met - PyYAML-parsed `run:` scalars byte-identical to ci.yml:19 and ci.yml:46,
+  each occurring exactly once; `typecheck` real at web/package.json:12; zero
+  "lint" occurrences in the workflow.
+3 met - concurrency cancel-in-progress:false intact; deploy job
+  timeout-minutes:15 untouched; no new caps introduced.
+Notes: (1) the spec's ci.yml:36 pointer is wrong - that line is
+`working-directory: .`; the implementer correctly used :46. (2) D-1 confirmed
+real: deleting both gates leaves Python 104/104 OK and web 292/292 green, so
+nothing pins the duplication - spec requires no pin, promoted to a new item.
+(3) The setup-node/`npm ci` reorder is necessary, not churn: typecheck exits
+127 without web/node_modules.
+Evidence: .improve/reports/verify-IMP-041.md

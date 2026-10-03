@@ -21,8 +21,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     # Job-wide backstop. The index step below may use up 75 of these, leaving
-    # 15 minutes for checkout, both dependency installs, the npm build and the
-    # Pages artifact upload -- together ~120 s on CI, so >7x headroom.
+    # 15 minutes for checkout, both dependency installs, the two quality gates,
+    # the npm build and the Pages artifact upload -- ~120 s on CI plus a few
+    # seconds per gate, so still >7x headroom.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -31,8 +32,49 @@ jobs:
         with:
           python-version: "3.x"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
       - name: Install Python dependencies
         run: pip install -r requirements.txt
+
+      - name: Run Python tests
+        # Byte-identical to ci.yml's python-tests job (ci.yml:19), including the
+        # repo-root working directory: this job sets no defaults.run, so the
+        # default applies.
+        #
+        # Duplicated on purpose. A workflow cannot depend on another workflow's
+        # job, so this run cannot see whether CI was green -- which is how a red
+        # main could publish anyway. Repeating the gate above the index build is
+        # the only thing that stops that, so this must stay ABOVE
+        # "Build the paper index".
+        run: python -m unittest discover -s tests -v
+
+      - name: Install web dependencies
+        # Moved above the gates that need it: `npm run typecheck` below runs
+        # against web/node_modules, so the install cannot stay below the index
+        # build. Nothing else moved -- this step and its `uses:` line are
+        # unchanged, only their position.
+        working-directory: web
+        run: npm ci
+
+      - name: Typecheck
+        # Byte-identical to ci.yml's web-tests job (ci.yml:46), which takes its
+        # working directory from that job's defaults.run; deploy.yml has no
+        # defaults.run, so it is spelled out here as every other web step does.
+        #
+        # `npm run typecheck` is `tsc --noEmit` and is the only static analysis
+        # either stack has: there is no lint script in web/package.json and no
+        # Python linter configured, so adding one here would name a command that
+        # does not exist rather than gate anything.
+        #
+        # Deliberately not `npm test`: the 292-test web suite belongs to CI's
+        # web-tests job, and this item is the Python suite plus typecheck.
+        working-directory: web
+        run: npm run typecheck
 
       - name: Build the paper index
         # Same rule as ci.yml's index step: the cap must be looser than the
@@ -73,16 +115,6 @@ jobs:
         # there is IMP-205's change. A healthy deploy is ~2-5 min.
         timeout-minutes: 75
         run: python scripts/build_index.py --max-per-category 30000
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install web dependencies
-        working-directory: web
-        run: npm ci
 
       - name: Build the web app
         # Order matters and is now asserted: the index has to be in
