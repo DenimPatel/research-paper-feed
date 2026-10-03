@@ -39,3 +39,4 @@
 2026-10-02T21:32:56Z | IMP-198        | DONE      | b7e23a8 (attempt 2)
 2026-10-02T22:28:18Z | IMP-204        | DONE      | c968a01 (attempt 2; closes the weekly deploy stall)
 2026-10-03T00:48:43Z | REGRESSION-5   | FIXED     | 5c964bc (last test flake + global asyncUtilTimeout; recovered scripts/build_index.py deleted by a sub-agent)
+2026-10-03T01:04:04Z | IMP-028        | DONE      | ba0cedc (also closes IMP-029)
