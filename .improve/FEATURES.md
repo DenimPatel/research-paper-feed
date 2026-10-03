@@ -618,7 +618,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Notes:**
 - **Notes:** commit pending
 ### IMP-029 — Assert `web/dist/data` exists in the deploy workflow
-- **Status:** IN-PROGRESS
+- **Status:** DONE
 - **Category:** CI & automation
 - **Type:** tooling
 - **Area / files:** `.github/workflows/deploy.yml:33-48` (index build at `:33`, `npm run build` at `:48`, upload at `:52-54`)
@@ -631,7 +631,7 @@ IMP-176 (may a malformed `published` silently drop a paper).
 - **Effort:** S    **Risk:** low
 - **Depends on:** none
 - **Priority score:** 20.0
-- **Notes:** Deliberately checks the filesystem, not HTTP — profile §4.5: a `curl -w %{http_code}` health check returns 200 from the SPA fallback and cannot catch this.
+- **Notes:** Deliberately checks the filesystem, not HTTP — profile §4.5: a `curl -w %{http_code}` health check returns 200 from the SPA fallback and cannot catch this. | commit pending; closed with IMP-028
 
 ### IMP-030 — Replace the stale README hero screenshot
 - **Status:** TODO
