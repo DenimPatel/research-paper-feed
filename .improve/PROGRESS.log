@@ -41,3 +41,4 @@
 2026-10-03T00:48:43Z | REGRESSION-5   | FIXED     | 5c964bc (last test flake + global asyncUtilTimeout; recovered scripts/build_index.py deleted by a sub-agent)
 2026-10-03T01:04:04Z | IMP-028        | DONE      | ba0cedc (also closes IMP-029)
 2026-10-03T01:33:16Z | IMP-028B       | DONE      | d57b77c (guard coverage + directory hole; IMP-028 follow-up)
+2026-10-03T02:03:24Z | IMP-028C       | DONE      | df53bf5 (pins the vitest include so guard tests cannot be silently dropped)
