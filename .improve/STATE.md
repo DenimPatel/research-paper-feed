@@ -16,23 +16,30 @@
 - **PRE-PUSH GUARD:** installed at .git/hooks/pre-push; nothing has ever been pushed
 
 ## Counters
-- Commits since start: 85
-- Items DONE: 42
+- Commits since start: 92 (9 landed this session: IMP-030, IMP-041, IMP-037, IMP-216, IMP-219, IMP-042 + 3 bookkeeping)
+- Items DONE: 44
 - Items BLOCKED: 0
 - Items NEEDS-HUMAN: 8 (product decisions)
-- Items TODO: 166 (150 ready, 16 dep-blocked)
-- Backlog total: 216
+- Items TODO: 165 (149 ready, 16 dep-blocked)
+- Backlog total: 217 (IMP-216..220 filed this session)
 - Impl attempts used on current item: 0
-- Regression sweeps run: 6 (all 6 found real problems except #6, which was CLEAN; all fixed)
+- Regression sweeps run: 7 (#1-#5 found real problems, #6 CLEAN, #7 CLEAN — all findings owned or fixed)
 - Discovery rounds: 0 (findings absorbed continuously instead)
 - Items needing a retry: IMP-007, IMP-008, IMP-009, IMP-024, IMP-031, IMP-198, IMP-204, IMP-216 (r2)
+- IMP-219 and IMP-042 needed a second pass for accuracy defects the verifier
+  found (a false absolute in readme.md, a conflated offset, an unfalsifiable
+  assertion). Both were fixed before commit, not after.
 
 ## Verified baselines (supersede the older figures in FINAL_REPORT.md)
-- Python: **118 tests** OK on 3.11.10, ~1.1s, hermetic (was 104)
+- Python: **119 tests** OK on 3.11.10, ~1.1s, hermetic (was 104)
 - Web: **20 test files / 293 tests**, typecheck clean, build clean
-  (41 modules, JS 172.50 kB, CSS 10.91 kB) (was 19/292)
-- Baselines moved again by IMP-216 (truncation classification + depth bound)
-  and IMP-037 (PaperCard render test). Verifiers must use THESE numbers.
+  (41 modules, JS ~172.5 kB, CSS 10.91 kB) (was 19/292)
+- Baselines moved three times this session: IMP-037 (render test), IMP-042
+  (dedupe test), IMP-216 (truncation classification + depth bound). Verifiers
+  must use THESE numbers. Sweep #7 confirmed all four gates with no drift.
+- **Flake-free as of sweep #7**: 11 web runs (6 ordered + 5 `--sequence.shuffle`)
+  all 20/293, 8 Python runs all OK, 1 run under a network block OK. The loop's
+  six historical order-dependent flakes have not returned.
 
 ## Verified baselines (current truth — verifiers must not blame these on new changes)
 - (superseded — see the new baselines above)
