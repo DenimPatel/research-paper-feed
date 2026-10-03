@@ -111,9 +111,16 @@ repository root):
 
 ```shell
 npm run typecheck   # tsc --noEmit
-npm test            # vitest: search, collections, index loading, components
-npm run build       # tsc --noEmit && vite build
+npm test            # vitest: search, collections, index loading, components, guards
+npm run build       # tsc --noEmit && node scripts/require-index.mjs && vite build
 ```
+
+`npm run build` fails unless the index from step 1 is already in
+`web/public/data/`: a production build has to ship the index, `vite build` copies
+`public/data` verbatim only when that directory already exists, and a `dist` with
+no `dist/data` deploys a site that reads "No paper index yet" forever. Generate
+it first. `npm run dev` and `npm test` do not check for it, so a missing index
+costs a developer nothing until they are trying to produce something deployable.
 
 ### Python CLI
 

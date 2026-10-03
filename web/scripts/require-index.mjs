@@ -21,8 +21,15 @@
 // that a config-file change cannot silently stop gating. It is outside the
 // TypeScript project (`tsconfig.json` includes `src` and `vite.config.ts` only),
 // so `npm run typecheck` is unaffected.
+//
+// Being outside `src/` used to mean outside the test suite as well, which left a
+// gate on every production deploy with nothing keeping it honest. It is covered
+// now: `web/scripts/__tests__/indexGuards.test.mjs` spawns this file against
+// fixtures in a temp directory and asserts both what it accepts and what it
+// refuses, and that file is registered in `vite.config.ts`'s `test.include`, so
+// it runs on every `npm test` in CI.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 const DEFAULT_DATA_DIR = "public/data";
@@ -87,16 +94,46 @@ function checkShardFiles(dataDir, manifest, named) {
     if (typeof name !== "string" || name === "") {
       fail([`${named} has a shard entry without a "file" name.`]);
     }
-    if (!existsSync(join(dataDir, name))) {
+    const problem = shardProblem(join(dataDir, name));
+    if (problem !== null) {
       fail([
-        `The paper index at ${named} names a shard that is not there: ${name}`,
+        `The paper index at ${named} names a shard that ${problem}: ${name}`,
         "",
-        "build_index.py writes the shards before the manifest, so a manifest",
-        "referring to a missing shard means the index was assembled by hand or",
-        "partly copied. Shipping it gives the site an index that cannot load.",
+        "build_index.py writes the shards before the manifest, and writes each",
+        "one as a JSON file, so a manifest naming anything else -- an absent",
+        "path, a directory, a dangling symlink -- means the index was assembled",
+        "by hand or partly copied. Shipping it gives the site an index that",
+        "cannot load.",
       ]);
     }
   }
+}
+
+// A shard has to be a regular file, and the reason is the deploy step: its
+// `test -f "${data_dir}/${shard}"` is the last gate before publication, so a
+// state this guard accepts but that one rejects is a state where the build is
+// green and the publish dies. `existsSync` accepts a *directory*, which made
+// the two gates disagree about a directory named `papers-2026-W40.json`.
+//
+// `statSync` follows symlinks, so this agrees with `test -f` on both: a
+// symlink to a real shard passes, and a dangling one fails. It also throws
+// rather than returning a falsy value, which is why the result is folded into a
+// phrase -- a bare `statSync(...).isFile()` would turn a dangling symlink into
+// an unhandled ENOENT and a stack trace instead of a diagnosis. Returns null
+// only when the path is a readable regular file.
+function shardProblem(shardPath) {
+  let stats;
+  try {
+    stats = statSync(shardPath);
+  } catch {
+    return "is not there";
+  }
+  if (stats.isFile()) {
+    return null;
+  }
+  return stats.isDirectory()
+    ? "is a directory, not a file"
+    : "is not a regular file";
 }
 
 function main(argv) {
