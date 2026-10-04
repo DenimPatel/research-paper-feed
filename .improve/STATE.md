@@ -112,3 +112,36 @@
 - Operating manual: `.improve/REPO_PROFILE.md` (kept current; includes a "recently fixed —
   do not re-report" section and a bug inventory).
 - Baseline screenshots: 14 files in `.improve/artifacts/baseline/` (local-only, git-excluded).
+
+## PUBLISHED — 2026-10-03 (rule #1 is void)
+
+The user explicitly instructed the loop to merge to `main`, push, and verify production. That
+overrides this loop's rule #1 ("never push"). Consequences a future session must not re-derive:
+
+- **The pre-push guard at `.git/hooks/pre-push` has been DELETED.** It is not coming back on its
+  own. If you want push protection, reinstall it deliberately — but note that `deploy.yml` runs on
+  every `push: [main]`, so a guard there blocks publication, not just version control.
+- **`main` was fast-forwarded to `c920797` and pushed**: `1c075b3..c920797`, 96 commits, no merge
+  commit, no force. `main` and `improve/auto-20261002` are the same commit.
+- **The repo is PUBLIC** (`DenimPatel/research-paper-feed`), so `.improve/` is now published —
+  including a 693 KB `FEATURES.md` and ~165 reports. That was the loop's design (state travels with
+  history), but it is now irreversible. `.improve/artifacts/` stays local via `.git/info/exclude`.
+- **Production verified, not assumed:**
+  - `CI` run `37164776618` **success** — `python-tests` and `web-tests` both green **on Node 20**,
+    which empirically resolves **IMP-213's** unmeasured risk (local is Node 25; only 25.6.1 is
+    installed, so it could not be checked locally).
+  - `Deploy to GitHub Pages` run `37164776617` **success** — every step green, including the two
+    gates IMP-041 added (`Run Python tests`, `Typecheck`) ahead of `Build the paper index`.
+  - Live bundle `index-Cn0orISQ.js` on `denimpatel.github.io/research-paper-feed/` is the **same
+    content hash as the local build**, so the deployed artefact is provably this push.
+  - **IMP-216 confirmed in production, live:** deployed `index.json` has
+    `totalPapers: 25481`, `retentionDays: 60`, **`failedCategories` absent** and
+    **`truncatedCategories: ["cs.AI"]`**. The site renders all five categories *including* `cs.AI`
+    with the honest notice "cs.AI was cut off at this index's per-category limit, so older papers
+    from it may be missing." Before this push the same condition dropped the `cs.AI` chip and told
+    readers a category it held papers for had none. Zero console errors on load.
+  - Proof screenshot: `.improve/artifacts/post-deploy-live-1280.png` (local only).
+- **Standing risk after publishing:** `cs.AI` truncates on every deploy that queries it, so the
+  notice is expected, not a new fault. If it ever appears with `failedCategories` non-empty, that
+  is a genuine regression. Note also the cron is `0 6 * * 0` (weekly) while the workflow comment
+  and readme say daily — **IMP-027**, still `NEEDS-HUMAN`, and now user-visible in production.
